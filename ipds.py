@@ -12,6 +12,11 @@ from imblearn.over_sampling import SMOTE
 from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scapy.all import rdpcap, TCP, UDP, ICMP, IP, sniff, get_if_list
+import subprocess
+import io
+import os
+from datetime import datetime, timedelta
 
 # Set page config must be first command
 st.set_page_config(page_title="ML-Based IDPS", page_icon="🛡️", layout="wide")
@@ -155,6 +160,247 @@ def predict_traffic(input_data, threshold=0.5):
         st.error(f"Error during prediction: {str(e)}")
         return None, None
 
+def process_packet(packet, connection_tracker, time_window=10):
+    """Process a single packet and extract NSL-KDD-like features."""
+    features = {col: 0 for col in nsl_kdd_columns if col != 'class'}
+    
+    if IP not in packet:
+        return None
+    
+    # Basic features
+    features['protocol_type'] = packet[IP].proto
+    if packet[IP].proto == 6:
+        features['protocol_type'] = 'tcp'
+        if TCP in packet:
+            features['src_bytes'] = len(packet[TCP].payload)
+            features['dst_bytes'] = 0  # Approximation, needs reverse traffic
+            features['service'] = str(packet[TCP].dport)
+            features['flag'] = 'SF'  # Simplified, based on TCP flags
+    elif packet[IP].proto == 17:
+        features['protocol_type'] = 'udp'
+        if UDP in packet:
+            features['src_bytes'] = len(packet[UDP].payload)
+            features['dst_bytes'] = 0
+            features['service'] = str(packet[UDP].dport)
+            features['flag'] = 'SF'
+    elif packet[IP].proto == 1:
+        features['protocol_type'] = 'icmp'
+        features['src_bytes'] = len(packet[ICMP])
+        features['dst_bytes'] = 0
+        features['service'] = 'other'
+        features['flag'] = 'SF'
+    
+    # Map service to common NSL-KDD services
+    service_map = {
+        '80': 'http', '443': 'http', '21': 'ftp', '22': 'ssh', '23': 'telnet',
+        '25': 'smtp', '53': 'dns', '110': 'pop3', '143': 'imap'
+    }
+    features['service'] = service_map.get(features['service'], 'other')
+    
+    # Connection-based features (approximated)
+    src_ip = packet[IP].src
+    dst_ip = packet[IP].dst
+    dst_port = packet[TCP].dport if TCP in packet else (packet[UDP].dport if UDP in packet else 0)
+    timestamp = packet.time
+    
+    # Track connections in a time window
+    connection_key = (src_ip, dst_ip, dst_port, features['protocol_type'])
+    current_time = datetime.fromtimestamp(timestamp)
+    connection_tracker[connection_key] = [
+        pkt for pkt in connection_tracker.get(connection_key, [])
+        if datetime.fromtimestamp(pkt['time']) > current_time - timedelta(seconds=time_window)
+    ]
+    connection_tracker[connection_key].append({'time': timestamp, 'packet': packet})
+    
+    # Traffic features
+    features['count'] = len(connection_tracker[connection_key])
+    features['srv_count'] = len([
+        pkt for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
+    ])
+    features['same_srv_rate'] = features['count'] / max(1, features['srv_count'])
+    features['diff_srv_rate'] = 1 - features['same_srv_rate']
+    
+    # Host-based features (approximated)
+    features['dst_host_count'] = len(set(
+        pkt['packet'][IP].src for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
+    ))
+    features['dst_host_srv_count'] = features['srv_count']
+    features['dst_host_same_srv_rate'] = features['same_srv_rate']
+    
+    return features
+
+def show_live_monitoring():
+    global model, scaler, label_encoders, le_class
+    
+    st.title("Live Network Monitoring")
+    
+    if model is None:
+        st.error("No trained model found. Please train a model first.")
+        return
+    
+    st.markdown("""
+    ### Live Network Traffic Monitoring
+    Monitor real-time network traffic or upload a PCAP file for analysis.
+    The system will analyze packets and flag potential intrusions.
+    """)
+    
+    # Connection tracker for aggregating features
+    if 'connection_tracker' not in st.session_state:
+        st.session_state.connection_tracker = {}
+    
+    # Monitoring options
+    monitoring_option = st.radio("Select monitoring method", ["Live Capture (Scapy)", "Upload PCAP File"])
+    
+    if monitoring_option == "Live Capture (Scapy)":
+        st.warning("Live capture requires Npcap installed and administrative privileges. Ensure Npcap is installed.")
+        
+        # List available interfaces
+        try:
+            interfaces = get_if_list()
+            if not interfaces:
+                st.error("No network interfaces found. Ensure Npcap is installed and you have network connectivity.")
+                return
+        except Exception as e:
+            st.error(f"Error listing interfaces: {str(e)}")
+            return
+        
+        interface = st.selectbox("Network Interface", interfaces, help="Select the active network interface (e.g., Wi-Fi or Ethernet).")
+        num_packets = st.slider("Number of packets to capture", 10, 1000, 100)
+        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
+        
+        if st.button("Start Live Capture"):
+            with st.spinner("Capturing network traffic..."):
+                try:
+                    # Capture packets using Scapy's sniff
+                    packets = sniff(iface=interface, count=num_packets, timeout=30)
+                    results = []
+                    intrusion_count = 0
+                    
+                    status_placeholder = st.empty()
+                    log_placeholder = st.empty()
+                    
+                    for i, packet in enumerate(packets):
+                        features = process_packet(packet, st.session_state.connection_tracker)
+                        if features is None:
+                            st.write(f"Packet {i+1}: Skipping non-IP packet")
+                            continue
+                        
+                        input_df = pd.DataFrame([features])
+                        prediction, confidence = predict_traffic(input_df, threshold)
+                        
+                        if prediction is None or confidence is None:
+                            continue
+                        
+                        is_intrusion = prediction != 'normal'
+                        if is_intrusion:
+                            intrusion_count += 1
+                            # Basic IPS: Block source IP using Windows Firewall
+                            src_ip = packet[IP].src
+                            subprocess.run(
+                                f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
+                                shell=True
+                            )
+                        
+                        results.append(is_intrusion)
+                        
+                        # Update status
+                        status_placeholder.markdown(f"""
+                        **Processing packet {i+1}/{len(packets)}**  
+                        Last detection: {'Intrusion' if is_intrusion else 'Normal'}  
+                        Total intrusions detected: {intrusion_count}
+                        """)
+                        
+                        # Update log
+                        if is_intrusion:
+                            log_placeholder.markdown(f"""
+                            **Packet {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
+                            Source IP: {packet[IP].src}
+                            """, unsafe_allow_html=True)
+                        else:
+                            log_placeholder.markdown(f"""
+                            **Packet {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
+                            Source IP: {packet[IP].src}
+                            """, unsafe_allow_html=True)
+                        
+                        time.sleep(0.1)  # Simulate real-time effect
+                    
+                    st.success(f"Capture complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
+                
+                except Exception as e:
+                    st.error(f"Error during live capture: {str(e)}")
+                    st.info("Ensure you have administrative privileges and Npcap is correctly installed.")
+    
+    else:  # Upload PCAP File
+        pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
+        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
+        
+        if pcap_file is not None and st.button("Analyze PCAP"):
+            with st.spinner("Analyzing PCAP file..."):
+                try:
+                    # Save uploaded file temporarily
+                    with open("temp_upload.pcap", "wb") as f:
+                        f.write(pcap_file.read())
+                    
+                    # Read and process PCAP
+                    packets = rdpcap("temp_upload.pcap")
+                    results = []
+                    intrusion_count = 0
+                    
+                    status_placeholder = st.empty()
+                    log_placeholder = st.empty()
+                    
+                    for i, packet in enumerate(packets):
+                        features = process_packet(packet, st.session_state.connection_tracker)
+                        if features is None:
+                            st.write(f"Packet {i+1}: Skipping non-IP packet")
+                            continue
+                        
+                        input_df = pd.DataFrame([features])
+                        prediction, confidence = predict_traffic(input_df, threshold)
+                        
+                        if prediction is None or confidence is None:
+                            continue
+                        
+                        is_intrusion = prediction != 'normal'
+                        if is_intrusion:
+                            intrusion_count += 1
+                            # Basic IPS: Block source IP using Windows Firewall
+                            src_ip = packet[IP].src
+                            subprocess.run(
+                                f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
+                                shell=True
+                            )
+                        
+                        results.append(is_intrusion)
+                        
+                        # Update status
+                        status_placeholder.markdown(f"""
+                        **Processing packet {i+1}/{len(packets)}**  
+                        Last detection: {'Intrusion' if is_intrusion else 'Normal'}  
+                        Total intrusions detected: {intrusion_count}
+                        """)
+                        
+                        # Update log
+                        if is_intrusion:
+                            log_placeholder.markdown(f"""
+                            **Packet {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
+                            Source IP: {packet[IP].src}
+                            """, unsafe_allow_html=True)
+                        else:
+                            log_placeholder.markdown(f"""
+                            **Packet {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
+                            Source IP: {packet[IP].src}
+                            """, unsafe_allow_html=True)
+                        
+                        time.sleep(0.1)  # Simulate real-time effect
+                    
+                    # Clean up
+                    os.remove("temp_upload.pcap")
+                    st.success(f"Analysis complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
+                
+                except Exception as e:
+                    st.error(f"Error during PCAP analysis: {str(e)}")
+
 def show_home():
     global model
     
@@ -167,6 +413,7 @@ def show_home():
     - Train a new intrusion detection model
     - Test the model with sample data
     - Perform real-time intrusion detection
+    - Monitor live network traffic
     - Visualize model performance
     
     ### Navigation:
@@ -593,6 +840,7 @@ def show_about():
     - Uses XGBoost classifier for intrusion detection
     - Trained on the NSL-KDD dataset
     - Provides real-time monitoring capabilities
+    - Monitors live network traffic using Scapy
     - Offers configurable detection threshold
     
     **Technical Details:**
@@ -601,6 +849,7 @@ def show_about():
     - Scikit-learn for preprocessing and evaluation
     - XGBoost for the machine learning model
     - Imbalanced-learn for handling class imbalance
+    - Scapy for packet processing
     
     **Dataset Information:**
     The NSL-KDD dataset is a refined version of the KDD Cup 99 dataset, containing network connection records
@@ -618,6 +867,7 @@ def show_about():
     1. **Train Model**: Upload training data and train a new model
     2. **Test Model**: Evaluate the model with test data or manual input
     3. **Real-time Detection**: Simulate real-time network monitoring
+    4. **Live Network Monitoring**: Capture and analyze live traffic or upload PCAP files
     """)
     
     st.subheader("Disclaimer")
@@ -630,7 +880,7 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     app_mode = st.sidebar.selectbox("Choose a page", 
-                                   ["Home", "Train Model", "Test Model", "Real-time Detection", "About"])
+                                   ["Home", "Train Model", "Test Model", "Real-time Detection", "Live Network Monitoring", "About"])
     
     if app_mode == "Home":
         show_home()
@@ -640,6 +890,8 @@ def main():
         show_test_model()
     elif app_mode == "Real-time Detection":
         show_realtime_detection()
+    elif app_mode == "Live Network Monitoring":
+        show_live_monitoring()
     elif app_mode == "About":
         show_about()
 
