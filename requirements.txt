@@ -1,9 +1,11 @@
-streamlit
-joblib
-xgboost
-scikit-learn
 pandas
 numpy
-imbalanced-learn
+streamlit
+joblib
+scikit-learn
+xgboost
+imblearn
+pillow
 matplotlib
 seaborn
+scapy
