@@ -632,7 +632,7 @@ def show_retrain_model():
                 accuracy = accuracy_score(y_test, y_pred)
                 unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                 target_names = [le_class.classes_[i] for i in unique_labels]
-                report = classification_report(y_test, y_pred, labels=unique_labels, target_names thrust_names)
+                report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
                 
                 # Save model and objects
                 joblib.dump(model, 'idps_model.pkl')
