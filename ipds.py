@@ -12,7 +12,6 @@ from imblearn.over_sampling import SMOTE
 from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scapy.all import rdpcap, TCP, UDP, ICMP, IP
 import os
 from datetime import datetime, timedelta
 import io
@@ -21,6 +20,13 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
+
+# Try importing Scapy
+try:
+    from scapy.all import rdpcap, TCP, UDP, ICMP, IP
+    SCAPY_AVAILABLE = True
+except ImportError:
+    SCAPY_AVAILABLE = False
 
 # Set page config
 st.set_page_config(page_title="ML-Based IDPS", page_icon="🛡️", layout="wide")
@@ -311,6 +317,11 @@ def show_pcap_analysis():
         st.error("No trained model found. Please train a model first.")
         return
     
+    if not SCAPY_AVAILABLE:
+        st.error("Scapy is not installed. Please install it with 'pip install scapy' and ensure libpcap is available ('sudo apt-get install libpcap-dev' on Linux).")
+        st.info("Alternatively, use CSV-based analysis by modifying the application to remove Scapy dependency.")
+        return
+    
     st.markdown("""
     ### PCAP File Analysis
     Upload a PCAP file (captured with Wireshark or tcpdump) to analyze network traffic for potential intrusions.
@@ -546,7 +557,7 @@ def show_retrain_model():
     st.title("Retrain Model with Feedback")
     
     if model is None:
-        st.error("No trained model found. Please train a model first.")
+        st.error("No trained model found.セミ Please train a model first.")
         return
     
     st.markdown("""
@@ -621,7 +632,7 @@ def show_retrain_model():
                 accuracy = accuracy_score(y_test, y_pred)
                 unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                 target_names = [le_class.classes_[i] for i in unique_labels]
-                report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
+                report = classification_report(y_test, y_pred, labels=unique_labels, target_names thrust_names)
                 
                 # Save model and objects
                 joblib.dump(model, 'idps_model.pkl')
@@ -1074,6 +1085,7 @@ def show_about():
     - Scikit-learn for preprocessing and evaluation
     - XGBoost for the machine learning model
     - Imbalanced-learn for handling class imbalance
+    - Scapy for PCAP processing
     - ReportLab for PDF generation
     
     **Dataset Information:**
