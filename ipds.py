@@ -13,12 +13,14 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scapy.all import rdpcap, TCP, UDP, ICMP, IP, sniff, get_if_list
+from scapy.arch.windows import IFACES
 import subprocess
 import io
 import os
 from datetime import datetime, timedelta
 import platform
 import ctypes
+import sys
 
 # Set page config must be first command
 st.set_page_config(page_title="ML-Based IDPS", page_icon="🛡️", layout="wide")
@@ -64,22 +66,58 @@ def load_model():
 
 model, scaler, label_encoders, le_class = load_model()
 
+def run_as_admin():
+    """Relaunch the script as Administrator if not already elevated."""
+    if platform.system() == "Windows" and not ctypes.windll.shell32.IsUserAnAdmin():
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit()
+
 def check_admin_privileges():
-    """Check if the process is running with administrative privileges on Windows."""
-    if platform.system() == "Windows":
-        try:
-            return ctypes.windll.shell32.IsUserAnAdmin() != 0
-        except:
-            return False
-    return True  # Non-Windows platforms handled differently
+    """Check if the process is running with administrative privileges."""
+    return ctypes.windll.shell32.IsUserAnAdmin() != 0
 
 def check_npcap_installed():
-    """Check if Npcap is installed by attempting to list interfaces."""
+    """Check if Npcap is installed and running."""
+    if platform.system() == "Windows":
+        try:
+            # Check Npcap service
+            result = subprocess.run("sc query npcap", capture_output=True, text=True, shell=True)
+            if "RUNNING" not in result.stdout:
+                return False, "Npcap service not running. Run 'net start npcap' or reinstall Npcap."
+            # Check if Scapy can list interfaces
+            interfaces = get_if_list()
+            if not interfaces:
+                return False, "No interfaces detected. Ensure Npcap is installed in WinPcap API-compatible mode."
+            return True, "Npcap is installed and running."
+        except Exception as e:
+            return False, f"Npcap check failed: {str(e)}. Reinstall Npcap from https://npcap.com."
+    return True, "Non-Windows system, assuming Npcap not required."
+
+def get_friendly_interfaces():
+    """Map Scapy interface GUIDs to friendly names, filter active interfaces."""
+    interfaces = get_if_list()
+    friendly_interfaces = []
     try:
-        interfaces = get_if_list()
-        return len(interfaces) > 0
-    except:
-        return False
+        # Get adapter status via netsh
+        result = subprocess.run("netsh interface show interface", capture_output=True, text=True, shell=True)
+        active_interfaces = [line.split()[-1] for line in result.stdout.splitlines() if "Connected" in line]
+        
+        for iface in interfaces:
+            try:
+                iface_info = IFACES.dev_from_name(iface)
+                friendly_name = iface_info.description if hasattr(iface_info, 'description') else iface
+                # Check if interface is active (has IP address)
+                ipconfig = subprocess.run("ipconfig", capture_output=True, text=True, shell=True)
+                is_active = any(friendly_name in line for line in ipconfig.stdout.splitlines() if "IPv4 Address" in line)
+                if is_active or any(friendly_name.lower().startswith(name.lower()) for name in active_interfaces):
+                    friendly_interfaces.append((iface, friendly_name))
+            except:
+                friendly_interfaces.append((iface, iface))
+    except Exception as e:
+        st.warning(f"Could not filter active interfaces: {str(e)}. Showing all interfaces.")
+        for iface in interfaces:
+            friendly_interfaces.append((iface, iface))
+    return friendly_interfaces
 
 def preprocess_data(df, label_encoders, le_class, is_train=True):
     df = df.copy()
@@ -269,32 +307,43 @@ def show_live_monitoring():
     
     # Check prerequisites
     if not check_admin_privileges():
-        st.error("Administrative privileges required. Run Command Prompt as Administrator and execute 'streamlit run ipds.py'.")
+        st.error("Administrative privileges required. This script will attempt to relaunch as Administrator.")
+        st.info("If prompted, click 'Yes' in the User Account Control (UAC) dialog. Alternatively, run manually: Right-click Command Prompt, select 'Run as administrator', and execute 'streamlit run ipds.py'.")
+        if st.button("Relaunch as Administrator"):
+            run_as_admin()
         return
     
-    if not check_npcap_installed():
-        st.error("Npcap not detected. Install Npcap from https://npcap.com and ensure it's running ('sc query npcap').")
+    npcap_status, npcap_message = check_npcap_installed()
+    if not npcap_status:
+        st.error(f"Npcap error: {npcap_message}")
+        st.info("Install Npcap from https://npcap.com (select WinPcap API-compatible mode). Verify service: 'sc query npcap'. Restart: 'net stop npcap && net start npcap'.")
         return
+    
+    st.success("Npcap is installed and running.")
     
     # Monitoring options
     monitoring_options = ["Live Capture (Scapy)", "Upload PCAP File"]
     monitoring_option = st.radio("Select monitoring method", monitoring_options)
     
     if monitoring_option == "Live Capture (Scapy)":
-        st.info("Ensure Npcap is installed and the correct network interface is selected.")
+        st.info("Select the active network interface (e.g., Wi-Fi or Ethernet). Ensure network traffic is flowing (e.g., run 'ping 8.8.8.8').")
         
-        # List available interfaces
+        # List available interfaces with friendly names
         try:
-            interfaces = get_if_list()
-            if not interfaces:
-                st.error("No network interfaces found. Ensure Npcap is installed and network connectivity is active.")
+            friendly_interfaces = get_friendly_interfaces()
+            if not friendly_interfaces:
+                st.error("No active network interfaces found. Check network adapters ('ipconfig') and ensure Npcap is installed.")
+                st.info("Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
                 return
+            interface_options = [f"{friendly_name} ({iface})" for iface, friendly_name in friendly_interfaces]
+            interface_selection = st.selectbox("Network Interface", interface_options, help="Select the active network interface with an IP address.")
+            # Extract the GUID from selection
+            selected_interface = next(iface for iface, _ in friendly_interfaces if iface in interface_selection)
         except Exception as e:
             st.error(f"Error listing interfaces: {str(e)}")
-            st.info("Check Npcap installation and run as Administrator.")
+            st.info("Verify Npcap ('sc query npcap'), adapters ('netsh interface show interface'), and run as Administrator.")
             return
         
-        interface = st.selectbox("Network Interface", interfaces, help="Select the active network interface (e.g., Ethernet or Wi-Fi).")
         num_packets = st.slider("Number of packets to capture", 10, 1000, 100)
         threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
         
@@ -302,7 +351,11 @@ def show_live_monitoring():
             with st.spinner("Capturing network traffic..."):
                 try:
                     # Capture packets using Scapy's sniff
-                    packets = sniff(iface=interface, count=num_packets, timeout=30)
+                    packets = sniff(iface=selected_interface, count=num_packets, timeout=60)
+                    if not packets:
+                        st.warning("No packets captured. Generate traffic (e.g., 'ping 8.8.8.8' or 'curl http://example.com') and verify interface ('ipconfig').")
+                        st.info("Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
+                    
                     results = []
                     intrusion_count = 0
                     
@@ -326,10 +379,13 @@ def show_live_monitoring():
                             intrusion_count += 1
                             # Basic IPS: Block source IP using Windows Firewall
                             src_ip = packet[IP].src
-                            subprocess.run(
-                                f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                shell=True, check=True
-                            )
+                            try:
+                                subprocess.run(
+                                    f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
+                                    shell=True, check=True
+                                )
+                            except subprocess.CalledProcessError as e:
+                                st.warning(f"Failed to add firewall rule for {src_ip}: {e}")
                         
                         results.append(is_intrusion)
                         
@@ -356,11 +412,20 @@ def show_live_monitoring():
                     
                     st.success(f"Capture complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
                 
+                except PermissionError as e:
+                    st.error(f"Permission error during live capture: {str(e)}")
+                    st.info("Ensure you are running as Administrator. Relaunch via the button above or manually: Right-click Command Prompt, select 'Run as administrator', and execute 'streamlit run ipds.py'.")
                 except Exception as e:
                     st.error(f"Error during live capture: {str(e)}")
-                    st.info("Ensure you are running as Administrator, Npcap is installed, and the interface is correct.")
+                    st.info("Possible causes:\n"
+                            "- Incorrect interface: Verify with 'ipconfig' and select the active adapter.\n"
+                            "- Npcap issue: Reinstall from https://npcap.com (WinPcap API-compatible mode).\n"
+                            "- Antivirus/Firewall: Disable temporarily or add exceptions for python.exe and streamlit.exe.\n"
+                            "- No traffic: Generate traffic with 'ping 8.8.8.8' or 'curl http://example.com'.\n"
+                            "Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
     
     else:  # Upload PCAP File
+        st.info("Upload a PCAP file captured with Wireshark or another tool if live capture is not working.")
         pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
         threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
         
@@ -397,10 +462,13 @@ def show_live_monitoring():
                             intrusion_count += 1
                             # Basic IPS: Block source IP
                             src_ip = packet[IP].src
-                            subprocess.run(
-                                f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                shell=True, check=True
-                            )
+                            try:
+                                subprocess.run(
+                                    f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
+                                    shell=True, check=True
+                                )
+                            except subprocess.CalledProcessError as e:
+                                st.warning(f"Failed to add firewall rule for {src_ip}: {e}")
                         
                         results.append(is_intrusion)
                         
@@ -929,4 +997,5 @@ def main():
         show_about()
 
 if __name__ == "__main__":
+    run_as_admin()
     main()
