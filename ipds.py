@@ -17,6 +17,8 @@ import subprocess
 import io
 import os
 from datetime import datetime, timedelta
+import platform
+import ctypes
 
 # Set page config must be first command
 st.set_page_config(page_title="ML-Based IDPS", page_icon="🛡️", layout="wide")
@@ -61,6 +63,23 @@ def load_model():
         return None, None, None, None
 
 model, scaler, label_encoders, le_class = load_model()
+
+def check_admin_privileges():
+    """Check if the process is running with administrative privileges on Windows."""
+    if platform.system() == "Windows":
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except:
+            return False
+    return True  # Non-Windows platforms handled differently
+
+def check_npcap_installed():
+    """Check if Npcap is installed by attempting to list interfaces."""
+    try:
+        interfaces = get_if_list()
+        return len(interfaces) > 0
+    except:
+        return False
 
 def preprocess_data(df, label_encoders, le_class, is_train=True):
     df = df.copy()
@@ -248,23 +267,34 @@ def show_live_monitoring():
     if 'connection_tracker' not in st.session_state:
         st.session_state.connection_tracker = {}
     
+    # Check prerequisites
+    if not check_admin_privileges():
+        st.error("Administrative privileges required. Run Command Prompt as Administrator and execute 'streamlit run ipds.py'.")
+        return
+    
+    if not check_npcap_installed():
+        st.error("Npcap not detected. Install Npcap from https://npcap.com and ensure it's running ('sc query npcap').")
+        return
+    
     # Monitoring options
-    monitoring_option = st.radio("Select monitoring method", ["Live Capture (Scapy)", "Upload PCAP File"])
+    monitoring_options = ["Live Capture (Scapy)", "Upload PCAP File"]
+    monitoring_option = st.radio("Select monitoring method", monitoring_options)
     
     if monitoring_option == "Live Capture (Scapy)":
-        st.warning("Live capture requires Npcap installed and administrative privileges. Ensure Npcap is installed.")
+        st.info("Ensure Npcap is installed and the correct network interface is selected.")
         
         # List available interfaces
         try:
             interfaces = get_if_list()
             if not interfaces:
-                st.error("No network interfaces found. Ensure Npcap is installed and you have network connectivity.")
+                st.error("No network interfaces found. Ensure Npcap is installed and network connectivity is active.")
                 return
         except Exception as e:
             st.error(f"Error listing interfaces: {str(e)}")
+            st.info("Check Npcap installation and run as Administrator.")
             return
         
-        interface = st.selectbox("Network Interface", interfaces, help="Select the active network interface (e.g., Wi-Fi or Ethernet).")
+        interface = st.selectbox("Network Interface", interfaces, help="Select the active network interface (e.g., Ethernet or Wi-Fi).")
         num_packets = st.slider("Number of packets to capture", 10, 1000, 100)
         threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
         
@@ -298,7 +328,7 @@ def show_live_monitoring():
                             src_ip = packet[IP].src
                             subprocess.run(
                                 f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                shell=True
+                                shell=True, check=True
                             )
                         
                         results.append(is_intrusion)
@@ -328,7 +358,7 @@ def show_live_monitoring():
                 
                 except Exception as e:
                     st.error(f"Error during live capture: {str(e)}")
-                    st.info("Ensure you have administrative privileges and Npcap is correctly installed.")
+                    st.info("Ensure you are running as Administrator, Npcap is installed, and the interface is correct.")
     
     else:  # Upload PCAP File
         pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
@@ -338,11 +368,12 @@ def show_live_monitoring():
             with st.spinner("Analyzing PCAP file..."):
                 try:
                     # Save uploaded file temporarily
-                    with open("temp_upload.pcap", "wb") as f:
+                    temp_pcap = "temp_upload.pcap"
+                    with open(temp_pcap, "wb") as f:
                         f.write(pcap_file.read())
                     
                     # Read and process PCAP
-                    packets = rdpcap("temp_upload.pcap")
+                    packets = rdpcap(temp_pcap)
                     results = []
                     intrusion_count = 0
                     
@@ -364,11 +395,11 @@ def show_live_monitoring():
                         is_intrusion = prediction != 'normal'
                         if is_intrusion:
                             intrusion_count += 1
-                            # Basic IPS: Block source IP using Windows Firewall
+                            # Basic IPS: Block source IP
                             src_ip = packet[IP].src
                             subprocess.run(
                                 f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                shell=True
+                                shell=True, check=True
                             )
                         
                         results.append(is_intrusion)
@@ -395,11 +426,13 @@ def show_live_monitoring():
                         time.sleep(0.1)  # Simulate real-time effect
                     
                     # Clean up
-                    os.remove("temp_upload.pcap")
+                    os.remove(temp_pcap)
                     st.success(f"Analysis complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
                 
                 except Exception as e:
                     st.error(f"Error during PCAP analysis: {str(e)}")
+                    if os.path.exists(temp_pcap):
+                        os.remove(temp_pcap)
 
 def show_home():
     global model
