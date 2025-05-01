@@ -12,17 +12,17 @@ from imblearn.over_sampling import SMOTE
 from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scapy.all import rdpcap, TCP, UDP, ICMP, IP, sniff, get_if_list
-from scapy.arch.windows import IFACES
-import subprocess
-import io
+from scapy.all import rdpcap, TCP, UDP, ICMP, IP
 import os
 from datetime import datetime, timedelta
-import platform
-import ctypes
-import sys
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
 
-# Set page config must be first command
+# Set page config
 st.set_page_config(page_title="ML-Based IDPS", page_icon="🛡️", layout="wide")
 
 # NSL-KDD columns
@@ -50,6 +50,14 @@ scaler = None
 label_encoders = None
 le_class = None
 
+# Initialize session state for history and alerts
+if 'analysis_history' not in st.session_state:
+    st.session_state.analysis_history = []
+if 'feedback_data' not in st.session_state:
+    st.session_state.feedback_data = []
+if 'alert_log' not in st.session_state:
+    st.session_state.alert_log = []
+
 # Load model and preprocessing objects
 @st.cache_resource
 def load_model():
@@ -65,59 +73,6 @@ def load_model():
         return None, None, None, None
 
 model, scaler, label_encoders, le_class = load_model()
-
-def run_as_admin():
-    """Relaunch the script as Administrator if not already elevated."""
-    if platform.system() == "Windows" and not ctypes.windll.shell32.IsUserAnAdmin():
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        sys.exit()
-
-def check_admin_privileges():
-    """Check if the process is running with administrative privileges."""
-    return ctypes.windll.shell32.IsUserAnAdmin() != 0
-
-def check_npcap_installed():
-    """Check if Npcap is installed and running."""
-    if platform.system() == "Windows":
-        try:
-            # Check Npcap service
-            result = subprocess.run("sc query npcap", capture_output=True, text=True, shell=True)
-            if "RUNNING" not in result.stdout:
-                return False, "Npcap service not running. Run 'net start npcap' or reinstall Npcap."
-            # Check if Scapy can list interfaces
-            interfaces = get_if_list()
-            if not interfaces:
-                return False, "No interfaces detected. Ensure Npcap is installed in WinPcap API-compatible mode."
-            return True, "Npcap is installed and running."
-        except Exception as e:
-            return False, f"Npcap check failed: {str(e)}. Reinstall Npcap from https://npcap.com."
-    return True, "Non-Windows system, assuming Npcap not required."
-
-def get_friendly_interfaces():
-    """Map Scapy interface GUIDs to friendly names, filter active interfaces."""
-    interfaces = get_if_list()
-    friendly_interfaces = []
-    try:
-        # Get adapter status via netsh
-        result = subprocess.run("netsh interface show interface", capture_output=True, text=True, shell=True)
-        active_interfaces = [line.split()[-1] for line in result.stdout.splitlines() if "Connected" in line]
-        
-        for iface in interfaces:
-            try:
-                iface_info = IFACES.dev_from_name(iface)
-                friendly_name = iface_info.description if hasattr(iface_info, 'description') else iface
-                # Check if interface is active (has IP address)
-                ipconfig = subprocess.run("ipconfig", capture_output=True, text=True, shell=True)
-                is_active = any(friendly_name in line for line in ipconfig.stdout.splitlines() if "IPv4 Address" in line)
-                if is_active or any(friendly_name.lower().startswith(name.lower()) for name in active_interfaces):
-                    friendly_interfaces.append((iface, friendly_name))
-            except:
-                friendly_interfaces.append((iface, iface))
-    except Exception as e:
-        st.warning(f"Could not filter active interfaces: {str(e)}. Showing all interfaces.")
-        for iface in interfaces:
-            friendly_interfaces.append((iface, iface))
-    return friendly_interfaces
 
 def preprocess_data(df, label_encoders, le_class, is_train=True):
     df = df.copy()
@@ -192,7 +147,7 @@ def predict_traffic(input_data, threshold=0.5):
         # Drop low importance features
         input_data = input_data.drop(columns=low_importance_features, errors='ignore')
         
-        # Define expected features (based on training data after preprocessing)
+        # Define expected features
         expected_features = [col for col in nsl_kdd_columns if col not in low_importance_features + ['class']]
         
         # Ensure all expected features are present
@@ -200,7 +155,7 @@ def predict_traffic(input_data, threshold=0.5):
             if col not in input_data.columns:
                 input_data[col] = 0
         
-        # Reorder columns to match expected features
+        # Reorder columns
         input_data = input_data[expected_features]
         
         # Scale features
@@ -230,9 +185,9 @@ def process_packet(packet, connection_tracker, time_window=10):
         features['protocol_type'] = 'tcp'
         if TCP in packet:
             features['src_bytes'] = len(packet[TCP].payload)
-            features['dst_bytes'] = 0  # Approximation, needs reverse traffic
+            features['dst_bytes'] = 0
             features['service'] = str(packet[TCP].dport)
-            features['flag'] = 'SF'  # Simplified, based on TCP flags
+            features['flag'] = 'SF'
     elif packet[IP].proto == 17:
         features['protocol_type'] = 'udp'
         if UDP in packet:
@@ -247,20 +202,19 @@ def process_packet(packet, connection_tracker, time_window=10):
         features['service'] = 'other'
         features['flag'] = 'SF'
     
-    # Map service to common NSL-KDD services
+    # Map service
     service_map = {
         '80': 'http', '443': 'http', '21': 'ftp', '22': 'ssh', '23': 'telnet',
         '25': 'smtp', '53': 'dns', '110': 'pop3', '143': 'imap'
     }
     features['service'] = service_map.get(features['service'], 'other')
     
-    # Connection-based features (approximated)
+    # Connection-based features
     src_ip = packet[IP].src
     dst_ip = packet[IP].dst
     dst_port = packet[TCP].dport if TCP in packet else (packet[UDP].dport if UDP in packet else 0)
     timestamp = packet.time
     
-    # Track connections in a time window
     connection_key = (src_ip, dst_ip, dst_port, features['protocol_type'])
     current_time = datetime.fromtimestamp(timestamp)
     connection_tracker[connection_key] = [
@@ -269,7 +223,6 @@ def process_packet(packet, connection_tracker, time_window=10):
     ]
     connection_tracker[connection_key].append({'time': timestamp, 'packet': packet})
     
-    # Traffic features
     features['count'] = len(connection_tracker[connection_key])
     features['srv_count'] = len([
         pkt for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
@@ -277,7 +230,6 @@ def process_packet(packet, connection_tracker, time_window=10):
     features['same_srv_rate'] = features['count'] / max(1, features['srv_count'])
     features['diff_srv_rate'] = 1 - features['same_srv_rate']
     
-    # Host-based features (approximated)
     features['dst_host_count'] = len(set(
         pkt['packet'][IP].src for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
     ))
@@ -286,221 +238,406 @@ def process_packet(packet, connection_tracker, time_window=10):
     
     return features
 
-def show_live_monitoring():
+def generate_pdf_report(analysis_results, intrusion_count, total_packets, filename, temp_dir="temp"):
+    """Generate a PDF report for PCAP analysis."""
+    os.makedirs(temp_dir, exist_ok=True)
+    pdf_path = os.path.join(temp_dir, f"IDPS_Report_{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("IDPS Analysis Report", styles['Title']))
+    elements.append(Spacer(1, 12))
+    
+    # Summary
+    summary_text = f"""
+    Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
+    PCAP File: {filename}<br/>
+    Total Packets Analyzed: {total_packets}<br/>
+    Intrusions Detected: {intrusion_count}<br/>
+    Normal Traffic: {total_packets - intrusion_count}
+    """
+    elements.append(Paragraph(summary_text, styles['BodyText']))
+    elements.append(Spacer(1, 12))
+    
+    # Intrusion Timeline
+    timeline_path = os.path.join(temp_dir, "intrusion_timeline.png")
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot([1 if r['is_intrusion'] else 0 for r in analysis_results], 'b-', label='Intrusion (1) / Normal (0)')
+    ax.set_ylim(-0.1, 1.1)
+    ax.set_xlabel("Packet Number")
+    ax.set_ylabel("Status")
+    ax.set_title("Intrusion Detection Timeline")
+    fig.savefig(timeline_path, bbox_inches='tight')
+    plt.close(fig)
+    elements.append(ReportLabImage(timeline_path, width=400, height=200))
+    elements.append(Spacer(1, 12))
+    
+    # Source IP Distribution
+    src_ip_counts = pd.Series([r['src_ip'] for r in analysis_results if r['is_intrusion']]).value_counts().head(5)
+    if not src_ip_counts.empty:
+        ip_plot_path = os.path.join(temp_dir, "src_ip_distribution.png")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        src_ip_counts.plot(kind='bar', ax=ax)
+        ax.set_xlabel("Source IP")
+        ax.set_ylabel("Intrusion Count")
+        ax.set_title("Top 5 Source IPs with Intrusions")
+        fig.savefig(ip_plot_path, bbox_inches='tight')
+        plt.close(fig)
+        elements.append(ReportLabImage(ip_plot_path, width=400, height=200))
+        elements.append(Spacer(1, 12))
+    
+    # Recommendations
+    elements.append(Paragraph("Recommendations", styles['Heading2']))
+    rec_text = "Based on the analysis:<br/>"
+    if intrusion_count > 0:
+        rec_text += f"- Block the top source IPs: {', '.join(src_ip_counts.index)}.<br/>"
+        rec_text += "- Review network security policies to mitigate detected attack types.<br/>"
+    else:
+        rec_text += "- No intrusions detected; continue monitoring with regular PCAP uploads."
+    elements.append(Paragraph(rec_text, styles['BodyText']))
+    
+    # Build PDF
+    doc.build(elements)
+    return pdf_path
+
+def show_pcap_analysis():
     global model, scaler, label_encoders, le_class
     
-    st.title("Live Network Monitoring")
+    st.title("PCAP File Analysis")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     st.markdown("""
-    ### Live Network Traffic Monitoring
-    Monitor real-time network traffic or upload a PCAP file for analysis.
-    The system will analyze packets and flag potential intrusions.
+    ### PCAP File Analysis
+    Upload a PCAP file (captured with Wireshark or tcpdump) to analyze network traffic for potential intrusions.
     """)
     
-    # Connection tracker for aggregating features
+    # Connection tracker
     if 'connection_tracker' not in st.session_state:
         st.session_state.connection_tracker = {}
     
-    # Check prerequisites
-    if not check_admin_privileges():
-        st.error("Administrative privileges required. This script will attempt to relaunch as Administrator.")
-        st.info("If prompted, click 'Yes' in the User Account Control (UAC) dialog. Alternatively, run manually: Right-click Command Prompt, select 'Run as administrator', and execute 'streamlit run ipds.py'.")
-        if st.button("Relaunch as Administrator"):
-            run_as_admin()
-        return
+    # Alert settings
+    st.subheader("Alert Settings")
+    alert_threshold = st.slider("Alert Confidence Threshold", 0.5, 0.9, 0.7, 0.05)
+    alert_recipient = st.text_input("Alert Recipient Email (Simulated)", "admin@example.com")
     
-    npcap_status, npcap_message = check_npcap_installed()
-    if not npcap_status:
-        st.error(f"Npcap error: {npcap_message}")
-        st.info("Install Npcap from https://npcap.com (select WinPcap API-compatible mode). Verify service: 'sc query npcap'. Restart: 'net stop npcap && net start npcap'.")
-        return
+    # PCAP upload
+    pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
+    threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
     
-    st.success("Npcap is installed and running.")
-    
-    # Monitoring options
-    monitoring_options = ["Live Capture (Scapy)", "Upload PCAP File"]
-    monitoring_option = st.radio("Select monitoring method", monitoring_options)
-    
-    if monitoring_option == "Live Capture (Scapy)":
-        st.info("Select the active network interface (e.g., Wi-Fi or Ethernet). Ensure network traffic is flowing (e.g., run 'ping 8.8.8.8').")
-        
-        # List available interfaces with friendly names
-        try:
-            friendly_interfaces = get_friendly_interfaces()
-            if not friendly_interfaces:
-                st.error("No active network interfaces found. Check network adapters ('ipconfig') and ensure Npcap is installed.")
-                st.info("Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
-                return
-            interface_options = [f"{friendly_name} ({iface})" for iface, friendly_name in friendly_interfaces]
-            interface_selection = st.selectbox("Network Interface", interface_options, help="Select the active network interface with an IP address.")
-            # Extract the GUID from selection
-            selected_interface = next(iface for iface, _ in friendly_interfaces if iface in interface_selection)
-        except Exception as e:
-            st.error(f"Error listing interfaces: {str(e)}")
-            st.info("Verify Npcap ('sc query npcap'), adapters ('netsh interface show interface'), and run as Administrator.")
-            return
-        
-        num_packets = st.slider("Number of packets to capture", 10, 1000, 100)
-        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
-        
-        if st.button("Start Live Capture"):
-            with st.spinner("Capturing network traffic..."):
-                try:
-                    # Capture packets using Scapy's sniff
-                    packets = sniff(iface=selected_interface, count=num_packets, timeout=60)
-                    if not packets:
-                        st.warning("No packets captured. Generate traffic (e.g., 'ping 8.8.8.8' or 'curl http://example.com') and verify interface ('ipconfig').")
-                        st.info("Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
-                    
-                    results = []
-                    intrusion_count = 0
-                    
-                    status_placeholder = st.empty()
-                    log_placeholder = st.empty()
-                    
-                    for i, packet in enumerate(packets):
-                        features = process_packet(packet, st.session_state.connection_tracker)
-                        if features is None:
-                            st.write(f"Packet {i+1}: Skipping non-IP packet")
-                            continue
-                        
-                        input_df = pd.DataFrame([features])
-                        prediction, confidence = predict_traffic(input_df, threshold)
-                        
-                        if prediction is None or confidence is None:
-                            continue
-                        
-                        is_intrusion = prediction != 'normal'
-                        if is_intrusion:
-                            intrusion_count += 1
-                            # Basic IPS: Block source IP using Windows Firewall
-                            src_ip = packet[IP].src
-                            try:
-                                subprocess.run(
-                                    f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                    shell=True, check=True
-                                )
-                            except subprocess.CalledProcessError as e:
-                                st.warning(f"Failed to add firewall rule for {src_ip}: {e}")
-                        
-                        results.append(is_intrusion)
-                        
-                        # Update status
-                        status_placeholder.markdown(f"""
-                        **Processing packet {i+1}/{len(packets)}**  
-                        Last detection: {'Intrusion' if is_intrusion else 'Normal'}  
-                        Total intrusions detected: {intrusion_count}
-                        """)
-                        
-                        # Update log
-                        if is_intrusion:
-                            log_placeholder.markdown(f"""
-                            **Packet {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
-                            Source IP: {packet[IP].src}
-                            """, unsafe_allow_html=True)
-                        else:
-                            log_placeholder.markdown(f"""
-                            **Packet {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
-                            Source IP: {packet[IP].src}
-                            """, unsafe_allow_html=True)
-                        
-                        time.sleep(0.1)  # Simulate real-time effect
-                    
-                    st.success(f"Capture complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
+    if pcap_file is not None and st.button("Analyze PCAP"):
+        with st.spinner("Analyzing PCAP file..."):
+            try:
+                # Save uploaded file
+                temp_pcap = "temp_upload.pcap"
+                with open(temp_pcap, "wb") as f:
+                    f.write(pcap_file.read())
                 
-                except PermissionError as e:
-                    st.error(f"Permission error during live capture: {str(e)}")
-                    st.info("Ensure you are running as Administrator. Relaunch via the button above or manually: Right-click Command Prompt, select 'Run as administrator', and execute 'streamlit run ipds.py'.")
-                except Exception as e:
-                    st.error(f"Error during live capture: {str(e)}")
-                    st.info("Possible causes:\n"
-                            "- Incorrect interface: Verify with 'ipconfig' and select the active adapter.\n"
-                            "- Npcap issue: Reinstall from https://npcap.com (WinPcap API-compatible mode).\n"
-                            "- Antivirus/Firewall: Disable temporarily or add exceptions for python.exe and streamlit.exe.\n"
-                            "- No traffic: Generate traffic with 'ping 8.8.8.8' or 'curl http://example.com'.\n"
-                            "Alternative: Use Wireshark to capture packets, save as PCAP, and upload below.")
-    
-    else:  # Upload PCAP File
-        st.info("Upload a PCAP file captured with Wireshark or another tool if live capture is not working.")
-        pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
-        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
-        
-        if pcap_file is not None and st.button("Analyze PCAP"):
-            with st.spinner("Analyzing PCAP file..."):
-                try:
-                    # Save uploaded file temporarily
-                    temp_pcap = "temp_upload.pcap"
-                    with open(temp_pcap, "wb") as f:
-                        f.write(pcap_file.read())
+                # Read and process PCAP
+                packets = rdpcap(temp_pcap)
+                results = []
+                intrusion_count = 0
+                analysis_results = []
+                
+                status_placeholder = st.empty()
+                log_placeholder = st.empty()
+                
+                for i, packet in enumerate(packets):
+                    features = process_packet(packet, st.session_state.connection_tracker)
+                    if features is None:
+                        st.write(f"Packet {i+1}: Skipping non-IP packet")
+                        continue
                     
-                    # Read and process PCAP
-                    packets = rdpcap(temp_pcap)
-                    results = []
-                    intrusion_count = 0
+                    input_df = pd.DataFrame([features])
+                    prediction, confidence = predict_traffic(input_df, threshold)
                     
-                    status_placeholder = st.empty()
-                    log_placeholder = st.empty()
+                    if prediction is None or confidence is None:
+                        continue
                     
-                    for i, packet in enumerate(packets):
-                        features = process_packet(packet, st.session_state.connection_tracker)
-                        if features is None:
-                            st.write(f"Packet {i+1}: Skipping non-IP packet")
-                            continue
-                        
-                        input_df = pd.DataFrame([features])
-                        prediction, confidence = predict_traffic(input_df, threshold)
-                        
-                        if prediction is None or confidence is None:
-                            continue
-                        
-                        is_intrusion = prediction != 'normal'
-                        if is_intrusion:
-                            intrusion_count += 1
-                            # Basic IPS: Block source IP
-                            src_ip = packet[IP].src
-                            try:
-                                subprocess.run(
-                                    f"netsh advfirewall firewall add rule name='Block {src_ip}' dir=in action=block remoteip={src_ip}",
-                                    shell=True, check=True
-                                )
-                            except subprocess.CalledProcessError as e:
-                                st.warning(f"Failed to add firewall rule for {src_ip}: {e}")
-                        
-                        results.append(is_intrusion)
-                        
-                        # Update status
-                        status_placeholder.markdown(f"""
-                        **Processing packet {i+1}/{len(packets)}**  
-                        Last detection: {'Intrusion' if is_intrusion else 'Normal'}  
-                        Total intrusions detected: {intrusion_count}
-                        """)
-                        
-                        # Update log
-                        if is_intrusion:
-                            log_placeholder.markdown(f"""
-                            **Packet {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
-                            Source IP: {packet[IP].src}
-                            """, unsafe_allow_html=True)
-                        else:
-                            log_placeholder.markdown(f"""
-                            **Packet {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
-                            Source IP: {packet[IP].src}
-                            """, unsafe_allow_html=True)
-                        
-                        time.sleep(0.1)  # Simulate real-time effect
+                    is_intrusion = prediction != 'normal'
+                    src_ip = packet[IP].src if IP in packet else "Unknown"
+                    if is_intrusion:
+                        intrusion_count += 1
+                        if confidence >= alert_threshold:
+                            alert_message = f"Intrusion detected in packet {i+1} ({prediction}) from {src_ip} with confidence {confidence:.2%}"
+                            st.session_state.alert_log.append({
+                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                'message': alert_message,
+                                'recipient': alert_recipient
+                            })
                     
-                    # Clean up
+                    results.append(is_intrusion)
+                    analysis_results.append({
+                        'packet_num': i+1,
+                        'is_intrusion': is_intrusion,
+                        'prediction': prediction,
+                        'confidence': confidence,
+                        'src_ip': src_ip
+                    })
+                
+                # Save to history
+                history_entry = {
+                    'timestamp': datetime.now(),
+                    'filename': pcap_file.name,
+                    'total_packets': len(packets),
+                    'intrusion_count': intrusion_count,
+                    'results': analysis_results
+                }
+                st.session_state.analysis_history.append(history_entry)
+                
+                # Update status
+                status_placeholder.markdown(f"""
+                **Analysis complete**  
+                Total packets: {len(packets)}  
+                Intrusions detected: {intrusion_count}  
+                Normal traffic: {len(packets) - intrusion_count}
+                """)
+                
+                # Display results
+                st.subheader("Detailed Results")
+                result_df = pd.DataFrame(analysis_results)
+                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_intrusion']])
+                
+                # Feedback
+                st.subheader("Provide Feedback")
+                with st.form(f"feedback_form_{pcap_file.name}"):
+                    feedback_indices = st.multiselect(
+                        "Select packets to mark as incorrect",
+                        options=result_df.index,
+                        format_func=lambda x: f"Packet {result_df.loc[x, 'packet_num']} ({result_df.loc[x, 'prediction']})"
+                    )
+                    correct_label = st.selectbox("Correct Label", ['normal'] + list(le_class.classes_))
+                    feedback_submit = st.form_submit_button("Submit Feedback")
+                    
+                    if feedback_submit and feedback_indices:
+                        for idx in feedback_indices:
+                            packet_features = process_packet(packets[result_df.loc[idx, 'packet_num'] - 1], st.session_state.connection_tracker)
+                            if packet_features:
+                                packet_features['class'] = correct_label
+                                st.session_state.feedback_data.append(packet_features)
+                        st.success(f"Feedback saved for {len(feedback_indices)} packets.")
+                
+                # Generate and download report
+                st.subheader("Download Report")
+                pdf_path = generate_pdf_report(analysis_results, intrusion_count, len(packets), pcap_file.name)
+                with open(pdf_path, "rb") as f:
+                    st.download_button(
+                        label="Download PDF Report",
+                        data=f,
+                        file_name=os.path.basename(pdf_path),
+                        mime="application/pdf"
+                    )
+                
+                # Clean up
+                os.remove(temp_pcap)
+                for temp_file in ['intrusion_timeline.png', 'src_ip_distribution.png']:
+                    temp_file_path = os.path.join("temp", temp_file)
+                    if os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                
+            except Exception as e:
+                st.error(f"Error during PCAP analysis: {str(e)}")
+                if os.path.exists(temp_pcap):
                     os.remove(temp_pcap)
-                    st.success(f"Analysis complete! Detected {intrusion_count} intrusions out of {len(packets)} packets.")
+
+def show_historical_analysis():
+    st.title("Historical Analysis Dashboard")
+    
+    if not st.session_state.analysis_history:
+        st.info("No analysis history available. Upload and analyze a PCAP file first.")
+        return
+    
+    st.markdown("""
+    ### Historical Analysis
+    View trends and insights from past PCAP analyses.
+    """)
+    
+    # Convert history to DataFrame
+    history_df = pd.DataFrame([
+        {
+            'Timestamp': h['timestamp'],
+            'Filename': h['filename'],
+            'Total Packets': h['total_packets'],
+            'Intrusions': h['intrusion_count'],
+            'Normal': h['total_packets'] - h['intrusion_count']
+        }
+        for h in st.session_state.analysis_history
+    ])
+    
+    # Date filter
+    st.subheader("Filter by Date")
+    min_date = min(history_df['Timestamp']).date()
+    max_date = max(history_df['Timestamp']).date()
+    start_date, end_date = st.date_input("Select date range", [min_date, max_date], min_value=min_date, max_value=max_date)
+    
+    filtered_df = history_df[
+        (history_df['Timestamp'].dt.date >= start_date) &
+        (history_df['Timestamp'].dt.date <= end_date)
+    ]
+    
+    # Summary
+    st.subheader("Summary")
+    st.write(f"Total Analyses: {len(filtered_df)}")
+    st.write(f"Total Packets: {filtered_df['Total Packets'].sum()}")
+    st.write(f"Total Intrusions: {filtered_df['Intrusions'].sum()}")
+    
+    # Visualizations
+    st.subheader("Intrusion Trends")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    filtered_df.set_index('Timestamp')['Intrusions'].plot(ax=ax, label='Intrusions')
+    filtered_df.set_index('Timestamp')['Normal'].plot(ax=ax, label='Normal')
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Count")
+    ax.set_title("Intrusion and Normal Traffic Over Time")
+    ax.legend()
+    st.pyplot(fig)
+    
+    # Top Source IPs
+    st.subheader("Top Source IPs with Intrusions")
+    all_results = []
+    for h in st.session_state.analysis_history:
+        if h['timestamp'].date() >= start_date and h['timestamp'].date() <= end_date:
+            all_results.extend(h['results'])
+    
+    if all_results:
+        src_ip_counts = pd.Series([r['src_ip'] for r in all_results if r['is_intrusion']]).value_counts().head(5)
+        fig, ax = plt.subplots(figsize=(8, 4))
+        src_ip_counts.plot(kind='bar', ax=ax)
+        ax.set_xlabel("Source IP")
+        ax.set_ylabel("Intrusion Count")
+        ax.set_title("Top 5 Source IPs with Intrusions")
+        st.pyplot(fig)
+    
+    # Attack Type Distribution
+    st.subheader("Attack Type Distribution")
+    attack_types = pd.Series([r['prediction'] for r in all_results if r['is_intrusion']]).value_counts()
+    if not attack_types.empty:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        attack_types.plot(kind='pie', ax=ax, autopct='%1.1f%%')
+        ax.set_title("Distribution of Attack Types")
+        st.pyplot(fig)
+
+def show_alert_log():
+    st.title("Alert Log")
+    
+    if not st.session_state.alert_log:
+        st.info("No alerts generated yet. Analyze a PCAP file with a high confidence threshold to trigger alerts.")
+        return
+    
+    st.markdown("""
+    ### Alert Log
+    View simulated email alerts for detected intrusions.
+    """)
+    
+    alert_df = pd.DataFrame(st.session_state.alert_log)
+    st.dataframe(alert_df[['timestamp', 'message', 'recipient']])
+    
+    if st.button("Clear Alert Log"):
+        st.session_state.alert_log = []
+        st.success("Alert log cleared.")
+
+def show_retrain_model():
+    global model, scaler, label_encoders, le_class
+    
+    st.title("Retrain Model with Feedback")
+    
+    if model is None:
+        st.error("No trained model found. Please train a model first.")
+        return
+    
+    st.markdown("""
+    ### Retrain Model
+    Use feedback from PCAP analyses to improve the model.
+    """)
+    
+    if not st.session_state.feedback_data:
+        st.info("No feedback data available. Provide feedback on PCAP analysis results first.")
+        return
+    
+    # Display feedback data
+    st.subheader("Feedback Data")
+    feedback_df = pd.DataFrame(st.session_state.feedback_data)
+    st.dataframe(feedback_df[[col for col in nsl_kdd_columns if col in feedback_df.columns]])
+    
+    # Retraining parameters
+    st.subheader("Retrain Parameters")
+    col1, col2 = st.columns(2)
+    with col1:
+        n_estimators = st.slider("Number of estimators", 50, 500, 200, 50)
+        max_depth = st.slider("Max depth", 3, 10, 6)
+    with col2:
+        learning_rate = st.slider("Learning rate", 0.01, 0.5, 0.1, 0.01)
+        scale_pos_weight = st.slider("Scale positive weight", 1, 5, 2)
+    
+    if st.button("Retrain Model"):
+        with st.spinner("Retraining model..."):
+            try:
+                # Load original training data
+                train_file = st.session_state.get('last_train_file')
+                if train_file:
+                    data = pd.read_csv(train_file, names=nsl_kdd_columns, header=None)
+                else:
+                    data = pd.DataFrame(columns=nsl_kdd_columns)
                 
-                except Exception as e:
-                    st.error(f"Error during PCAP analysis: {str(e)}")
-                    if os.path.exists(temp_pcap):
-                        os.remove(temp_pcap)
+                # Append feedback data
+                feedback_df = pd.DataFrame(st.session_state.feedback_data)
+                data = pd.concat([data, feedback_df], ignore_index=True)
+                
+                # Preprocess
+                data, label_encoders, le_class = preprocess_data(data, {}, None, is_train=True)
+                
+                # Separate features and labels
+                X = data.drop('class', axis=1)
+                y = data['class']
+                
+                # Scale features
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
+                
+                # Split data
+                X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+                
+                # Apply SMOTE
+                smote = SMOTE(random_state=42)
+                X_train, y_train = smote.fit_resample(X_train, y_train)
+                
+                # Train model
+                model = XGBClassifier(
+                    n_estimators=n_estimators,
+                    max_depth=max_depth,
+                    learning_rate=learning_rate,
+                    scale_pos_weight=scale_pos_weight,
+                    random_state=42
+                )
+                
+                model.fit(X_train, y_train)
+                
+                # Evaluate
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                unique_labels = np.unique(np.concatenate([y_test, y_pred]))
+                target_names = [le_class.classes_[i] for i in unique_labels]
+                report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
+                
+                # Save model and objects
+                joblib.dump(model, 'idps_model.pkl')
+                joblib.dump(scaler, 'scaler.pkl')
+                joblib.dump(label_encoders, 'label_encoders.pkl')
+                joblib.dump(le_class, 'le_class.pkl')
+                
+                # Display results
+                st.success("Model retrained successfully!")
+                st.metric("Accuracy", f"{accuracy:.2%}")
+                
+                st.subheader("Classification Report")
+                st.text(report)
+                
+            except Exception as e:
+                st.error(f"Error during retraining: {str(e)}")
 
 def show_home():
     global model
@@ -513,9 +650,11 @@ def show_home():
     ### Features:
     - Train a new intrusion detection model
     - Test the model with sample data
-    - Perform real-time intrusion detection
-    - Monitor live network traffic
-    - Visualize model performance
+    - Analyze PCAP files for intrusions
+    - View historical analysis trends
+    - Retrain model with user feedback
+    - Receive simulated alert notifications
+    - Export analysis reports as PDF
     
     ### Navigation:
     - Use the sidebar to access different functionalities
@@ -526,7 +665,7 @@ def show_home():
     else:
         st.warning("No trained model found. Please train a model first.")
     
-    # Display sample data
+    # Sample data
     st.subheader("Sample Network Traffic Data")
     sample_data = {
         'duration': [0],
@@ -636,6 +775,9 @@ def show_train_model():
                     joblib.dump(label_encoders, 'label_encoders.pkl')
                     joblib.dump(le_class, 'le_class.pkl')
                     
+                    # Save train file for retraining
+                    st.session_state['last_train_file'] = train_file
+                    
                     # Display results
                     st.success("Model trained successfully!")
                     st.metric("Accuracy", f"{accuracy:.2%}")
@@ -698,7 +840,7 @@ def show_test_model():
                     y_pred_prob = model.predict_proba(X_test_scaled)[:, 1]
                     y_pred = (y_pred_prob >= threshold).astype(int)
                     
-                    # Get unique labels in predictions and test data
+                    # Get unique labels
                     unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                     target_names = [le_class.classes_[i] for i in unique_labels]
                     
@@ -730,7 +872,6 @@ def show_test_model():
     else:  # Manual Input
         st.subheader("Enter Network Traffic Parameters")
         
-        # Create input form
         with st.form("manual_test_form"):
             col1, col2 = st.columns(2)
             
@@ -757,7 +898,6 @@ def show_test_model():
             threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
             
             if st.form_submit_button("Test Traffic"):
-                # Create input DataFrame
                 input_data = {
                     'duration': [duration],
                     'protocol_type': [protocol_type],
@@ -792,18 +932,15 @@ def show_test_model():
                 
                 input_df = pd.DataFrame(input_data)
                 
-                # Make prediction
                 prediction, confidence = predict_traffic(input_df, threshold)
                 
                 if prediction is not None and confidence is not None:
-                    # Display results
                     st.subheader("Detection Result")
                     if prediction == 'normal':
                         st.success(f"Normal traffic detected (Confidence: {confidence:.2%})")
                     else:
                         st.error(f"Intrusion detected: {prediction} (Confidence: {confidence:.2%})")
                     
-                    # Show action recommendation
                     st.subheader("Recommended Action")
                     if prediction == 'normal':
                         st.info("✅ Allow traffic - No malicious activity detected")
@@ -813,26 +950,23 @@ def show_test_model():
 def show_realtime_detection():
     global model, scaler, label_encoders, le_class
     
-    st.title("Real-time Intrusion Detection")
+    st.title("Real-time Intrusion Detection Simulation")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     st.markdown("""
-    ### Real-time Monitoring:
-    This page simulates real-time network traffic monitoring. 
-    The system will analyze traffic and flag potential intrusions.
+    ### Real-time Simulation
+    Simulate real-time network traffic monitoring using random data.
     """)
     
-    # Simulation controls
     st.subheader("Simulation Controls")
     simulation_speed = st.select_slider("Simulation Speed", options=["Slow", "Normal", "Fast"], value="Normal")
     num_samples = st.slider("Number of samples to simulate", 10, 100, 20)
     threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
     
     if st.button("Start Simulation"):
-        # Generate random test data for simulation
         np.random.seed(42)
         sample_data = {
             'duration': np.random.randint(0, 100, num_samples),
@@ -868,43 +1002,34 @@ def show_realtime_detection():
         
         sample_df = pd.DataFrame(sample_data)
         
-        # Create placeholder for live updates
         status_placeholder = st.empty()
         chart_placeholder = st.empty()
         log_placeholder = st.empty()
         
-        # Initialize results
         results = []
         intrusion_count = 0
         
-        # Determine speed
         delay = 1.0 if simulation_speed == "Slow" else 0.5 if simulation_speed == "Normal" else 0.1
         
-        # Process each sample
         for i in range(num_samples):
-            # Get current sample
             current_sample = sample_df.iloc[[i]]
             
-            # Make prediction
             prediction, confidence = predict_traffic(current_sample, threshold)
             
             if prediction is None or confidence is None:
                 continue
             
-            # Record result
             is_intrusion = prediction != 'normal'
             if is_intrusion:
                 intrusion_count += 1
             results.append(is_intrusion)
             
-            # Update status
             status_placeholder.markdown(f"""
             **Processing sample {i+1}/{num_samples}**  
             Last detection: {'Intrusion' if is_intrusion else 'Normal'}  
             Total intrusions detected: {intrusion_count}
             """)
             
-            # Update chart
             fig, ax = plt.subplots(figsize=(10, 3))
             ax.plot(results, 'b-', label='Intrusion (1) / Normal (0)')
             ax.set_ylim(-0.1, 1.1)
@@ -913,7 +1038,6 @@ def show_realtime_detection():
             ax.set_title("Detection Results Over Time")
             chart_placeholder.pyplot(fig)
             
-            # Update log
             if is_intrusion:
                 log_placeholder.markdown(f"""
                 **Sample {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
@@ -923,10 +1047,8 @@ def show_realtime_detection():
                 **Sample {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
                 """, unsafe_allow_html=True)
             
-            # Add delay for simulation effect
             time.sleep(delay)
         
-        # Final summary
         st.success(f"Simulation complete! Detected {intrusion_count} intrusions out of {num_samples} samples.")
 
 def show_about():
@@ -940,9 +1062,11 @@ def show_about():
     **Key Features:**
     - Uses XGBoost classifier for intrusion detection
     - Trained on the NSL-KDD dataset
-    - Provides real-time monitoring capabilities
-    - Monitors live network traffic using Scapy
-    - Offers configurable detection threshold
+    - Analyzes PCAP files for intrusions
+    - Provides historical analysis dashboard
+    - Supports model retraining with user feedback
+    - Simulates alert notifications
+    - Exports analysis reports as PDF
     
     **Technical Details:**
     - Python 3.x
@@ -950,7 +1074,7 @@ def show_about():
     - Scikit-learn for preprocessing and evaluation
     - XGBoost for the machine learning model
     - Imbalanced-learn for handling class imbalance
-    - Scapy for packet processing
+    - ReportLab for PDF generation
     
     **Dataset Information:**
     The NSL-KDD dataset is a refined version of the KDD Cup 99 dataset, containing network connection records
@@ -967,8 +1091,10 @@ def show_about():
     st.markdown("""
     1. **Train Model**: Upload training data and train a new model
     2. **Test Model**: Evaluate the model with test data or manual input
-    3. **Real-time Detection**: Simulate real-time network monitoring
-    4. **Live Network Monitoring**: Capture and analyze live traffic or upload PCAP files
+    3. **PCAP Analysis**: Upload PCAP files to detect intrusions
+    4. **Historical Analysis**: View trends from past analyses
+    5. **Retrain Model**: Improve the model with feedback
+    6. **Alert Log**: Review simulated intrusion alerts
     """)
     
     st.subheader("Disclaimer")
@@ -978,10 +1104,10 @@ def show_about():
     """)
 
 def main():
-    # Sidebar navigation
     st.sidebar.title("Navigation")
     app_mode = st.sidebar.selectbox("Choose a page", 
-                                   ["Home", "Train Model", "Test Model", "Real-time Detection", "Live Network Monitoring", "About"])
+                                   ["Home", "Train Model", "Test Model", "Real-time Detection", 
+                                    "PCAP Analysis", "Historical Analysis", "Alert Log", "Retrain Model", "About"])
     
     if app_mode == "Home":
         show_home()
@@ -991,11 +1117,16 @@ def main():
         show_test_model()
     elif app_mode == "Real-time Detection":
         show_realtime_detection()
-    elif app_mode == "Live Network Monitoring":
-        show_live_monitoring()
+    elif app_mode == "PCAP Analysis":
+        show_pcap_analysis()
+    elif app_mode == "Historical Analysis":
+        show_historical_analysis()
+    elif app_mode == "Alert Log":
+        show_alert_log()
+    elif app_mode == "Retrain Model":
+        show_retrain_model()
     elif app_mode == "About":
         show_about()
 
 if __name__ == "__main__":
-    run_as_admin()
     main()
