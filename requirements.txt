@@ -8,4 +8,4 @@ imblearn
 pillow
 matplotlib
 seaborn
-scapy
+reportlab
