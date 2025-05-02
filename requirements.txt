@@ -11,3 +11,4 @@ scapy
 tensorflow-cpu
 joblib
 requests
+plotly 
