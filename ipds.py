@@ -6,6 +6,7 @@ import time
 import os
 from datetime import datetime, timedelta
 import io
+import requests
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
@@ -134,7 +135,7 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
     # Drop low importance features
     df = df.drop(columns=[col for col in low_importance_features if col in df.columns], errors='ignore')
     
-    return df, label_encoders,atação
+    return df, label_encoders, le_class
 
 def train_lstm_model(X_train, y_train, X_test, y_test):
     model = Sequential([
@@ -167,6 +168,37 @@ def detect_anomaly(input_data_scaled, autoencoder, threshold=0.1):
     reconstructions = autoencoder.predict(input_data_scaled)
     mse = np.mean(np.square(input_data_scaled - reconstructions), axis=1)
     return mse > threshold
+
+def explain_threat(prediction, confidence, src_ip, xai_api_key=None, openai_api_key=None):
+    prompt = f"Explain the network intrusion type '{prediction}' with confidence {confidence:.2%} from source IP {src_ip}. Suggest mitigation actions."
+    
+    # Try xAI API first
+    if xai_api_key:
+        try:
+            response = requests.post(
+                'https://api.x.ai/v1/completions',
+                headers={'Authorization': f'Bearer {xai_api_key}', 'Content-Type': 'application/json'},
+                json={'model': 'grok-beta', 'prompt': prompt, 'max_tokens': 200}
+            )
+            response.raise_for_status()
+            return response.json().get('choices', [{}])[0].get('text', 'Explanation unavailable')
+        except Exception as e:
+            st.warning(f"xAI API error: {str(e)}. Trying OpenAI API if provided.")
+    
+    # Fallback to OpenAI API
+    if openai_api_key:
+        try:
+            response = requests.post(
+                'https://api.openai.com/v1/completions',
+                headers={'Authorization': f'Bearer {openai_api_key}', 'Content-Type': 'application/json'},
+                json={'model': 'text-davinci-003', 'prompt': prompt, 'max_tokens': 200}
+            )
+            response.raise_for_status()
+            return response.json().get('choices', [{}])[0].get('text', 'Explanation unavailable')
+        except Exception as e:
+            return f"OpenAI API error: {str(e)}"
+    
+    return "No valid API key provided for threat explanation."
 
 def predict_traffic(input_data, threshold=0.5):
     global model, scaler, label_encoders, le_class, model_type
@@ -338,14 +370,15 @@ def generate_pdf_report(analysis_results, intrusion_count, total_packets, filena
     
     # Results Table
     elements.append(Paragraph("Detailed Results", styles['Heading2']))
-    data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly']]
+    data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly', 'Explanation']]
     for r in analysis_results[:10]:  # Limit to first 10 for brevity
         data.append([
             str(r['packet_num']),
             r['src_ip'],
             r['prediction'],
             f"{r['confidence']:.2%}",
-            'Yes' if r['is_anomaly'] else 'No'
+            'Yes' if r['is_anomaly'] else 'No',
+            r['explanation'][:50] + '...' if len(r['explanation']) > 50 else r['explanation']
         ])
     table = Table(data)
     table.setStyle(TableStyle([
@@ -393,7 +426,16 @@ def show_pcap_analysis():
     st.markdown("""
     ### PCAP File Analysis
     Upload a PCAP file to analyze network traffic for intrusions using AI-enhanced detection (LSTM, Autoencoders, Active Learning).
+    Provide an xAI or OpenAI API key for threat explanations.
     """)
+    
+    # API key inputs
+    st.subheader("API Keys for Threat Explanations")
+    col1, col2 = st.columns(2)
+    with col1:
+        xai_api_key = st.text_input("xAI API Key", type="password")
+    with col2:
+        openai_api_key = st.text_input("OpenAI API Key", type="password")
     
     # Alert settings
     st.subheader("Alert Settings")
@@ -439,6 +481,9 @@ def show_pcap_analysis():
                         input_data_scaled = scaler.transform(input_df)
                         is_anomaly = detect_anomaly(input_data_scaled, autoencoder)[0]
                     
+                    # Get threat explanation
+                    explanation = explain_threat(prediction, confidence, src_ip, xai_api_key, openai_api_key)
+                    
                     if is_intrusion:
                         intrusion_count += 1
                         if confidence >= alert_threshold:
@@ -455,7 +500,8 @@ def show_pcap_analysis():
                         'prediction': prediction,
                         'confidence': confidence,
                         'src_ip': src_ip,
-                        'is_anomaly': is_anomaly
+                        'is_anomaly': is_anomaly,
+                        'explanation': explanation
                     })
                 
                 # Save to history
@@ -479,7 +525,7 @@ def show_pcap_analysis():
                 # Display results
                 st.subheader("Detailed Results")
                 result_df = pd.DataFrame(analysis_results)
-                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly']])
+                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly', 'explanation']])
                 
                 # Feedback with Active Learning
                 st.subheader("Provide Feedback")
@@ -734,12 +780,13 @@ def show_home():
     st.title("AI-Enhanced Intrusion Detection and Prevention System")
     st.markdown("""
     Welcome to the AI-Enhanced IDPS application. This system uses advanced AI (XGBoost, LSTM, Autoencoders) 
-    to detect and prevent network intrusions using the NSL-KDD dataset.
+    to detect and prevent network intrusions using the NSL-KDD dataset. Optional Generative AI provides threat explanations.
     
     ### AI Features:
     - **Deep Learning (LSTM)**: Captures temporal patterns in traffic.
     - **Anomaly Detection (Autoencoders)**: Flags zero-day attacks.
     - **Active Learning**: Optimizes feedback for model improvement.
+    - **Generative AI**: Explains intrusions (requires xAI or OpenAI API key).
     
     ### Other Features:
     - Train and test intrusion detection models
@@ -1148,6 +1195,7 @@ def show_about():
     - **Deep Learning (LSTM)**: Models temporal patterns in network traffic.
     - **Anomaly Detection (Autoencoders)**: Detects zero-day attacks via unsupervised learning.
     - **Active Learning**: Optimizes feedback by prioritizing uncertain predictions.
+    - **Generative AI**: Explains intrusions using xAI or OpenAI APIs.
     
     **Other Features:**
     - Uses XGBoost or LSTM classifiers
