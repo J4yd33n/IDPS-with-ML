@@ -29,6 +29,56 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 nsl_kdd_columns = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
     'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted', 'num_root',
+    'num_file_creations', 'num_shells', 'num_access_files', 'num_outbound_cmds', 'is_host_login', 'is:
+
+System: You are Grok 3 built by xAI.
+
+I notice the artifact code you provided is incomplete, as it cuts off mid-line. However, I can still address the two issues you raised: the deprecated `use_column_width` parameter and the bright graph issue in dark mode. I'll provide a corrected version of the relevant sections (`show_nmap_analysis`, and other sections with `use_column_width`) with the following changes:
+
+1. **Replace `use_column_width` with `use_container_width`**:
+   - Update all `st.dataframe` and `st.plotly_chart` calls to use `use_container_width=True` instead of `use_column_width=True`.
+   - Affected sections: `show_nmap_analysis`, `show_historical_analysis`, `show_alert_log`, `show_retrain_model`, `show_test_model`, `show_realtime_detection`.
+
+2. **Fix Graph Brightness**:
+   - In `show_nmap_analysis`, modify the Plotly bar chart to use a muted color scale (e.g., `px.colors.sequential.Blues`) for bars, ensure text labels are white (`#ffffff`), and reinforce the dark background (`#2a2a3d`) with a dark plot area (`plot_bgcolor`).
+   - Add `font=dict(color='#ffffff')` to ensure all text (titles, labels) is readable in dark mode.
+
+Below is the updated `ipds.py` artifact with these changes. Since the original code was incomplete, I'll focus on the corrected sections and ensure the NMAP Analysis graph is readable. For brevity, I'll include the modified `show_nmap_analysis` and note changes to other sections, assuming the rest of the code remains as provided in your last message. The `artifact_id` remains `a95c3f19-b9fc-43e6-9276-7da7b8d47f4e` as it’s an update.
+
+---
+
+<xaiArtifact artifact_id="a95c3f19-b9fc-43e6-9276-7da7b8d47f4e" artifact_version_id="aeebb89d-8f34-4bde-ac86-e8389410a4ce" title="ipds.py" contentType="text/python">
+import pandas as pd
+import numpy as np
+import streamlit as st
+import joblib
+import time
+import os
+from datetime import datetime, timedelta
+import io
+import requests
+import base64
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, roc_curve, auc, precision_recall_curve
+from xgboost import XGBClassifier
+from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+
+# NSL-KDD columns
+nsl_kdd_columns = [
+    'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
+    'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted', 'num_root',
     'num_file_creations', 'num_shells', 'num_access_files', 'num_outbound_cmds', 'is_host_login', 'is_guest_login',
     'count', 'srv_count', 'serror_rate', 'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate', 'same_srv_rate',
     'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count', 'dst_host_srv_count', 'dst_host_same_srv_rate',
@@ -67,6 +117,66 @@ if 'openai_api_key' not in st.session_state:
     st.session_state.openai_api_key = ""
 if 'theme' not in st.session_state:
     st.session_state.theme = "Light"
+
+# Custom CSS for professional look with improved dark mode readability
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f0f2f6;
+        color: #000000;
+    }
+    .sidebar .sidebar-content {
+        background-color: #1e1e2f;
+        color: #ffffff;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: #ffffff;
+        border-radius: 5px;
+        border: 1px solid #388E3C;
+    }
+    .stTextInput>div>input {
+        background-color: #ffffff;
+        color: #000000;
+        border-radius: 5px;
+        border: 1px solid #cccccc;
+    }
+    .stSelectbox, .stSlider, .stRadio, .stCheckbox {
+        color: #000000;
+    }
+    .stMarkdown, .stDataFrame, .stTable {
+        color: #000000;
+    }
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #ffffff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {
+        color: #000000;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Theme toggle with improved dark mode contrast
 def toggle_theme():
@@ -387,12 +497,17 @@ def show_nmap_analysis():
                         color='protocol',
                         title=f"Open Ports on {target}",
                         labels={'port': 'Port Number', 'service': 'Service'},
-                        height=400
+                        height=400,
+                        color_discrete_sequence=px.colors.sequential.Blues
                     )
                     fig.update_layout(
                         paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
                         plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                        font=dict(color='#ffffff'),
+                        title_font=dict(color='#ffffff'),
+                        xaxis=dict(title_font=dict(color='#ffffff'), tickfont=dict(color='#ffffff')),
+                        yaxis=dict(title_font=dict(color='#ffffff'), tickfont=dict(color='#ffffff')),
+                        legend=dict(font=dict(color='#ffffff'))
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
@@ -461,7 +576,7 @@ def show_historical_analysis():
     fig.update_layout(
         paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
         plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+        font_color='#ffffff'
     )
     st.plotly_chart(fig, use_container_width=True)
     
@@ -480,7 +595,7 @@ def show_historical_analysis():
         )
         fig.update_layout(
             paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-            font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+            font_color='#ffffff'
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -669,7 +784,7 @@ def show_train_model():
                     accuracy = accuracy_score(y_test, y_pred)
                     unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                     target_names = [le_class.classes_[i] for i in unique_labels]
-                    report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
+                    report = classification_report(y_pred, labels=unique_labels, target_names=target_names)
                     
                     if train_autoencoder_option:
                         X_normal = X_train[y_train == le_class.transform(['normal'])[0]]
@@ -699,7 +814,7 @@ def show_train_model():
                     fig_roc.update_layout(
                         paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
                         plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                        font_color='#ffffff'
                     )
                     st.plotly_chart(fig_roc, use_container_width=True)
                     
@@ -712,7 +827,7 @@ def show_train_model():
                     fig_pr.update_layout(
                         paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
                         plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                        font_color='#ffffff'
                     )
                     st.plotly_chart(fig_pr, use_container_width=True)
                     
@@ -791,7 +906,7 @@ def show_test_model():
                     fig_cm.update_layout(
                         paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
                         plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                        font_color='#ffffff'
                     )
                     st.plotly_chart(fig_cm, use_container_width=True)
                     
@@ -968,7 +1083,7 @@ def show_realtime_detection():
             fig.update_layout(
                 paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
                 plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                font_color='#ffffff'
             )
             chart_placeholder.plotly_chart(fig, use_container_width=True)
             
