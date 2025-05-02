@@ -10,3 +10,4 @@ reportlab
 scapy
 tensorflow-cpu
 joblib
+requests
