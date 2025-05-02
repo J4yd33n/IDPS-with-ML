@@ -1,12 +1,12 @@
+streamlit
 pandas
 numpy
-streamlit
-joblib
 scikit-learn
 xgboost
-imblearn
-pillow
+imbalanced-learn
 matplotlib
 seaborn
 reportlab
 scapy
+tensorflow-cpu
+joblib
