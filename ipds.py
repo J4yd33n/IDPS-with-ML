@@ -7,13 +7,16 @@ import os
 from datetime import datetime, timedelta
 import io
 import requests
+import base64
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, roc_curve, auc, precision_recall_curve
 from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -30,7 +33,53 @@ except ImportError:
     SCAPY_AVAILABLE = False
 
 # Set page config
-st.set_page_config(page_title="AI-Enhanced IDPS", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="AI-Enhanced IDPS", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
+
+# Custom CSS for professional look
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f0f2f6;
+    }
+    .sidebar .sidebar-content {
+        background-color: #1e1e2f;
+        color: white;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+    }
+    .stTextInput>div>input {
+        border-radius: 5px;
+    }
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # NSL-KDD columns
 nsl_kdd_columns = [
@@ -68,6 +117,26 @@ if 'alert_log' not in st.session_state:
     st.session_state.alert_log = []
 if 'connection_tracker' not in st.session_state:
     st.session_state.connection_tracker = {}
+if 'xai_api_key' not in st.session_state:
+    st.session_state.xai_api_key = ""
+if 'openai_api_key' not in st.session_state:
+    st.session_state.openai_api_key = ""
+if 'theme' not in st.session_state:
+    st.session_state.theme = "Light"
+
+# Theme toggle
+def toggle_theme():
+    st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+    st.markdown(
+        f"""
+        <style>
+            .stApp {{
+                background-color: {'#1e1e2f' if st.session_state.theme == 'Dark' else '#f0f2f6'};
+                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+            }}
+        </style>
+        """, unsafe_allow_html=True
+    )
 
 # Load model and preprocessing objects
 @st.cache_resource
@@ -79,7 +148,7 @@ def load_model():
         le_class = joblib.load('le_class.pkl')
         autoencoder = joblib.load('autoencoder.pkl') if os.path.exists('autoencoder.pkl') else None
         model_type = joblib.load('model_type.pkl') if os.path.exists('model_type.pkl') else 'XGBoost'
-        st.write("Model and preprocessing objects loaded successfully.")
+        st.success("Model and preprocessing objects loaded successfully.")
         return model, scaler, label_encoders, le_class, autoencoder, model_type
     except Exception as e:
         st.error(f"Failed to load model or preprocessing objects: {str(e)}")
@@ -90,11 +159,9 @@ model, scaler, label_encoders, le_class, autoencoder, model_type = load_model()
 def preprocess_data(df, label_encoders, le_class, is_train=True):
     df = df.copy()
     
-    # Handle missing values
     df.fillna({'protocol_type': 'missing', 'service': 'missing', 'flag': 'missing'}, inplace=True)
     df.fillna(0, inplace=True)
     
-    # Convert numeric columns
     numeric_cols = [
         col for col in nsl_kdd_columns 
         if col not in categorical_cols + ['class'] + low_importance_features
@@ -103,7 +170,6 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
-    # Encode categorical features
     for col in categorical_cols:
         df[col] = df[col].astype(str)
         df[col] = df[col].replace('', 'missing')
@@ -118,7 +184,6 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
                 label_encoders[col].classes_ = np.append(label_encoders[col].classes_, 'unknown')
             df[col] = label_encoders[col].transform(df[col])
     
-    # Encode target if exists
     if 'class' in df.columns:
         df['class'] = df['class'].astype(str)
         
@@ -132,7 +197,6 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
                 le_class.classes_ = np.append(le_class.classes_, 'unknown')
             df['class'] = le_class.transform(df['class'])
     
-    # Drop low importance features
     df = df.drop(columns=[col for col in low_importance_features if col in df.columns], errors='ignore')
     
     return df, label_encoders, le_class
@@ -149,7 +213,7 @@ def train_lstm_model(X_train, y_train, X_test, y_test):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     X_train_reshaped = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
     X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
-    model.fit(X_train_reshaped, y_train, epochs=5, batch_size=16, validation_data=(X_test_reshaped, y_test), verbose=0)
+    model.fit(X_train_reshaped, y_train, epochs=5, batch_size=8, validation_data=(X_test_reshaped, y_test), verbose=0)
     return model
 
 def train_autoencoder(X_train, epochs=10):
@@ -161,7 +225,7 @@ def train_autoencoder(X_train, epochs=10):
     decoder = Dense(input_dim, activation='linear')(decoder)
     autoencoder = Model(inputs=input_layer, outputs=decoder)
     autoencoder.compile(optimizer='adam', loss='mse')
-    autoencoder.fit(X_train, X_train, epochs=epochs, batch_size=16, verbose=0)
+    autoencoder.fit(X_train, X_train, epochs=epochs, batch_size=8, verbose=0)
     return autoencoder
 
 def detect_anomaly(input_data_scaled, autoencoder, threshold=0.1):
@@ -172,7 +236,6 @@ def detect_anomaly(input_data_scaled, autoencoder, threshold=0.1):
 def explain_threat(prediction, confidence, src_ip, xai_api_key=None, openai_api_key=None):
     prompt = f"Explain the network intrusion type '{prediction}' with confidence {confidence:.2%} from source IP {src_ip}. Suggest mitigation actions."
     
-    # Try xAI API first
     if xai_api_key:
         try:
             response = requests.post(
@@ -185,7 +248,6 @@ def explain_threat(prediction, confidence, src_ip, xai_api_key=None, openai_api_
         except Exception as e:
             st.warning(f"xAI API error: {str(e)}. Trying OpenAI API if provided.")
     
-    # Fallback to OpenAI API
     if openai_api_key:
         try:
             response = requests.post(
@@ -210,7 +272,6 @@ def predict_traffic(input_data, threshold=0.5):
     try:
         input_data = input_data.copy()
         
-        # Preprocess categorical features
         for col in categorical_cols:
             if col in input_data.columns:
                 input_data[col] = input_data[col].astype(str)
@@ -220,24 +281,18 @@ def predict_traffic(input_data, threshold=0.5):
                     label_encoders[col].classes_ = np.append(label_encoders[col].classes_, 'unknown')
                 input_data[col] = label_encoders[col].transform(input_data[col].astype(str))
         
-        # Drop low importance features
         input_data = input_data.drop(columns=low_importance_features, errors='ignore')
         
-        # Define expected features
         expected_features = [col for col in nsl_kdd_columns if col not in low_importance_features + ['class']]
         
-        # Ensure all expected features are present
         for col in expected_features:
             if col not in input_data.columns:
                 input_data[col] = 0
         
-        # Reorder columns
         input_data = input_data[expected_features]
         
-        # Scale features
         input_data_scaled = scaler.transform(input_data)
         
-        # Make prediction
         if model_type == 'LSTM':
             input_data_reshaped = input_data_scaled.reshape(input_data_scaled.shape[0], input_data_scaled.shape[1], 1)
             pred_prob = model.predict(input_data_reshaped, verbose=0)[:, 0]
@@ -259,7 +314,6 @@ def process_packet(packet, connection_tracker, time_window=10):
     if IP not in packet:
         return None
     
-    # Basic features
     features['protocol_type'] = packet[IP].proto
     if packet[IP].proto == 6:
         features['protocol_type'] = 'tcp'
@@ -282,14 +336,12 @@ def process_packet(packet, connection_tracker, time_window=10):
         features['service'] = 'other'
         features['flag'] = 'SF'
     
-    # Map service
     service_map = {
         '80': 'http', '443': 'http', '21': 'ftp', '22': 'ssh', '23': 'telnet',
         '25': 'smtp', '53': 'dns', '110': 'pop3', '143': 'imap'
     }
     features['service'] = service_map.get(features['service'], 'other')
     
-    # Connection-based features
     src_ip = packet[IP].src
     dst_ip = packet[IP].dst
     dst_port = packet[TCP].dport if TCP in packet else (packet[UDP].dport if UDP in packet else 0)
@@ -325,53 +377,47 @@ def generate_pdf_report(analysis_results, intrusion_count, total_packets, filena
     styles = getSampleStyleSheet()
     elements = []
     
-    # Title
     elements.append(Paragraph("AI-Enhanced IDPS Analysis Report", styles['Title']))
     elements.append(Spacer(1, 12))
     
-    # Summary
     summary_text = f"""
-    Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
-    PCAP File: {filename}<br/>
-    Total Packets Analyzed: {total_packets}<br/>
-    Intrusions Detected: {intrusion_count}<br/>
-    Normal Traffic: {total_packets - intrusion_count}
+    <b>Analysis Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
+    <b>PCAP File:</b> {filename}<br/>
+    <b>Total Packets Analyzed:</b> {total_packets}<br/>
+    <b>Intrusions Detected:</b> {intrusion_count}<br/>
+    <b>Normal Traffic:</b> {total_packets - intrusion_count}
     """
     elements.append(Paragraph(summary_text, styles['BodyText']))
     elements.append(Spacer(1, 12))
     
-    # Intrusion Timeline
     timeline_path = os.path.join(temp_dir, "intrusion_timeline.png")
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot([1 if r['is_intrusion'] else 0 for r in analysis_results], 'b-', label='Intrusion (1) / Normal (0)')
-    ax.set_ylim(-0.1, 1.1)
-    ax.set_xlabel("Packet Number")
-    ax.set_ylabel("Status")
-    ax.set_title("Intrusion Detection Timeline")
-    ax.legend()
-    fig.savefig(timeline_path, bbox_inches='tight')
-    plt.close(fig)
+    fig = px.line(
+        x=range(1, len(analysis_results) + 1),
+        y=[1 if r['is_intrusion'] else 0 for r in analysis_results],
+        labels={'x': 'Packet Number', 'y': 'Status'},
+        title="Intrusion Detection Timeline"
+    )
+    fig.update_yaxes(range=[-0.1, 1.1], tickvals=[0, 1], ticktext=['Normal', 'Intrusion'])
+    fig.write_to_file(timeline_path)
     elements.append(ReportLabImage(timeline_path, width=400, height=200))
     elements.append(Spacer(1, 12))
     
-    # Source IP Distribution
     src_ip_counts = pd.Series([r['src_ip'] for r in analysis_results if r['is_intrusion']]).value_counts().head(5)
     if not src_ip_counts.empty:
         ip_plot_path = os.path.join(temp_dir, "src_ip_distribution.png")
-        fig, ax = plt.subplots(figsize=(8, 4))
-        src_ip_counts.plot(kind='bar', ax=ax)
-        ax.set_xlabel("Source IP")
-        ax.set_ylabel("Intrusion Count")
-        ax.set_title("Top 5 Source IPs with Intrusions")
-        fig.savefig(ip_plot_path, bbox_inches='tight')
-        plt.close(fig)
+        fig = px.bar(
+            x=src_ip_counts.index,
+            y=src_ip_counts.values,
+            labels={'x': 'Source IP', 'y': 'Intrusion Count'},
+            title="Top 5 Source IPs with Intrusions"
+        )
+        fig.write_to_file(ip_plot_path)
         elements.append(ReportLabImage(ip_plot_path, width=400, height=200))
         elements.append(Spacer(1, 12))
     
-    # Results Table
     elements.append(Paragraph("Detailed Results", styles['Heading2']))
     data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly', 'Explanation']]
-    for r in analysis_results[:10]:  # Limit to first 10 for brevity
+    for r in analysis_results[:10]:
         data.append([
             str(r['packet_num']),
             r['src_ip'],
@@ -393,79 +439,108 @@ def generate_pdf_report(analysis_results, intrusion_count, total_packets, filena
     ]))
     elements.append(table)
     
-    # Recommendations
     elements.append(Paragraph("Recommendations", styles['Heading2']))
     rec_text = "Based on the analysis:<br/>"
     if intrusion_count > 0:
         rec_text += f"- Block the top source IPs: {', '.join(src_ip_counts.index)}.<br/>"
-        rec_text += "- Review network security policies to mitigate detected attack types.<br/>"
+        rec_text += "- Review firewall rules and enable deep packet inspection.<br/>"
     else:
-        rec_text += "- No intrusions detected; continue monitoring with regular PCAP uploads."
+        rec_text += "- No intrusions detected; maintain regular monitoring."
     elements.append(Paragraph(rec_text, styles['BodyText']))
     
-    # Build PDF
     doc.build(elements)
     return pdf_path
+
+def generate_csv_report(analysis_results):
+    df = pd.DataFrame(analysis_results)
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    return csv_buffer.getvalue()
+
+def generate_json_report(analysis_results):
+    df = pd.DataFrame(analysis_results)
+    return df.to_json(orient='records')
 
 def select_uncertain_packets(analysis_results, uncertainty_threshold=0.1):
     return [i for i, r in enumerate(analysis_results) if abs(r['confidence'] - 0.5) < uncertainty_threshold]
 
+def get_sample_pcap():
+    sample_data = """
+    0000   45 00 00 34 00 01 00 00 40 06 3a 8c c0 a8 01 02
+    0010   c0 a8 01 03 00 50 00 15 00 00 00 00 50 10 20 00
+    0020   8e 8f 00 00 47 45 54 20 2f 20 48 54 54 50 2f 31
+    0030   2e 31 0d 0a 0d 0a
+    """
+    temp_pcap = "sample.pcap"
+    with open(temp_pcap, "wb") as f:
+        f.write(bytes.fromhex(''.join(sample_data.split())))
+    return temp_pcap
+
 def show_pcap_analysis():
     global model, scaler, label_encoders, le_class, autoencoder, model_type
     
-    st.title("PCAP File Analysis")
+    st.header("PCAP File Analysis")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     if not SCAPY_AVAILABLE:
-        st.error("Scapy is not installed. Please install it with 'pip install scapy' and ensure libpcap is available.")
+        st.error("Scapy is not installed. Please install it with 'pip install scapy'.")
         return
     
     st.markdown("""
-    ### PCAP File Analysis
-    Upload a PCAP file to analyze network traffic for intrusions using AI-enhanced detection (LSTM, Autoencoders, Active Learning).
-    Provide an xAI or OpenAI API key for threat explanations.
-    """)
+    Analyze network traffic from PCAP files for intrusions using AI models (LSTM, Autoencoders, Active Learning).
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Upload a PCAP file or use the sample to detect intrusions. API keys enhance explanations.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # API key inputs
-    st.subheader("API Keys for Threat Explanations")
+    tabs = st.tabs(["Upload PCAP", "Use Sample PCAP"])
+    
+    with tabs[0]:
+        pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
+    
+    with tabs[1]:
+        if st.button("Use Sample PCAP"):
+            pcap_file = get_sample_pcap()
+            st.success("Sample PCAP loaded for analysis.")
+    
+    st.subheader("API Keys")
     col1, col2 = st.columns(2)
     with col1:
-        xai_api_key = st.text_input("xAI API Key", type="password")
+        xai_api_key = st.text_input("xAI API Key", type="password", value=st.session_state.xai_api_key)
+        if xai_api_key:
+            st.session_state.xai_api_key = xai_api_key
     with col2:
-        openai_api_key = st.text_input("OpenAI API Key", type="password")
+        openai_api_key = st.text_input("OpenAI API Key", type="password", value=st.session_state.openai_api_key)
+        if openai_api_key:
+            st.session_state.openai_api_key = openai_api_key
     
-    # Alert settings
-    st.subheader("Alert Settings")
-    alert_threshold = st.slider("Alert Confidence Threshold", 0.5, 0.9, 0.7, 0.05)
-    alert_recipient = st.text_input("Alert Recipient Email (Simulated)", "admin@example.com")
-    
-    # PCAP upload
-    pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
+    st.subheader("Settings")
     threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
+    alert_threshold = st.slider("Alert Confidence Threshold", 0.5, 0.9, 0.7, 0.05)
     
-    if pcap_file is not None and st.button("Analyze PCAP"):
+    if (pcap_file is not None or os.path.exists("sample.pcap")) and st.button("Analyze PCAP"):
         with st.spinner("Analyzing PCAP file..."):
+            progress_bar = st.progress(0)
             try:
-                # Save uploaded file
-                temp_pcap = "temp_upload.pcap"
-                with open(temp_pcap, "wb") as f:
-                    f.write(pcap_file.read())
+                if isinstance(pcap_file, str):
+                    packets = rdpcap(pcap_file)
+                    filename = "sample.pcap"
+                else:
+                    temp_pcap = "temp_upload.pcap"
+                    with open(temp_pcap, "wb") as f:
+                        f.write(pcap_file.read())
+                    packets = rdpcap(temp_pcap)
+                    filename = pcap_file.name
                 
-                # Read and process PCAP
-                packets = rdpcap(temp_pcap)
                 analysis_results = []
                 intrusion_count = 0
-                
-                status_placeholder = st.empty()
-                log_placeholder = st.empty()
                 
                 for i, packet in enumerate(packets):
                     features = process_packet(packet, st.session_state.connection_tracker)
                     if features is None:
-                        st.write(f"Packet {i+1}: Skipping non-IP packet")
                         continue
                     
                     input_df = pd.DataFrame([features])
@@ -481,18 +556,18 @@ def show_pcap_analysis():
                         input_data_scaled = scaler.transform(input_df)
                         is_anomaly = detect_anomaly(input_data_scaled, autoencoder)[0]
                     
-                    # Get threat explanation
-                    explanation = explain_threat(prediction, confidence, src_ip, xai_api_key, openai_api_key)
+                    explanation = explain_threat(prediction, confidence, src_ip, st.session_state.xai_api_key, st.session_state.openai_api_key)
                     
-                    if is_intrusion:
+                    if is_intrusion and confidence >= alert_threshold:
                         intrusion_count += 1
-                        if confidence >= alert_threshold:
-                            alert_message = f"Intrusion detected in packet {i+1} ({prediction}) from {src_ip} with confidence {confidence:.2%}"
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': alert_message,
-                                'recipient': alert_recipient
-                            })
+                        alert_message = f"Intrusion detected in packet {i+1} ({prediction}) from {src_ip} with confidence {confidence:.2%}"
+                        st.session_state.alert_log.append({
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'message': alert_message,
+                            'recipient': 'admin@example.com'
+                        })
+                        st.balloons()
+                        st.markdown(f"<div style='background-color:#ff4d4d;padding:10px;border-radius:5px;'>🚨 {alert_message}</div>", unsafe_allow_html=True)
                     
                     analysis_results.append({
                         'packet_num': i+1,
@@ -503,44 +578,81 @@ def show_pcap_analysis():
                         'is_anomaly': is_anomaly,
                         'explanation': explanation
                     })
+                    progress_bar.progress((i + 1) / len(packets))
                 
-                # Save to history
                 history_entry = {
                     'timestamp': datetime.now(),
-                    'filename': pcap_file.name,
+                    'filename': filename,
                     'total_packets': len(packets),
                     'intrusion_count': intrusion_count,
                     'results': analysis_results
                 }
                 st.session_state.analysis_history.append(history_entry)
                 
-                # Update status
-                status_placeholder.markdown(f"""
-                **Analysis complete**  
-                Total packets: {len(packets)}  
-                Intrusions detected: {intrusion_count}  
-                Normal traffic: {len(packets) - intrusion_count}
-                """)
+                st.success(f"Analysis complete: {intrusion_count} intrusions detected in {len(packets)} packets.")
                 
-                # Display results
-                st.subheader("Detailed Results")
+                st.subheader("Interactive Dashboard")
                 result_df = pd.DataFrame(analysis_results)
-                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly', 'explanation']])
                 
-                # Feedback with Active Learning
-                st.subheader("Provide Feedback")
-                with st.form(f"feedback_form_{pcap_file.name}"):
+                fig_heatmap = px.density_heatmap(
+                    result_df[result_df['is_intrusion']],
+                    x='confidence',
+                    y='prediction',
+                    title="Intrusion Confidence Heatmap",
+                    labels={'confidence': 'Confidence', 'prediction': 'Attack Type'}
+                )
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+                
+                fig_treemap = px.treemap(
+                    result_df[result_df['is_intrusion']],
+                    path=['prediction', 'src_ip'],
+                    values='confidence',
+                    title="Attack Type and Source IP Treemap"
+                )
+                st.plotly_chart(fig_treemap, use_container_width=True)
+                
+                st.subheader("Results Table")
+                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly', 'explanation']], use_container_width=True)
+                
+                st.subheader("Export Report")
+                col_pdf, col_csv, col_json = st.columns(3)
+                with col_pdf:
+                    pdf_path = generate_pdf_report(analysis_results, intrusion_count, len(packets), filename)
+                    with open(pdf_path, "rb") as f:
+                        st.download_button(
+                            label="Download PDF",
+                            data=f,
+                            file_name=os.path.basename(pdf_path),
+                            mime="application/pdf"
+                        )
+                with col_csv:
+                    csv_data = generate_csv_report(analysis_results)
+                    st.download_button(
+                        label="Download CSV",
+                        data=csv_data,
+                        file_name=f"IDPS_Report_{filename}.csv",
+                        mime="text/csv"
+                    )
+                with col_json:
+                    json_data = generate_json_report(analysis_results)
+                    st.download_button(
+                        label="Download JSON",
+                        data=json_data,
+                        file_name=f"IDPS_Report_{filename}.json",
+                        mime="application/json"
+                    )
+                
+                st.subheader("Feedback")
+                with st.form(f"feedback_form_{filename}"):
                     uncertain_indices = select_uncertain_packets(analysis_results)
                     feedback_indices = st.multiselect(
-                        "Select packets to mark as incorrect (suggested uncertain packets pre-selected)",
+                        "Select packets to mark as incorrect",
                         options=result_df.index,
                         default=uncertain_indices,
                         format_func=lambda x: f"Packet {result_df.loc[x, 'packet_num']} ({result_df.loc[x, 'prediction']}, Confidence: {result_df.loc[x, 'confidence']:.2%})"
                     )
                     correct_label = st.selectbox("Correct Label", ['normal'] + list(le_class.classes_))
-                    feedback_submit = st.form_submit_button("Submit Feedback")
-                    
-                    if feedback_submit and feedback_indices:
+                    if st.form_submit_button("Submit Feedback"):
                         for idx in feedback_indices:
                             packet_features = process_packet(packets[result_df.loc[idx, 'packet_num'] - 1], st.session_state.connection_tracker)
                             if packet_features:
@@ -548,42 +660,32 @@ def show_pcap_analysis():
                                 st.session_state.feedback_data.append(packet_features)
                         st.success(f"Feedback saved for {len(feedback_indices)} packets.")
                 
-                # Generate and download report
-                st.subheader("Download Report")
-                pdf_path = generate_pdf_report(analysis_results, intrusion_count, len(packets), pcap_file.name)
-                with open(pdf_path, "rb") as f:
-                    st.download_button(
-                        label="Download PDF Report",
-                        data=f,
-                        file_name=os.path.basename(pdf_path),
-                        mime="application/pdf"
-                    )
-                
-                # Clean up
-                os.remove(temp_pcap)
-                for temp_file in ['intrusion_timeline.png', 'src_ip_distribution.png']:
-                    temp_file_path = os.path.join("temp", temp_file)
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
+                if isinstance(pcap_file, str):
+                    os.remove(pcap_file)
+                else:
+                    os.remove(temp_pcap)
                 
             except Exception as e:
                 st.error(f"Error during PCAP analysis: {str(e)}")
-                if os.path.exists(temp_pcap):
-                    os.remove(temp_pcap)
+                if os.path.exists("temp_upload.pcap"):
+                    os.remove("temp_upload.pcap")
+                if os.path.exists("sample.pcap"):
+                    os.remove("sample.pcap")
 
 def show_historical_analysis():
-    st.title("Historical Analysis Dashboard")
+    st.header("Historical Analysis Dashboard")
     
     if not st.session_state.analysis_history:
-        st.info("No analysis history available. Upload and analyze a PCAP file first.")
+        st.info("No analysis history available. Analyze a PCAP file first.")
         return
     
     st.markdown("""
-    ### Historical Analysis
-    View trends and insights from past PCAP analyses.
-    """)
+    Visualize trends and insights from past PCAP analyses.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Filter by date to explore intrusion trends and attack distributions.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Convert history to DataFrame
     history_df = pd.DataFrame([
         {
             'Timestamp': h['timestamp'],
@@ -595,8 +697,7 @@ def show_historical_analysis():
         for h in st.session_state.analysis_history
     ])
     
-    # Date filter
-    st.subheader("Filter by Date")
+    st.subheader("Date Filter")
     min_date = min(history_df['Timestamp']).date()
     max_date = max(history_df['Timestamp']).date()
     start_date, end_date = st.date_input("Select date range", [min_date, max_date], min_value=min_date, max_value=max_date)
@@ -606,62 +707,53 @@ def show_historical_analysis():
         (history_df['Timestamp'].dt.date <= end_date)
     ]
     
-    # Summary
     st.subheader("Summary")
-    st.write(f"Total Analyses: {len(filtered_df)}")
-    st.write(f"Total Packets: {filtered_df['Total Packets'].sum()}")
-    st.write(f"Total Intrusions: {filtered_df['Intrusions'].sum()}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Analyses", len(filtered_df))
+    col2.metric("Total Packets", filtered_df['Total Packets'].sum())
+    col3.metric("Total Intrusions", filtered_df['Intrusions'].sum())
     
-    # Visualizations
     st.subheader("Intrusion Trends")
-    fig, ax = plt.subplots(figsize=(10, 4))
-    filtered_df.set_index('Timestamp')['Intrusions'].plot(ax=ax, label='Intrusions')
-    filtered_df.set_index('Timestamp')['Normal'].plot(ax=ax, label='Normal')
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Count")
-    ax.set_title("Intrusion and Normal Traffic Over Time")
-    ax.legend()
-    st.pyplot(fig)
+    fig = px.line(
+        filtered_df,
+        x='Timestamp',
+        y=['Intrusions', 'Normal'],
+        title="Intrusion and Normal Traffic Over Time",
+        labels={'value': 'Count', 'variable': 'Traffic Type'}
+    )
+    st.plotly_chart(fig, use_container_width=True)
     
-    # Top Source IPs
-    st.subheader("Top Source IPs with Intrusions")
+    st.subheader("Attack Type Distribution")
     all_results = []
     for h in st.session_state.analysis_history:
         if h['timestamp'].date() >= start_date and h['timestamp'].date() <= end_date:
             all_results.extend(h['results'])
     
     if all_results:
-        src_ip_counts = pd.Series([r['src_ip'] for r in all_results if r['is_intrusion']]).value_counts().head(5)
-        fig, ax = plt.subplots(figsize=(8, 4))
-        src_ip_counts.plot(kind='bar', ax=ax)
-        ax.set_xlabel("Source IP")
-        ax.set_ylabel("Intrusion Count")
-        ax.set_title("Top 5 Source IPs with Intrusions")
-        st.pyplot(fig)
-    
-    # Attack Type Distribution
-    st.subheader("Attack Type Distribution")
-    attack_types = pd.Series([r['prediction'] for r in all_results if r['is_intrusion']]).value_counts()
-    if not attack_types.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        attack_types.plot(kind='pie', ax=ax, autopct='%1.1f%%')
-        ax.set_title("Distribution of Attack Types")
-        st.pyplot(fig)
+        attack_types = pd.Series([r['prediction'] for r in all_results if r['is_intrusion']]).value_counts()
+        fig = px.pie(
+            names=attack_types.index,
+            values=attack_types.values,
+            title="Distribution of Attack Types"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 def show_alert_log():
-    st.title("Alert Log")
+    st.header("Alert Log")
     
     if not st.session_state.alert_log:
-        st.info("No alerts generated yet. Analyze a PCAP file with a high confidence threshold to trigger alerts.")
+        st.info("No alerts generated yet. Analyze a PCAP file with a high confidence threshold.")
         return
     
     st.markdown("""
-    ### Alert Log
-    View simulated email alerts for detected intrusions.
-    """)
+    View intrusion alerts with timestamps and details.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Alerts are triggered when intrusions exceed the confidence threshold.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     alert_df = pd.DataFrame(st.session_state.alert_log)
-    st.dataframe(alert_df[['timestamp', 'message', 'recipient']])
+    st.dataframe(alert_df[['timestamp', 'message', 'recipient']], use_container_width=True)
     
     if st.button("Clear Alert Log"):
         st.session_state.alert_log = []
@@ -670,27 +762,26 @@ def show_alert_log():
 def show_retrain_model():
     global model, scaler, label_encoders, le_class, model_type
     
-    st.title("Retrain Model with Feedback")
+    st.header("Retrain Model")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     st.markdown("""
-    ### Retrain Model
-    Use feedback from PCAP analyses to improve the model. Active learning prioritizes uncertain predictions.
-    """)
+    Improve the model using feedback from PCAP analyses.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Active learning prioritizes uncertain predictions for feedback.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     if not st.session_state.feedback_data:
         st.info("No feedback data available. Provide feedback on PCAP analysis results first.")
         return
     
-    # Display feedback data
-    st.subheader("Feedback Data")
     feedback_df = pd.DataFrame(st.session_state.feedback_data)
-    st.dataframe(feedback_df[[col for col in nsl_kdd_columns if col in feedback_df.columns]])
+    st.dataframe(feedback_df[[col for col in nsl_kdd_columns if col in feedback_df.columns]], use_container_width=True)
     
-    # Retraining parameters
     st.subheader("Retrain Parameters")
     col1, col2 = st.columns(2)
     with col1:
@@ -703,36 +794,27 @@ def show_retrain_model():
     if st.button("Retrain Model"):
         with st.spinner("Retraining model..."):
             try:
-                # Load original training data
                 train_file = st.session_state.get('last_train_file')
                 if train_file:
                     data = pd.read_csv(train_file, names=nsl_kdd_columns, header=None)
                 else:
                     data = pd.DataFrame(columns=nsl_kdd_columns)
                 
-                # Append feedback data
-                feedback_df = pd.DataFrame(st.session_state.feedback_data)
                 data = pd.concat([data, feedback_df], ignore_index=True)
                 
-                # Preprocess
                 data, label_encoders, le_class = preprocess_data(data, {}, None, is_train=True)
                 
-                # Separate features and labels
                 X = data.drop('class', axis=1)
                 y = data['class']
                 
-                # Scale features
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
                 
-                # Split data
                 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
                 
-                # Apply SMOTE
                 smote = SMOTE(random_state=42)
                 X_train, y_train = smote.fit_resample(X_train, y_train)
                 
-                # Train model
                 if model_type == 'LSTM':
                     model = train_lstm_model(X_train, y_train, X_test, y_test)
                 else:
@@ -745,7 +827,6 @@ def show_retrain_model():
                     )
                     model.fit(X_train, y_train)
                 
-                # Evaluate
                 if model_type == 'LSTM':
                     X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
                     y_pred = (model.predict(X_test_reshaped, verbose=0) > 0.5).astype(int).flatten()
@@ -757,78 +838,38 @@ def show_retrain_model():
                 target_names = [le_class.classes_[i] for i in unique_labels]
                 report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
                 
-                # Save model and objects
                 joblib.dump(model, 'idps_model.pkl')
                 joblib.dump(scaler, 'scaler.pkl')
                 joblib.dump(label_encoders, 'label_encoders.pkl')
                 joblib.dump(le_class, 'le_class.pkl')
                 joblib.dump(model_type, 'model_type.pkl')
                 
-                # Display results
                 st.success("Model retrained successfully!")
                 st.metric("Accuracy", f"{accuracy:.2%}")
-                
-                st.subheader("Classification Report")
                 st.text(report)
                 
             except Exception as e:
                 st.error(f"Error during retraining: {str(e)}")
 
-def show_home():
-    global model, model_type
-    
-    st.title("AI-Enhanced Intrusion Detection and Prevention System")
-    st.markdown("""
-    Welcome to the AI-Enhanced IDPS application. This system uses advanced AI (XGBoost, LSTM, Autoencoders) 
-    to detect and prevent network intrusions using the NSL-KDD dataset. Optional Generative AI provides threat explanations.
-    
-    ### AI Features:
-    - **Deep Learning (LSTM)**: Captures temporal patterns in traffic.
-    - **Anomaly Detection (Autoencoders)**: Flags zero-day attacks.
-    - **Active Learning**: Optimizes feedback for model improvement.
-    - **Generative AI**: Explains intrusions (requires xAI or OpenAI API key).
-    
-    ### Other Features:
-    - Train and test intrusion detection models
-    - Analyze PCAP files for intrusions
-    - View historical analysis trends
-    - Retrain models with feedback
-    - Receive simulated alert notifications
-    - Export analysis reports as PDF
-    
-    ### Navigation:
-    - Use the sidebar to access different functionalities
-    """)
-    
-    if model is not None:
-        st.success(f"A trained {model_type} model is loaded and ready for use!")
-    else:
-        st.warning("No trained model found. Please train a model first.")
-
 def show_train_model():
     global model, scaler, label_encoders, le_class, autoencoder, model_type
     
-    st.title("Train New IDPS Model")
+    st.header("Train New Model")
     
     if model is not None:
-        st.warning("A trained model already exists. Training a new model will overwrite the existing one.")
+        st.warning("A trained model exists. Training a new model will overwrite it.")
     
     st.markdown("""
-    ### Training Instructions:
-    1. Upload the training data file (KDDTrain+.csv)
-    2. Select model type (XGBoost or LSTM)
-    3. Configure model parameters
-    4. Optionally train an autoencoder for anomaly detection
-    5. Click 'Train Model' button
-    """)
+    Train a new IDPS model using the NSL-KDD dataset.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Upload training data and select model type to start.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # File uploader
     train_file = st.file_uploader("Upload Training Data (CSV)", type=["csv"])
     
-    # Model selection
     model_type = st.selectbox("Model Type", ["XGBoost", "LSTM"], index=0)
     
-    # Model parameters
     st.subheader("Model Parameters")
     if model_type == "XGBoost":
         col1, col2 = st.columns(2)
@@ -846,103 +887,101 @@ def show_train_model():
             'random_state': 42
         }
     else:
-        params = {}  # LSTM parameters are fixed in train_lstm_model
+        params = {}
     
-    # Autoencoder option
     train_autoencoder_option = st.checkbox("Train Autoencoder for Anomaly Detection")
     
     if st.button("Train Model"):
         if train_file is not None:
             with st.spinner("Training model..."):
                 try:
-                    # Load and preprocess data
                     data = pd.read_csv(train_file, names=nsl_kdd_columns, header=None)
                     data, label_encoders, le_class = preprocess_data(data, {}, None, is_train=True)
                     
-                    # Separate features and labels
                     X = data.drop('class', axis=1)
                     y = data['class']
                     
-                    # Scale features
                     scaler = StandardScaler()
                     X_scaled = scaler.fit_transform(X)
                     
-                    # Split data
                     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
                     
-                    # Apply SMOTE
                     smote = SMOTE(random_state=42)
                     X_train, y_train = smote.fit_resample(X_train, y_train)
                     
-                    # Train model
                     if model_type == "LSTM":
                         model = train_lstm_model(X_train, y_train, X_test, y_test)
                         X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
                         y_pred = (model.predict(X_test_reshaped, verbose=0) > 0.5).astype(int).flatten()
+                        y_pred_prob = model.predict(X_test_reshaped, verbose=0)[:, 0]
                     else:
                         model = XGBClassifier(**params)
                         model.fit(X_train, y_train)
                         y_pred = model.predict(X_test)
+                        y_pred_prob = model.predict_proba(X_test)[:, 1]
                     
-                    # Evaluate
                     accuracy = accuracy_score(y_test, y_pred)
                     unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                     target_names = [le_class.classes_[i] for i in unique_labels]
                     report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
                     
-                    # Train autoencoder if selected
                     if train_autoencoder_option:
                         X_normal = X_train[y_train == le_class.transform(['normal'])[0]]
                         autoencoder = train_autoencoder(scaler.transform(X_normal))
                         joblib.dump(autoencoder, 'autoencoder.pkl')
                     
-                    # Save model and objects
                     joblib.dump(model, 'idps_model.pkl')
                     joblib.dump(scaler, 'scaler.pkl')
                     joblib.dump(label_encoders, 'label_encoders.pkl')
                     joblib.dump(le_class, 'le_class.pkl')
                     joblib.dump(model_type, 'model_type.pkl')
                     
-                    # Save train file for retraining
                     st.session_state['last_train_file'] = train_file
                     
-                    # Display results
                     st.success(f"{model_type} model trained successfully!")
                     st.metric("Accuracy", f"{accuracy:.2%}")
                     
-                    st.subheader("Classification Report")
-                    st.text(report)
+                    st.subheader("Model Performance")
+                    fpr, tpr, _ = roc_curve(y_test, y_pred_prob, pos_label=le_class.transform(['normal'])[0])
+                    roc_auc = auc(fpr, tpr)
+                    fig_roc = px.line(
+                        x=fpr, y=tpr,
+                        title=f"ROC Curve (AUC = {roc_auc:.2f})",
+                        labels={'x': 'False Positive Rate', 'y': 'True Positive Rate'}
+                    )
+                    fig_roc.add_shape(type='line', line=dict(dash='dash'), x0=0, x1=1, y0=0, y1=1)
+                    st.plotly_chart(fig_roc, use_container_width=True)
                     
-                    # Feature importance (XGBoost only)
-                    if model_type == "XGBoost":
-                        st.subheader("Feature Importance")
-                        importances = model.feature_importances_
-                        feature_names = X.columns
-                        importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
-                        importance_df = importance_df.sort_values('Importance', ascending=False)
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        sns.barplot(x='Importance', y='Feature', data=importance_df.head(20), ax=ax)
-                        st.pyplot(fig)
+                    precision, recall, _ = precision_recall_curve(y_test, y_pred_prob, pos_label=le_class.transform(['normal'])[0])
+                    fig_pr = px.line(
+                        x=recall, y=precision,
+                        title="Precision-Recall Curve",
+                        labels={'x': 'Recall', 'y': 'Precision'}
+                    )
+                    st.plotly_chart(fig_pr, use_container_width=True)
+                    
+                    st.text(report)
                     
                 except Exception as e:
                     st.error(f"Error during training: {str(e)}")
         else:
-            st.error("Please upload a training data file first.")
+            st.error("Please upload a training data file.")
 
 def show_test_model():
     global model, scaler, label_encoders, le_class, model_type
     
-    st.title("Test IDPS Model")
+    st.header("Test Model")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     st.markdown("""
-    ### Testing Options:
-    1. Upload test data file (KDDTest+.csv)
-    2. Enter manual test data
-    """)
+    Test the IDPS model with a test dataset or manual input.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Upload test data or enter traffic parameters to evaluate model performance.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     test_option = st.radio("Select testing method", ["Upload Test File", "Manual Input"])
     
@@ -952,41 +991,34 @@ def show_test_model():
         if test_file is not None and st.button("Run Test"):
             with st.spinner("Testing model..."):
                 try:
-                    # Load and preprocess test data
                     test_data = pd.read_csv(test_file, names=nsl_kdd_columns, header=None)
                     test_data, _, _ = preprocess_data(test_data, label_encoders, le_class, is_train=False)
                     
-                    # Separate features and labels
                     X_test = test_data.drop('class', axis=1)
                     y_test = test_data['class']
                     
-                    # Scale features
                     X_test_scaled = scaler.transform(X_test)
                     
-                    # Make predictions
                     threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
                     if model_type == 'LSTM':
                         X_test_reshaped = X_test_scaled.reshape(X_test_scaled.shape[0], X_test_scaled.shape[1], 1)
                         y_pred_prob = model.predict(X_test_reshaped, verbose=0)[:, 0]
+                        y_pred = (y_pred_prob >= threshold).astype(int).flatten()
                     else:
                         y_pred_prob = model.predict_proba(X_test_scaled)[:, 1]
-                    y_pred = (y_pred_prob >= threshold).astype(int)
+                        y_pred = (y_pred_prob >= threshold).astype(int)
                     
-                    # Get unique labels
                     unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                     target_names = [le_class.classes_[i] for i in unique_labels]
                     
-                    # Evaluate
                     accuracy = accuracy_score(y_test, y_pred)
                     report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
                     
-                    # Display results
                     st.metric("Accuracy", f"{accuracy:.2%}")
                     
                     st.subheader("Classification Report")
                     st.text(report)
                     
-                    # Confusion matrix
                     st.subheader("Confusion Matrix")
                     conf_matrix = pd.crosstab(
                         le_class.inverse_transform(y_test),
@@ -994,14 +1026,18 @@ def show_test_model():
                         rownames=['Actual'],
                         colnames=['Predicted']
                     )
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', ax=ax)
-                    st.pyplot(fig)
+                    fig_cm = px.imshow(
+                        conf_matrix,
+                        text_auto=True,
+                        title="Confusion Matrix",
+                        color_continuous_scale='Blues'
+                    )
+                    st.plotly_chart(fig_cm, use_container_width=True)
                     
                 except Exception as e:
                     st.error(f"Error during testing: {str(e)}")
     
-    else:  # Manual Input
+    else:
         st.subheader("Enter Network Traffic Parameters")
         
         with st.form("manual_test_form"):
@@ -1067,33 +1103,30 @@ def show_test_model():
                 prediction, confidence = predict_traffic(input_df, threshold)
                 
                 if prediction is not None and confidence is not None:
-                    st.subheader("Detection Result")
                     if prediction == 'normal':
                         st.success(f"Normal traffic detected (Confidence: {confidence:.2%})")
                     else:
                         st.error(f"Intrusion detected: {prediction} (Confidence: {confidence:.2%})")
                     
-                    st.subheader("Recommended Action")
-                    if prediction == 'normal':
-                        st.info("✅ Allow traffic - No malicious activity detected")
-                    else:
-                        st.warning("⛔ Block traffic - Potential intrusion detected")
+                    explanation = explain_threat(prediction, confidence, "Manual Input", st.session_state.xai_api_key, st.session_state.openai_api_key)
+                    st.markdown(f"**Explanation**: {explanation}")
 
 def show_realtime_detection():
     global model, scaler, label_encoders, le_class, model_type
     
-    st.title("Real-time Intrusion Detection Simulation")
+    st.header("Real-time Intrusion Detection Simulation")
     
     if model is None:
         st.error("No trained model found. Please train a model first.")
         return
     
     st.markdown("""
-    ### Real-time Simulation
-    Simulate real-time network traffic monitoring using random data.
-    """)
+    Simulate real-time network traffic monitoring.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Generate random traffic to test the model's real-time detection capabilities.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.subheader("Simulation Controls")
     simulation_speed = st.select_slider("Simulation Speed", options=["Slow", "Normal", "Fast"], value="Normal")
     num_samples = st.slider("Number of samples to simulate", 10, 100, 20)
     threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
@@ -1154,6 +1187,8 @@ def show_realtime_detection():
             is_intrusion = prediction != 'normal'
             if is_intrusion:
                 intrusion_count += 1
+                st.balloons()
+                st.markdown(f"<div style='background-color:#ff4d4d;padding:10px;border-radius:5px;'>🚨 Intrusion detected: {prediction} (Confidence: {confidence:.2%})</div>", unsafe_allow_html=True)
             results.append(is_intrusion)
             
             status_placeholder.markdown(f"""
@@ -1162,94 +1197,118 @@ def show_realtime_detection():
             Total intrusions detected: {intrusion_count}
             """)
             
-            fig, ax = plt.subplots(figsize=(10, 3))
-            ax.plot(results, 'b-', label='Intrusion (1) / Normal (0)')
-            ax.set_ylim(-0.1, 1.1)
-            ax.set_xlabel("Sample")
-            ax.set_ylabel("Status")
-            ax.set_title("Detection Results Over Time")
-            chart_placeholder.pyplot(fig)
+            fig = px.line(
+                x=range(1, len(results) + 1),
+                y=results,
+                title="Detection Results Over Time",
+                labels={'x': 'Sample', 'y': 'Status'},
+            )
+            fig.update_yaxes(range=[-0.1, 1.1], tickvals=[0, 1], ticktext=['Normal', 'Intrusion'])
+            chart_placeholder.plotly_chart(fig, use_container_width=True)
             
-            if is_intrusion:
-                log_placeholder.markdown(f"""
-                **Sample {i+1}**: 🚨 Intrusion detected ({prediction}) with confidence {confidence:.2%}
-                """, unsafe_allow_html=True)
-            else:
-                log_placeholder.markdown(f"""
-                **Sample {i+1}**: ✅ Normal traffic with confidence {confidence:.2%}
-                """, unsafe_allow_html=True)
+            log_placeholder.markdown(f"**Sample {i+1}**: {'🚨 Intrusion' if is_intrusion else '✅ Normal'} (Confidence: {confidence:.2%})")
             
             time.sleep(delay)
         
         st.success(f"Simulation complete! Detected {intrusion_count} intrusions out of {num_samples} samples.")
 
-def show_about():
-    st.title("About This Project")
+def show_threat_intelligence():
+    st.header("Threat Intelligence Feed")
     
     st.markdown("""
-    ### AI-Enhanced Intrusion Detection and Prevention System (IDPS)
+    Stay updated with the latest cybersecurity threats.
+    <div class="tooltip">ℹ️
+        <span class="tooltiptext">Mock feed showcasing recent threats for demonstration purposes.</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    This application demonstrates advanced AI techniques for network intrusion detection and prevention.
+    mock_feed = [
+        {"date": "2025-05-01", "threat": "DDoS Attack", "description": "Increased botnet activity targeting cloud services.", "severity": "High"},
+        {"date": "2025-04-30", "threat": "Phishing Campaign", "description": "Spear-phishing emails targeting corporate users.", "severity": "Medium"},
+        {"date": "2025-04-29", "threat": "Ransomware", "description": "New variant exploiting unpatched systems.", "severity": "Critical"}
+    ]
     
-    **AI Features:**
-    - **Deep Learning (LSTM)**: Models temporal patterns in network traffic.
-    - **Anomaly Detection (Autoencoders)**: Detects zero-day attacks via unsupervised learning.
-    - **Active Learning**: Optimizes feedback by prioritizing uncertain predictions.
-    - **Generative AI**: Explains intrusions using xAI or OpenAI APIs.
+    for item in mock_feed:
+        st.markdown(f"""
+        **{item['date']} - {item['threat']}** ({item['severity']})  
+        {item['description']}
+        """)
+
+def show_documentation():
+    st.header("Project Documentation")
     
-    **Other Features:**
-    - Uses XGBoost or LSTM classifiers
-    - Trained on the NSL-KDD dataset
-    - Analyzes PCAP files for intrusions
-    - Provides historical analysis dashboard
-    - Supports model retraining with feedback
-    - Simulates alert notifications
-    - Exports analysis reports as PDF
-    
-    **Technical Details:**
-    - Python 3.x
-    - Streamlit for the web interface
-    - Scikit-learn, TensorFlow for machine learning
-    - XGBoost for traditional ML
-    - Imbalanced-learn for handling class imbalance
-    - Scapy for PCAP processing
-    - ReportLab for PDF generation
-    
-    **Dataset Information:**
-    The NSL-KDD dataset is a refined version of the KDD Cup 99 dataset, containing network connection records
-    labeled as either normal or as specific attack types.
-    
-    **Attack Types:**
-    - Denial of Service (DoS)
-    - Probe (surveillance and probing)
-    - Remote-to-Local (R2L)
-    - User-to-Root (U2R)
-    """)
-    
-    st.subheader("How to Use")
     st.markdown("""
-    1. **Train Model**: Upload training data, select XGBoost or LSTM, and optionally train an autoencoder
-    2. **Test Model**: Evaluate the model with test data or manual input
-    3. **PCAP Analysis**: Upload PCAP files to detect intrusions with anomaly detection
-    4. **Historical Analysis**: View trends from past analyses
-    5. **Retrain Model**: Improve the model with active learning feedback
-    6. **Alert Log**: Review simulated intrusion alerts
-    """)
+    ### AI-Enhanced Intrusion Detection and Prevention System
     
-    st.subheader("Disclaimer")
-    st.markdown("""
-    This is a demonstration project for educational purposes. Not intended for production use without security reviews.
-    Deployed on Streamlit Cloud with TensorFlow CPU for compatibility.
+    **Overview**  
+    This IDPS leverages machine learning (XGBoost, LSTM, Autoencoders) and Generative AI to detect and prevent network intrusions. Built for academic and professional use, it offers a user-friendly interface and advanced analytics.
+    
+    **Objectives**  
+    - Detect network intrusions with high accuracy using ML models.
+    - Provide actionable insights with Generative AI explanations.
+    - Enable real-time monitoring and historical analysis.
+    
+    **System Architecture**  
+    - **Data Ingestion**: Processes NSL-KDD datasets and PCAP files using Scapy.
+    - **ML Models**: XGBoost for classification, LSTM for temporal patterns, Autoencoders for anomaly detection.
+    - **Generative AI**: Integrates xAI/OpenAI APIs for threat explanations.
+    - **Frontend**: Streamlit with Plotly for interactive visualizations.
+    - **Storage**: In-memory session state for scalability.
+    
+    **Key Features**  
+    - Real-time intrusion detection simulation.
+    - Interactive dashboards with Plotly visualizations.
+    - Multi-format report export (PDF, CSV, JSON).
+    - Active learning for model improvement.
+    - Mock threat intelligence feed.
+    
+    **Methodology**  
+    - **Dataset**: NSL-KDD with 41 features and attack labels (DoS, Probe, R2L, U2R).
+    - **Preprocessing**: Label encoding, SMOTE for class imbalance, feature scaling.
+    - **Evaluation**: Accuracy, ROC-AUC, Precision-Recall curves.
+    
+    **Technology Stack**  
+    - Python, Streamlit, Scikit-learn, TensorFlow, XGBoost, Scapy, Plotly, ReportLab.
+    
+    **Future Improvements**  
+    - Integrate live network capture with Scapy.
+    - Support additional datasets (e.g., CICIDS2017).
+    - Enhance Generative AI with custom prompts.
+    
+    **Contact**  
+    For feedback, contact the developer via [email@example.com](mailto:email@example.com).
     """)
 
 def main():
-    st.sidebar.title("Navigation")
-    app_mode = st.sidebar.selectbox("Choose a page", 
-                                   ["Home", "Train Model", "Test Model", "Real-time Detection", 
-                                    "PCAP Analysis", "Historical Analysis", "Alert Log", "Retrain Model", "About"])
+    st.sidebar.image("https://via.placeholder.com/150?text=IDPS+Logo", use_column_width=True)
+    st.sidebar.title("AI-Enhanced IDPS")
+    st.sidebar.button("Toggle Theme", on_click=toggle_theme)
+    
+    app_mode = st.sidebar.selectbox(
+        "Navigation",
+        ["Home", "Train Model", "Test Model", "Real-time Detection", "PCAP Analysis", "Historical Analysis", "Alert Log", "Retrain Model", "Threat Intelligence", "Documentation"],
+        format_func=lambda x: f"{'🛠️' if x in ['Train Model', 'Retrain Model'] else '📊' if x in ['Historical Analysis', 'Test Model'] else '🚨' if x == 'Alert Log' else '🌐' if x == 'Real-time Detection' else '🔍' if x == 'PCAP Analysis' else 'ℹ️' if x == 'Documentation' else '📰' if x == 'Threat Intelligence' else '🏠'} {x}"
+    )
     
     if app_mode == "Home":
-        show_home()
+        st.header("AI-Enhanced Intrusion Detection and Prevention System")
+        st.markdown("""
+        Welcome to a state-of-the-art IDPS powered by AI. Detect and prevent network intrusions with advanced machine learning and Generative AI.
+        
+        ### Features
+        - **Deep Learning**: LSTM for temporal pattern detection.
+        - **Anomaly Detection**: Autoencoders for zero-day attacks.
+        - **Generative AI**: Threat explanations via xAI/OpenAI APIs.
+        - **Interactive Dashboards**: Visualize threats with Plotly.
+        - **Real-time Alerts**: Instant notifications for intrusions.
+        
+        Start by training a model or analyzing a PCAP file!
+        """)
+        if model is not None:
+            st.success(f"Loaded {model_type} model is ready!")
+        else:
+            st.warning("Train a model to begin.")
+    
     elif app_mode == "Train Model":
         show_train_model()
     elif app_mode == "Test Model":
@@ -1264,8 +1323,10 @@ def main():
         show_alert_log()
     elif app_mode == "Retrain Model":
         show_retrain_model()
-    elif app_mode == "About":
-        show_about()
+    elif app_mode == "Threat Intelligence":
+        show_threat_intelligence()
+    elif app_mode == "Documentation":
+        show_documentation()
 
 if __name__ == "__main__":
     main()
