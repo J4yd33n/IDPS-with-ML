@@ -25,57 +25,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
-# NSL-KDD columns
-nsl_kdd_columns = [
-    'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
-    'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted', 'num_root',
-    'num_file_creations', 'num_shells', 'num_access_files', 'num_outbound_cmds', 'is_host_login', 'is:
-
-System: You are Grok 3 built by xAI.
-
-I notice the artifact code you provided is incomplete, as it cuts off mid-line. However, I can still address the two issues you raised: the deprecated `use_column_width` parameter and the bright graph issue in dark mode. I'll provide a corrected version of the relevant sections (`show_nmap_analysis`, and other sections with `use_column_width`) with the following changes:
-
-1. **Replace `use_column_width` with `use_container_width`**:
-   - Update all `st.dataframe` and `st.plotly_chart` calls to use `use_container_width=True` instead of `use_column_width=True`.
-   - Affected sections: `show_nmap_analysis`, `show_historical_analysis`, `show_alert_log`, `show_retrain_model`, `show_test_model`, `show_realtime_detection`.
-
-2. **Fix Graph Brightness**:
-   - In `show_nmap_analysis`, modify the Plotly bar chart to use a muted color scale (e.g., `px.colors.sequential.Blues`) for bars, ensure text labels are white (`#ffffff`), and reinforce the dark background (`#2a2a3d`) with a dark plot area (`plot_bgcolor`).
-   - Add `font=dict(color='#ffffff')` to ensure all text (titles, labels) is readable in dark mode.
-
-Below is the updated `ipds.py` artifact with these changes. Since the original code was incomplete, I'll focus on the corrected sections and ensure the NMAP Analysis graph is readable. For brevity, I'll include the modified `show_nmap_analysis` and note changes to other sections, assuming the rest of the code remains as provided in your last message. The `artifact_id` remains `a95c3f19-b9fc-43e6-9276-7da7b8d47f4e` as it’s an update.
-
----
-
-<xaiArtifact artifact_id="a95c3f19-b9fc-43e6-9276-7da7b8d47f4e" artifact_version_id="aeebb89d-8f34-4bde-ac86-e8389410a4ce" title="ipds.py" contentType="text/python">
-import pandas as pd
-import numpy as np
-import streamlit as st
-import joblib
-import time
-import os
-from datetime import datetime, timedelta
-import io
-import requests
-import base64
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, roc_curve, auc, precision_recall_curve
-from xgboost import XGBClassifier
-from imblearn.over_sampling import SMOTE
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
-import plotly.graph_objects as go
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-
-# NSL-KDD columns
+# NSL-KDD columns (corrected to include all features)
 nsl_kdd_columns = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
     'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted', 'num_root',
@@ -784,7 +734,7 @@ def show_train_model():
                     accuracy = accuracy_score(y_test, y_pred)
                     unique_labels = np.unique(np.concatenate([y_test, y_pred]))
                     target_names = [le_class.classes_[i] for i in unique_labels]
-                    report = classification_report(y_pred, labels=unique_labels, target_names=target_names)
+                    report = classification_report(y_test, y_pred, labels=unique_labels, target_names=target_names)
                     
                     if train_autoencoder_option:
                         X_normal = X_train[y_train == le_class.transform(['normal'])[0]]
@@ -1162,7 +1112,7 @@ def show_documentation():
     """)
 
 def main():
-    st.sidebar.image("https://via.placeholder.com/150?text=IDPS+Logo", use_column_width=True)
+    st.sidebar.image("https://via.placeholder.com/150?text=IDPS+Logo", use_container_width=True)
     st.sidebar.title("AI-Enhanced IDPS")
     st.sidebar.button("Toggle Theme", on_click=toggle_theme)
     
