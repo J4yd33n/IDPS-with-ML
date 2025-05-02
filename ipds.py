@@ -25,7 +25,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
-# NSL-KDD columns (corrected to include all features)
+# NSL-KDD columns
 nsl_kdd_columns = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
     'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted', 'num_root',
@@ -68,93 +68,101 @@ if 'openai_api_key' not in st.session_state:
 if 'theme' not in st.session_state:
     st.session_state.theme = "Light"
 
-# Custom CSS for professional look with improved dark mode readability
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #f0f2f6;
-        color: #000000;
+# Define color schemes for light and dark themes
+THEME_COLORS = {
+    "Light": {
+        "background": "#f0f2f6",
+        "text": "#000000",
+        "input_bg": "#ffffff",
+        "input_border": "#cccccc",
+        "chart_bg": "#ffffff",
+        "chart_text": "#000000"
+    },
+    "Dark": {
+        "background": "#1e1e2f",
+        "text": "#ffffff",
+        "input_bg": "#2a2a3d",
+        "input_border": "#555555",
+        "chart_bg": "#1c1c2c",
+        "chart_text": "#ffffff"
     }
-    .sidebar .sidebar-content {
-        background-color: #1e1e2f;
-        color: #ffffff;
-    }
-    .stButton>button {
-        background-color: #4CAF50;
-        color: #ffffff;
-        border-radius: 5px;
-        border: 1px solid #388E3C;
-    }
-    .stTextInput>div>input {
-        background-color: #ffffff;
-        color: #000000;
-        border-radius: 5px;
-        border: 1px solid #cccccc;
-    }
-    .stSelectbox, .stSlider, .stRadio, .stCheckbox {
-        color: #000000;
-    }
-    .stMarkdown, .stDataFrame, .stTable {
-        color: #000000;
-    }
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        cursor: pointer;
-    }
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: #555;
-        color: #ffffff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-    [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {
-        color: #000000;
-    }
-</style>
-""", unsafe_allow_html=True)
+}
 
-# Theme toggle with improved dark mode contrast
-def toggle_theme():
-    st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+# Custom CSS for consistent theming
+def apply_theme_css():
+    theme = st.session_state.theme
+    colors = THEME_COLORS[theme]
     st.markdown(
         f"""
         <style>
             .stApp {{
-                background-color: {'#1e1e2f' if st.session_state.theme == 'Dark' else '#f0f2f6'};
-                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+                background-color: {colors['background']};
+                color: {colors['text']};
             }}
-            .stMarkdown, .stDataFrame, .stTable, .stSelectbox, .stSlider, .stRadio, .stCheckbox {{
-                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+            .sidebar .sidebar-content {{
+                background-color: {'#1e1e2f' if theme == 'Dark' else '#ffffff'};
+                color: {colors['text']};
+            }}
+            .stButton>button {{
+                background-color: {'#4CAF50' if theme == 'Light' else '#388E3C'};
+                color: #ffffff;
+                border-radius: 5px;
+                border: 1px solid {'#388E3C' if theme == 'Light' else '#2E7D32'};
             }}
             .stTextInput>div>input {{
-                background-color: {'#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff'};
-                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
-                border: 1px solid {'#555555' if st.session_state.theme == 'Dark' else '#cccccc'};
+                background-color: {colors['input_bg']};
+                color: {colors['text']};
+                border-radius: 5px;
+                border: 1px solid {colors['input_border']};
+            }}
+            .stSelectbox, .stSlider, .stRadio, .stCheckbox {{
+                color: {colors['text']};
+            }}
+            .stMarkdown, .stDataFrame, .stTable {{
+                color: {colors['text']};
+            }}
+            .tooltip {{
+                position: relative;
+                display: inline-block;
+                cursor: pointer;
+            }}
+            .tooltip .tooltiptext {{
+                visibility: hidden;
+                width: 200px;
+                background-color: {'#555' if theme == 'Light' else '#333'};
+                color: #ffffff;
+                text-align: center;
+                border-radius: 6px;
+                padding: 5px;
+                position: absolute;
+                z-index: 1;
+                bottom: 125%;
+                left: 50%;
+                margin-left: -100px;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }}
+            .tooltip:hover .tooltiptext {{
+                visibility: visible;
+                opacity: 1;
             }}
             [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {{
-                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+                color: {colors['text']};
             }}
             .stPlotlyChart {{
-                background-color: {'#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff'};
+                background-color: {colors['chart_bg']};
             }}
         </style>
         """, unsafe_allow_html=True
     )
+
+# Theme toggle
+def toggle_theme():
+    st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+    apply_theme_css()
+
+# Apply initial theme
+apply_theme_css()
 
 # Load model and preprocessing objects
 @st.cache_resource
@@ -327,7 +335,6 @@ def predict_traffic(input_data, threshold=0.5):
         return None, None
 
 def simulate_nmap_scan(target, scan_type, port_range):
-    # Mock port data for simulation
     common_ports = {
         21: ('ftp', 'tcp'),
         22: ('ssh', 'tcp'),
@@ -346,11 +353,9 @@ def simulate_nmap_scan(target, scan_type, port_range):
         500: ('ipsec', 'udp')
     }
     
-    # Filter ports based on scan type and port range
     start_port, end_port = map(int, port_range.split('-'))
     ports_to_scan = [p for p in common_ports.keys() if start_port <= p <= end_port]
     
-    # Simulate open/closed ports
     np.random.seed(42)
     scan_results = []
     for port in ports_to_scan:
@@ -394,7 +399,6 @@ def show_nmap_analysis():
     if submit:
         with st.spinner("Running NMAP simulation..."):
             try:
-                # Validate inputs
                 if not target:
                     st.error("Please provide a target IP or hostname.")
                     return
@@ -407,10 +411,8 @@ def show_nmap_analysis():
                     st.error("Port range must be between 1 and 65535, with start port less than or equal to end port.")
                     return
                 
-                # Simulate scan
                 scan_results = simulate_nmap_scan(target, scan_type, port_range)
                 
-                # Display results in NMAP-like format
                 st.subheader(f"Scan Results for {target}")
                 st.markdown(f"""
                 **NMAP Simulation**  
@@ -420,7 +422,6 @@ def show_nmap_analysis():
                 Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
                 """)
                 
-                # Filter open ports
                 open_ports = [r for r in scan_results if r['state'] == 'open']
                 if not open_ports:
                     st.warning("No open ports detected.")
@@ -438,8 +439,9 @@ def show_nmap_analysis():
                         use_container_width=True
                     )
                 
-                # Visualize open ports
                 if open_ports:
+                    theme = st.session_state.theme
+                    colors = THEME_COLORS[theme]
                     fig = px.bar(
                         df,
                         x='port',
@@ -448,20 +450,28 @@ def show_nmap_analysis():
                         title=f"Open Ports on {target}",
                         labels={'port': 'Port Number', 'service': 'Service'},
                         height=400,
-                        color_discrete_sequence=px.colors.sequential.Blues
+                        color_discrete_sequence=px.colors.sequential.Blues_r,
+                        opacity=0.7
                     )
                     fig.update_layout(
-                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font=dict(color='#ffffff'),
-                        title_font=dict(color='#ffffff'),
-                        xaxis=dict(title_font=dict(color='#ffffff'), tickfont=dict(color='#ffffff')),
-                        yaxis=dict(title_font=dict(color='#ffffff'), tickfont=dict(color='#ffffff')),
-                        legend=dict(font=dict(color='#ffffff'))
+                        paper_bgcolor=colors['chart_bg'],
+                        plot_bgcolor=colors['chart_bg'],
+                        font=dict(color=colors['chart_text']),
+                        title_font=dict(color=colors['chart_text']),
+                        xaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        ),
+                        yaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        ),
+                        legend=dict(font=dict(color=colors['chart_text']))
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
-                # Export results
                 st.subheader("Export Results")
                 csv_data = pd.DataFrame(scan_results).to_csv(index=False)
                 st.download_button(
@@ -516,17 +526,32 @@ def show_historical_analysis():
     col3.metric("Total Intrusions", filtered_df['Intrusions'].sum())
     
     st.subheader("Intrusion Trends")
+    theme = st.session_state.theme
+    colors = THEME_COLORS[theme]
     fig = px.line(
         filtered_df,
         x='Timestamp',
         y=['Intrusions', 'Normal'],
         title="Intrusion and Normal Traffic Over Time",
-        labels={'value': 'Count', 'variable': 'Traffic Type'}
+        labels={'value': 'Count', 'variable': 'Traffic Type'},
+        color_discrete_sequence=px.colors.sequential.Blues_r
     )
     fig.update_layout(
-        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-        font_color='#ffffff'
+        paper_bgcolor=colors['chart_bg'],
+        plot_bgcolor=colors['chart_bg'],
+        font_color=colors['chart_text'],
+        title_font=dict(color=colors['chart_text']),
+        xaxis=dict(
+            title_font=dict(color=colors['chart_text']),
+            tickfont=dict(color=colors['chart_text']),
+            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+        ),
+        yaxis=dict(
+            title_font=dict(color=colors['chart_text']),
+            tickfont=dict(color=colors['chart_text']),
+            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+        ),
+        legend=dict(font=dict(color=colors['chart_text']))
     )
     st.plotly_chart(fig, use_container_width=True)
     
@@ -541,11 +566,16 @@ def show_historical_analysis():
         fig = px.pie(
             names=attack_types.index,
             values=attack_types.values,
-            title="Distribution of Attack Types"
+            title="Distribution of Attack Types",
+            color_discrete_sequence=px.colors.sequential.Blues_r,
+            opacity=0.7
         )
         fig.update_layout(
-            paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-            font_color='#ffffff'
+            paper_bgcolor=colors['chart_bg'],
+            plot_bgcolor=colors['chart_bg'],
+            font_color=colors['chart_text'],
+            title_font=dict(color=colors['chart_text']),
+            legend=dict(font=dict(color=colors['chart_text']))
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -753,18 +783,32 @@ def show_train_model():
                     st.metric("Accuracy", f"{accuracy:.2%}")
                     
                     st.subheader("Model Performance")
+                    theme = st.session_state.theme
+                    colors = THEME_COLORS[theme]
                     fpr, tpr, _ = roc_curve(y_test, y_pred_prob, pos_label=le_class.transform(['normal'])[0])
                     roc_auc = auc(fpr, tpr)
                     fig_roc = px.line(
                         x=fpr, y=tpr,
                         title=f"ROC Curve (AUC = {roc_auc:.2f})",
-                        labels={'x': 'False Positive Rate', 'y': 'True Positive Rate'}
+                        labels={'x': 'False Positive Rate', 'y': 'True Positive Rate'},
+                        color_discrete_sequence=px.colors.sequential.Blues_r
                     )
                     fig_roc.add_shape(type='line', line=dict(dash='dash'), x0=0, x1=1, y0=0, y1=1)
                     fig_roc.update_layout(
-                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff'
+                        paper_bgcolor=colors['chart_bg'],
+                        plot_bgcolor=colors['chart_bg'],
+                        font_color=colors['chart_text'],
+                        title_font=dict(color=colors['chart_text']),
+                        xaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        ),
+                        yaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        )
                     )
                     st.plotly_chart(fig_roc, use_container_width=True)
                     
@@ -772,17 +816,29 @@ def show_train_model():
                     fig_pr = px.line(
                         x=recall, y=precision,
                         title="Precision-Recall Curve",
-                        labels={'x': 'Recall', 'y': 'Precision'}
+                        labels={'x': 'Recall', 'y': 'Precision'},
+                        color_discrete_sequence=px.colors.sequential.Blues_r
                     )
                     fig_pr.update_layout(
-                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff'
+                        paper_bgcolor=colors['chart_bg'],
+                        plot_bgcolor=colors['chart_bg'],
+                        font_color=colors['chart_text'],
+                        title_font=dict(color=colors['chart_text']),
+                        xaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        ),
+                        yaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text']),
+                            gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                        )
                     )
                     st.plotly_chart(fig_pr, use_container_width=True)
                     
                     st.text(report)
-                    
+                
                 except Exception as e:
                     st.error(f"Error during training: {str(e)}")
         else:
@@ -841,6 +897,8 @@ def show_test_model():
                     st.text(report)
                     
                     st.subheader("Confusion Matrix")
+                    theme = st.session_state.theme
+                    colors = THEME_COLORS[theme]
                     conf_matrix = pd.crosstab(
                         le_class.inverse_transform(y_test),
                         le_class.inverse_transform(y_pred),
@@ -851,15 +909,24 @@ def show_test_model():
                         conf_matrix,
                         text_auto=True,
                         title="Confusion Matrix",
-                        color_continuous_scale='Blues'
+                        color_continuous_scale='Blues_r'
                     )
                     fig_cm.update_layout(
-                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                        font_color='#ffffff'
+                        paper_bgcolor=colors['chart_bg'],
+                        plot_bgcolor=colors['chart_bg'],
+                        font_color=colors['chart_text'],
+                        title_font=dict(color=colors['chart_text']),
+                        xaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text'])
+                        ),
+                        yaxis=dict(
+                            title_font=dict(color=colors['chart_text']),
+                            tickfont=dict(color=colors['chart_text'])
+                        )
                     )
                     st.plotly_chart(fig_cm, use_container_width=True)
-                    
+                
                 except Exception as e:
                     st.error(f"Error during testing: {str(e)}")
     
@@ -1023,17 +1090,31 @@ def show_realtime_detection():
             Total intrusions detected: {intrusion_count}
             """)
             
+            theme = st.session_state.theme
+            colors = THEME_COLORS[theme]
             fig = px.line(
                 x=range(1, len(results) + 1),
                 y=results,
                 title="Detection Results Over Time",
                 labels={'x': 'Sample', 'y': 'Status'},
+                color_discrete_sequence=px.colors.sequential.Blues_r
             )
             fig.update_yaxes(range=[-0.1, 1.1], tickvals=[0, 1], ticktext=['Normal', 'Intrusion'])
             fig.update_layout(
-                paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
-                font_color='#ffffff'
+                paper_bgcolor=colors['chart_bg'],
+                plot_bgcolor=colors['chart_bg'],
+                font_color=colors['chart_text'],
+                title_font=dict(color=colors['chart_text']),
+                xaxis=dict(
+                    title_font=dict(color=colors['chart_text']),
+                    tickfont=dict(color=colors['chart_text']),
+                    gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                ),
+                yaxis=dict(
+                    title_font=dict(color=colors['chart_text']),
+                    tickfont=dict(color=colors['chart_text']),
+                    gridcolor='#555555' if theme == 'Dark' else '#cccccc'
+                )
             )
             chart_placeholder.plotly_chart(fig, use_container_width=True)
             
