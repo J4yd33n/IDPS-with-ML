@@ -6,13 +6,11 @@ import time
 import os
 from datetime import datetime, timedelta
 import io
-import requests
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE
-from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
 from reportlab.lib.pagesizes import letter
@@ -136,7 +134,7 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
     # Drop low importance features
     df = df.drop(columns=[col for col in low_importance_features if col in df.columns], errors='ignore')
     
-    return df, label_encoders, le_class
+    return df, label_encoders,atação
 
 def train_lstm_model(X_train, y_train, X_test, y_test):
     model = Sequential([
@@ -150,10 +148,10 @@ def train_lstm_model(X_train, y_train, X_test, y_test):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     X_train_reshaped = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
     X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
-    model.fit(X_train_reshaped, y_train, epochs=10, batch_size=32, validation_data=(X_test_reshaped, y_test), verbose=0)
+    model.fit(X_train_reshaped, y_train, epochs=5, batch_size=16, validation_data=(X_test_reshaped, y_test), verbose=0)
     return model
 
-def train_autoencoder(X_train, epochs=20):
+def train_autoencoder(X_train, epochs=10):
     input_dim = X_train.shape[1]
     input_layer = Input(shape=(input_dim,))
     encoder = Dense(32, activation='relu')(input_layer)
@@ -162,27 +160,13 @@ def train_autoencoder(X_train, epochs=20):
     decoder = Dense(input_dim, activation='linear')(decoder)
     autoencoder = Model(inputs=input_layer, outputs=decoder)
     autoencoder.compile(optimizer='adam', loss='mse')
-    autoencoder.fit(X_train, X_train, epochs=epochs, batch_size=32, verbose=0)
+    autoencoder.fit(X_train, X_train, epochs=epochs, batch_size=16, verbose=0)
     return autoencoder
 
 def detect_anomaly(input_data_scaled, autoencoder, threshold=0.1):
     reconstructions = autoencoder.predict(input_data_scaled)
     mse = np.mean(np.square(input_data_scaled - reconstructions), axis=1)
     return mse > threshold
-
-def explain_threat(prediction, confidence, src_ip, api_key):
-    if not api_key:
-        return "No API key provided for threat explanation."
-    try:
-        prompt = f"Explain the network intrusion type '{prediction}' with confidence {confidence:.2%} from source IP {src_ip}. Suggest mitigation actions."
-        response = requests.post(
-            'https://api.x.ai/v1/grok',
-            headers={'Authorization': f'Bearer {api_key}'},
-            json={'prompt': prompt, 'model': 'grok-3'}
-        )
-        return response.json().get('text', 'Explanation unavailable')
-    except Exception as e:
-        return f"Error fetching explanation: {str(e)}"
 
 def predict_traffic(input_data, threshold=0.5):
     global model, scaler, label_encoders, le_class, model_type
@@ -354,15 +338,14 @@ def generate_pdf_report(analysis_results, intrusion_count, total_packets, filena
     
     # Results Table
     elements.append(Paragraph("Detailed Results", styles['Heading2']))
-    data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly', 'Explanation']]
+    data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly']]
     for r in analysis_results[:10]:  # Limit to first 10 for brevity
         data.append([
             str(r['packet_num']),
             r['src_ip'],
             r['prediction'],
             f"{r['confidence']:.2%}",
-            'Yes' if r['is_anomaly'] else 'No',
-            r['explanation'][:50] + '...' if len(r['explanation']) > 50 else r['explanation']
+            'Yes' if r['is_anomaly'] else 'No'
         ])
     table = Table(data)
     table.setStyle(TableStyle([
@@ -404,21 +387,18 @@ def show_pcap_analysis():
         return
     
     if not SCAPY_AVAILABLE:
-        st.error("Scapy is not installed. Please install it with 'pip install scapy' and ensure libpcap is available ('sudo apt-get install libpcap-dev' on Linux).")
+        st.error("Scapy is not installed. Please install it with 'pip install scapy' and ensure libpcap is available.")
         return
     
     st.markdown("""
     ### PCAP File Analysis
-    Upload a PCAP file to analyze network traffic for intrusions using AI-enhanced detection.
+    Upload a PCAP file to analyze network traffic for intrusions using AI-enhanced detection (LSTM, Autoencoders, Active Learning).
     """)
     
     # Alert settings
     st.subheader("Alert Settings")
     alert_threshold = st.slider("Alert Confidence Threshold", 0.5, 0.9, 0.7, 0.05)
     alert_recipient = st.text_input("Alert Recipient Email (Simulated)", "admin@example.com")
-    
-    # xAI API key for explanations
-    api_key = st.text_input("xAI API Key (Optional for Threat Explanations)", type="password")
     
     # PCAP upload
     pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
@@ -459,8 +439,6 @@ def show_pcap_analysis():
                         input_data_scaled = scaler.transform(input_df)
                         is_anomaly = detect_anomaly(input_data_scaled, autoencoder)[0]
                     
-                    explanation = explain_threat(prediction, confidence, src_ip, api_key) if is_intrusion and api_key else "No explanation available"
-                    
                     if is_intrusion:
                         intrusion_count += 1
                         if confidence >= alert_threshold:
@@ -477,8 +455,7 @@ def show_pcap_analysis():
                         'prediction': prediction,
                         'confidence': confidence,
                         'src_ip': src_ip,
-                        'is_anomaly': is_anomaly,
-                        'explanation': explanation
+                        'is_anomaly': is_anomaly
                     })
                 
                 # Save to history
@@ -502,7 +479,7 @@ def show_pcap_analysis():
                 # Display results
                 st.subheader("Detailed Results")
                 result_df = pd.DataFrame(analysis_results)
-                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly', 'explanation']])
+                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly']])
                 
                 # Feedback with Active Learning
                 st.subheader("Provide Feedback")
@@ -756,13 +733,12 @@ def show_home():
     
     st.title("AI-Enhanced Intrusion Detection and Prevention System")
     st.markdown("""
-    Welcome to the AI-Enhanced IDPS application. This system uses advanced AI (XGBoost, LSTM, Autoencoders, and Generative AI) 
+    Welcome to the AI-Enhanced IDPS application. This system uses advanced AI (XGBoost, LSTM, Autoencoders) 
     to detect and prevent network intrusions using the NSL-KDD dataset.
     
     ### AI Features:
     - **Deep Learning (LSTM)**: Captures temporal patterns in traffic.
     - **Anomaly Detection (Autoencoders)**: Flags zero-day attacks.
-    - **Generative AI (Grok)**: Explains intrusions in natural language.
     - **Active Learning**: Optimizes feedback for model improvement.
     
     ### Other Features:
@@ -1171,7 +1147,6 @@ def show_about():
     **AI Features:**
     - **Deep Learning (LSTM)**: Models temporal patterns in network traffic.
     - **Anomaly Detection (Autoencoders)**: Detects zero-day attacks via unsupervised learning.
-    - **Generative AI (Grok)**: Provides natural language explanations of intrusions.
     - **Active Learning**: Optimizes feedback by prioritizing uncertain predictions.
     
     **Other Features:**
@@ -1191,7 +1166,6 @@ def show_about():
     - Imbalanced-learn for handling class imbalance
     - Scapy for PCAP processing
     - ReportLab for PDF generation
-    - xAI API for threat explanations
     
     **Dataset Information:**
     The NSL-KDD dataset is a refined version of the KDD Cup 99 dataset, containing network connection records
@@ -1208,7 +1182,7 @@ def show_about():
     st.markdown("""
     1. **Train Model**: Upload training data, select XGBoost or LSTM, and optionally train an autoencoder
     2. **Test Model**: Evaluate the model with test data or manual input
-    3. **PCAP Analysis**: Upload PCAP files to detect intrusions with AI explanations
+    3. **PCAP Analysis**: Upload PCAP files to detect intrusions with anomaly detection
     4. **Historical Analysis**: View trends from past analyses
     5. **Retrain Model**: Improve the model with active learning feedback
     6. **Alert Log**: Review simulated intrusion alerts
@@ -1217,7 +1191,7 @@ def show_about():
     st.subheader("Disclaimer")
     st.markdown("""
     This is a demonstration project for educational purposes. Not intended for production use without security reviews.
-    For xAI API pricing, visit [x.ai/api](https://x.ai/api).
+    Deployed on Streamlit Cloud with TensorFlow CPU for compatibility.
     """)
 
 def main():
