@@ -25,62 +25,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
-# Try importing Scapy
-try:
-    from scapy.all import rdpcap, TCP, UDP, ICMP, IP
-    SCAPY_AVAILABLE = True
-except ImportError:
-    SCAPY_AVAILABLE = False
-
-# Set page config
-st.set_page_config(page_title="AI-Enhanced IDPS", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
-
-# Custom CSS for professional look
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    .sidebar .sidebar-content {
-        background-color: #1e1e2f;
-        color: white;
-    }
-    .stButton>button {
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 5px;
-    }
-    .stTextInput>div>input {
-        border-radius: 5px;
-    }
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        cursor: pointer;
-    }
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: #555;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # NSL-KDD columns
 nsl_kdd_columns = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment', 'urgent',
@@ -124,7 +68,7 @@ if 'openai_api_key' not in st.session_state:
 if 'theme' not in st.session_state:
     st.session_state.theme = "Light"
 
-# Theme toggle
+# Theme toggle with improved dark mode contrast
 def toggle_theme():
     st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
     st.markdown(
@@ -133,6 +77,20 @@ def toggle_theme():
             .stApp {{
                 background-color: {'#1e1e2f' if st.session_state.theme == 'Dark' else '#f0f2f6'};
                 color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+            }}
+            .stMarkdown, .stDataFrame, .stTable, .stSelectbox, .stSlider, .stRadio, .stCheckbox {{
+                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+            }}
+            .stTextInput>div>input {{
+                background-color: {'#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff'};
+                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+                border: 1px solid {'#555555' if st.session_state.theme == 'Dark' else '#cccccc'};
+            }}
+            [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {{
+                color: {'#ffffff' if st.session_state.theme == 'Dark' else '#000000'};
+            }}
+            .stPlotlyChart {{
+                background-color: {'#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff'};
             }}
         </style>
         """, unsafe_allow_html=True
@@ -308,369 +266,148 @@ def predict_traffic(input_data, threshold=0.5):
         st.error(f"Error during prediction: {str(e)}")
         return None, None
 
-def process_packet(packet, connection_tracker, time_window=10):
-    features = {col: 0 for col in nsl_kdd_columns if col != 'class'}
-    
-    if IP not in packet:
-        return None
-    
-    features['protocol_type'] = packet[IP].proto
-    if packet[IP].proto == 6:
-        features['protocol_type'] = 'tcp'
-        if TCP in packet:
-            features['src_bytes'] = len(packet[TCP].payload)
-            features['dst_bytes'] = 0
-            features['service'] = str(packet[TCP].dport)
-            features['flag'] = 'SF'
-    elif packet[IP].proto == 17:
-        features['protocol_type'] = 'udp'
-        if UDP in packet:
-            features['src_bytes'] = len(packet[UDP].payload)
-            features['dst_bytes'] = 0
-            features['service'] = str(packet[UDP].dport)
-            features['flag'] = 'SF'
-    elif packet[IP].proto == 1:
-        features['protocol_type'] = 'icmp'
-        features['src_bytes'] = len(packet[ICMP])
-        features['dst_bytes'] = 0
-        features['service'] = 'other'
-        features['flag'] = 'SF'
-    
-    service_map = {
-        '80': 'http', '443': 'http', '21': 'ftp', '22': 'ssh', '23': 'telnet',
-        '25': 'smtp', '53': 'dns', '110': 'pop3', '143': 'imap'
+def simulate_nmap_scan(target, scan_type, port_range):
+    # Mock port data for simulation
+    common_ports = {
+        21: ('ftp', 'tcp'),
+        22: ('ssh', 'tcp'),
+        23: ('telnet', 'tcp'),
+        25: ('smtp', 'tcp'),
+        53: ('dns', 'tcp/udp'),
+        80: ('http', 'tcp'),
+        110: ('pop3', 'tcp'),
+        143: ('imap', 'tcp'),
+        443: ('https', 'tcp'),
+        3306: ('mysql', 'tcp'),
+        3389: ('rdp', 'tcp'),
+        5432: ('postgresql', 'tcp'),
+        137: ('netbios-ns', 'udp'),
+        161: ('snmp', 'udp'),
+        500: ('ipsec', 'udp')
     }
-    features['service'] = service_map.get(features['service'], 'other')
     
-    src_ip = packet[IP].src
-    dst_ip = packet[IP].dst
-    dst_port = packet[TCP].dport if TCP in packet else (packet[UDP].dport if UDP in packet else 0)
-    timestamp = packet.time
+    # Filter ports based on scan type and port range
+    start_port, end_port = map(int, port_range.split('-'))
+    ports_to_scan = [p for p in common_ports.keys() if start_port <= p <= end_port]
     
-    connection_key = (src_ip, dst_ip, dst_port, features['protocol_type'])
-    current_time = datetime.fromtimestamp(timestamp)
-    connection_tracker[connection_key] = [
-        pkt for pkt in connection_tracker.get(connection_key, [])
-        if datetime.fromtimestamp(pkt['time']) > current_time - timedelta(seconds=time_window)
-    ]
-    connection_tracker[connection_key].append({'time': timestamp, 'packet': packet})
+    # Simulate open/closed ports
+    np.random.seed(42)
+    scan_results = []
+    for port in ports_to_scan:
+        service, proto = common_ports[port]
+        if scan_type == 'TCP SYN' and 'tcp' not in proto:
+            continue
+        if scan_type == 'UDP' and 'udp' not in proto:
+            continue
+        state = 'open' if np.random.random() > 0.5 else 'closed'
+        scan_results.append({
+            'port': port,
+            'protocol': 'tcp' if scan_type != 'UDP' else 'udp',
+            'state': state,
+            'service': service
+        })
     
-    features['count'] = len(connection_tracker[connection_key])
-    features['srv_count'] = len([
-        pkt for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
-    ])
-    features['same_srv_rate'] = features['count'] / max(1, features['srv_count'])
-    features['diff_srv_rate'] = 1 - features['same_srv_rate']
-    
-    features['dst_host_count'] = len(set(
-        pkt['packet'][IP].src for pkt in connection_tracker.get((dst_ip, src_ip, dst_port, features['protocol_type']), [])
-    ))
-    features['dst_host_srv_count'] = features['srv_count']
-    features['dst_host_same_srv_rate'] = features['same_srv_rate']
-    
-    return features
+    return scan_results
 
-def generate_pdf_report(analysis_results, intrusion_count, total_packets, filename, temp_dir="temp"):
-    os.makedirs(temp_dir, exist_ok=True)
-    pdf_path = os.path.join(temp_dir, f"IDPS_Report_{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-    styles = getSampleStyleSheet()
-    elements = []
-    
-    elements.append(Paragraph("AI-Enhanced IDPS Analysis Report", styles['Title']))
-    elements.append(Spacer(1, 12))
-    
-    summary_text = f"""
-    <b>Analysis Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
-    <b>PCAP File:</b> {filename}<br/>
-    <b>Total Packets Analyzed:</b> {total_packets}<br/>
-    <b>Intrusions Detected:</b> {intrusion_count}<br/>
-    <b>Normal Traffic:</b> {total_packets - intrusion_count}
-    """
-    elements.append(Paragraph(summary_text, styles['BodyText']))
-    elements.append(Spacer(1, 12))
-    
-    timeline_path = os.path.join(temp_dir, "intrusion_timeline.png")
-    fig = px.line(
-        x=range(1, len(analysis_results) + 1),
-        y=[1 if r['is_intrusion'] else 0 for r in analysis_results],
-        labels={'x': 'Packet Number', 'y': 'Status'},
-        title="Intrusion Detection Timeline"
-    )
-    fig.update_yaxes(range=[-0.1, 1.1], tickvals=[0, 1], ticktext=['Normal', 'Intrusion'])
-    fig.write_to_file(timeline_path)
-    elements.append(ReportLabImage(timeline_path, width=400, height=200))
-    elements.append(Spacer(1, 12))
-    
-    src_ip_counts = pd.Series([r['src_ip'] for r in analysis_results if r['is_intrusion']]).value_counts().head(5)
-    if not src_ip_counts.empty:
-        ip_plot_path = os.path.join(temp_dir, "src_ip_distribution.png")
-        fig = px.bar(
-            x=src_ip_counts.index,
-            y=src_ip_counts.values,
-            labels={'x': 'Source IP', 'y': 'Intrusion Count'},
-            title="Top 5 Source IPs with Intrusions"
-        )
-        fig.write_to_file(ip_plot_path)
-        elements.append(ReportLabImage(ip_plot_path, width=400, height=200))
-        elements.append(Spacer(1, 12))
-    
-    elements.append(Paragraph("Detailed Results", styles['Heading2']))
-    data = [['Packet', 'Source IP', 'Prediction', 'Confidence', 'Anomaly', 'Explanation']]
-    for r in analysis_results[:10]:
-        data.append([
-            str(r['packet_num']),
-            r['src_ip'],
-            r['prediction'],
-            f"{r['confidence']:.2%}",
-            'Yes' if r['is_anomaly'] else 'No',
-            r['explanation'][:50] + '...' if len(r['explanation']) > 50 else r['explanation']
-        ])
-    table = Table(data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(table)
-    
-    elements.append(Paragraph("Recommendations", styles['Heading2']))
-    rec_text = "Based on the analysis:<br/>"
-    if intrusion_count > 0:
-        rec_text += f"- Block the top source IPs: {', '.join(src_ip_counts.index)}.<br/>"
-        rec_text += "- Review firewall rules and enable deep packet inspection.<br/>"
-    else:
-        rec_text += "- No intrusions detected; maintain regular monitoring."
-    elements.append(Paragraph(rec_text, styles['BodyText']))
-    
-    doc.build(elements)
-    return pdf_path
-
-def generate_csv_report(analysis_results):
-    df = pd.DataFrame(analysis_results)
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    return csv_buffer.getvalue()
-
-def generate_json_report(analysis_results):
-    df = pd.DataFrame(analysis_results)
-    return df.to_json(orient='records')
-
-def select_uncertain_packets(analysis_results, uncertainty_threshold=0.1):
-    return [i for i, r in enumerate(analysis_results) if abs(r['confidence'] - 0.5) < uncertainty_threshold]
-
-def get_sample_pcap():
-    sample_data = """
-    0000   45 00 00 34 00 01 00 00 40 06 3a 8c c0 a8 01 02
-    0010   c0 a8 01 03 00 50 00 15 00 00 00 00 50 10 20 00
-    0020   8e 8f 00 00 47 45 54 20 2f 20 48 54 54 50 2f 31
-    0030   2e 31 0d 0a 0d 0a
-    """
-    temp_pcap = "sample.pcap"
-    with open(temp_pcap, "wb") as f:
-        f.write(bytes.fromhex(''.join(sample_data.split())))
-    return temp_pcap
-
-def show_pcap_analysis():
-    global model, scaler, label_encoders, le_class, autoencoder, model_type
-    
-    st.header("PCAP File Analysis")
-    
-    if model is None:
-        st.error("No trained model found. Please train a model first.")
-        return
-    
-    if not SCAPY_AVAILABLE:
-        st.error("Scapy is not installed. Please install it with 'pip install scapy'.")
-        return
+def show_nmap_analysis():
+    st.header("NMAP Analysis")
     
     st.markdown("""
-    Analyze network traffic from PCAP files for intrusions using AI models (LSTM, Autoencoders, Active Learning).
+    Simulate an NMAP port scan to identify open ports and services on a target host.
     <div class="tooltip">ℹ️
-        <span class="tooltiptext">Upload a PCAP file or use the sample to detect intrusions. API keys enhance explanations.</span>
+        <span class="tooltiptext">Enter a target IP/hostname, select scan type, and specify port range to view results.</span>
     </div>
     """, unsafe_allow_html=True)
     
-    tabs = st.tabs(["Upload PCAP", "Use Sample PCAP"])
+    st.subheader("Scan Configuration")
+    with st.form("nmap_scan_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            target = st.text_input("Target IP/Hostname", value="192.168.1.1")
+            scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
+        with col2:
+            port_range = st.text_input("Port Range (e.g., 1-1000)", value="1-1000")
+            intensity = st.slider("Scan Intensity", 1, 5, 3, help="Higher intensity simulates more thorough scans")
+        
+        submit = st.form_submit_button("Run Scan")
     
-    with tabs[0]:
-        pcap_file = st.file_uploader("Upload PCAP File", type=["pcap", "pcapng"])
-    
-    with tabs[1]:
-        if st.button("Use Sample PCAP"):
-            pcap_file = get_sample_pcap()
-            st.success("Sample PCAP loaded for analysis.")
-    
-    st.subheader("API Keys")
-    col1, col2 = st.columns(2)
-    with col1:
-        xai_api_key = st.text_input("xAI API Key", type="password", value=st.session_state.xai_api_key)
-        if xai_api_key:
-            st.session_state.xai_api_key = xai_api_key
-    with col2:
-        openai_api_key = st.text_input("OpenAI API Key", type="password", value=st.session_state.openai_api_key)
-        if openai_api_key:
-            st.session_state.openai_api_key = openai_api_key
-    
-    st.subheader("Settings")
-    threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.4, 0.05)
-    alert_threshold = st.slider("Alert Confidence Threshold", 0.5, 0.9, 0.7, 0.05)
-    
-    if (pcap_file is not None or os.path.exists("sample.pcap")) and st.button("Analyze PCAP"):
-        with st.spinner("Analyzing PCAP file..."):
-            progress_bar = st.progress(0)
+    if submit:
+        with st.spinner("Running NMAP simulation..."):
             try:
-                if isinstance(pcap_file, str):
-                    packets = rdpcap(pcap_file)
-                    filename = "sample.pcap"
+                # Validate inputs
+                if not target:
+                    st.error("Please provide a target IP or hostname.")
+                    return
+                if not port_range or '-' not in port_range:
+                    st.error("Please provide a valid port range (e.g., 1-1000).")
+                    return
+                start_port, end_port = port_range.split('-')
+                start_port, end_port = int(start_port), int(end_port)
+                if start_port < 1 or end_port > 65535 or start_port > end_port:
+                    st.error("Port range must be between 1 and 65535, with start port less than or equal to end port.")
+                    return
+                
+                # Simulate scan
+                scan_results = simulate_nmap_scan(target, scan_type, port_range)
+                
+                # Display results in NMAP-like format
+                st.subheader(f"Scan Results for {target}")
+                st.markdown(f"""
+                **NMAP Simulation**  
+                Scan Type: {scan_type}  
+                Port Range: {port_range}  
+                Intensity: {intensity}  
+                Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+                """)
+                
+                # Filter open ports
+                open_ports = [r for r in scan_results if r['state'] == 'open']
+                if not open_ports:
+                    st.warning("No open ports detected.")
                 else:
-                    temp_pcap = "temp_upload.pcap"
-                    with open(temp_pcap, "wb") as f:
-                        f.write(pcap_file.read())
-                    packets = rdpcap(temp_pcap)
-                    filename = pcap_file.name
+                    st.success(f"Found {len(open_ports)} open ports.")
+                    df = pd.DataFrame(open_ports)
+                    st.dataframe(
+                        df[['port', 'protocol', 'state', 'service']],
+                        column_config={
+                            'port': st.column_config.NumberColumn("Port"),
+                            'protocol': st.column_config.TextColumn("Protocol"),
+                            'state': st.column_config.TextColumn("State"),
+                            'service': st.column_config.TextColumn("Service")
+                        },
+                        use_container_width=True
+                    )
                 
-                analysis_results = []
-                intrusion_count = 0
+                # Visualize open ports
+                if open_ports:
+                    fig = px.bar(
+                        df,
+                        x='port',
+                        y='service',
+                        color='protocol',
+                        title=f"Open Ports on {target}",
+                        labels={'port': 'Port Number', 'service': 'Service'},
+                        height=400
+                    )
+                    fig.update_layout(
+                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
                 
-                for i, packet in enumerate(packets):
-                    features = process_packet(packet, st.session_state.connection_tracker)
-                    if features is None:
-                        continue
-                    
-                    input_df = pd.DataFrame([features])
-                    prediction, confidence = predict_traffic(input_df, threshold)
-                    
-                    if prediction is None or confidence is None:
-                        continue
-                    
-                    is_intrusion = prediction != 'normal'
-                    src_ip = packet[IP].src if IP in packet else "Unknown"
-                    is_anomaly = False
-                    if autoencoder:
-                        input_data_scaled = scaler.transform(input_df)
-                        is_anomaly = detect_anomaly(input_data_scaled, autoencoder)[0]
-                    
-                    explanation = explain_threat(prediction, confidence, src_ip, st.session_state.xai_api_key, st.session_state.openai_api_key)
-                    
-                    if is_intrusion and confidence >= alert_threshold:
-                        intrusion_count += 1
-                        alert_message = f"Intrusion detected in packet {i+1} ({prediction}) from {src_ip} with confidence {confidence:.2%}"
-                        st.session_state.alert_log.append({
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'message': alert_message,
-                            'recipient': 'admin@example.com'
-                        })
-                        st.balloons()
-                        st.markdown(f"<div style='background-color:#ff4d4d;padding:10px;border-radius:5px;'>🚨 {alert_message}</div>", unsafe_allow_html=True)
-                    
-                    analysis_results.append({
-                        'packet_num': i+1,
-                        'is_intrusion': is_intrusion,
-                        'prediction': prediction,
-                        'confidence': confidence,
-                        'src_ip': src_ip,
-                        'is_anomaly': is_anomaly,
-                        'explanation': explanation
-                    })
-                    progress_bar.progress((i + 1) / len(packets))
-                
-                history_entry = {
-                    'timestamp': datetime.now(),
-                    'filename': filename,
-                    'total_packets': len(packets),
-                    'intrusion_count': intrusion_count,
-                    'results': analysis_results
-                }
-                st.session_state.analysis_history.append(history_entry)
-                
-                st.success(f"Analysis complete: {intrusion_count} intrusions detected in {len(packets)} packets.")
-                
-                st.subheader("Interactive Dashboard")
-                result_df = pd.DataFrame(analysis_results)
-                
-                fig_heatmap = px.density_heatmap(
-                    result_df[result_df['is_intrusion']],
-                    x='confidence',
-                    y='prediction',
-                    title="Intrusion Confidence Heatmap",
-                    labels={'confidence': 'Confidence', 'prediction': 'Attack Type'}
+                # Export results
+                st.subheader("Export Results")
+                csv_data = pd.DataFrame(scan_results).to_csv(index=False)
+                st.download_button(
+                    label="Download CSV",
+                    data=csv_data,
+                    file_name=f"nmap_scan_{target}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
                 )
-                st.plotly_chart(fig_heatmap, use_container_width=True)
-                
-                fig_treemap = px.treemap(
-                    result_df[result_df['is_intrusion']],
-                    path=['prediction', 'src_ip'],
-                    values='confidence',
-                    title="Attack Type and Source IP Treemap"
-                )
-                st.plotly_chart(fig_treemap, use_container_width=True)
-                
-                st.subheader("Results Table")
-                st.dataframe(result_df[['packet_num', 'src_ip', 'prediction', 'confidence', 'is_anomaly', 'explanation']], use_container_width=True)
-                
-                st.subheader("Export Report")
-                col_pdf, col_csv, col_json = st.columns(3)
-                with col_pdf:
-                    pdf_path = generate_pdf_report(analysis_results, intrusion_count, len(packets), filename)
-                    with open(pdf_path, "rb") as f:
-                        st.download_button(
-                            label="Download PDF",
-                            data=f,
-                            file_name=os.path.basename(pdf_path),
-                            mime="application/pdf"
-                        )
-                with col_csv:
-                    csv_data = generate_csv_report(analysis_results)
-                    st.download_button(
-                        label="Download CSV",
-                        data=csv_data,
-                        file_name=f"IDPS_Report_{filename}.csv",
-                        mime="text/csv"
-                    )
-                with col_json:
-                    json_data = generate_json_report(analysis_results)
-                    st.download_button(
-                        label="Download JSON",
-                        data=json_data,
-                        file_name=f"IDPS_Report_{filename}.json",
-                        mime="application/json"
-                    )
-                
-                st.subheader("Feedback")
-                with st.form(f"feedback_form_{filename}"):
-                    uncertain_indices = select_uncertain_packets(analysis_results)
-                    feedback_indices = st.multiselect(
-                        "Select packets to mark as incorrect",
-                        options=result_df.index,
-                        default=uncertain_indices,
-                        format_func=lambda x: f"Packet {result_df.loc[x, 'packet_num']} ({result_df.loc[x, 'prediction']}, Confidence: {result_df.loc[x, 'confidence']:.2%})"
-                    )
-                    correct_label = st.selectbox("Correct Label", ['normal'] + list(le_class.classes_))
-                    if st.form_submit_button("Submit Feedback"):
-                        for idx in feedback_indices:
-                            packet_features = process_packet(packets[result_df.loc[idx, 'packet_num'] - 1], st.session_state.connection_tracker)
-                            if packet_features:
-                                packet_features['class'] = correct_label
-                                st.session_state.feedback_data.append(packet_features)
-                        st.success(f"Feedback saved for {len(feedback_indices)} packets.")
-                
-                if isinstance(pcap_file, str):
-                    os.remove(pcap_file)
-                else:
-                    os.remove(temp_pcap)
                 
             except Exception as e:
-                st.error(f"Error during PCAP analysis: {str(e)}")
-                if os.path.exists("temp_upload.pcap"):
-                    os.remove("temp_upload.pcap")
-                if os.path.exists("sample.pcap"):
-                    os.remove("sample.pcap")
+                st.error(f"Error during scan simulation: {str(e)}")
 
 def show_historical_analysis():
     st.header("Historical Analysis Dashboard")
@@ -680,7 +417,7 @@ def show_historical_analysis():
         return
     
     st.markdown("""
-    Visualize trends and insights from past PCAP analyses.
+    Visualize trends and insights from past analyses.
     <div class="tooltip">ℹ️
         <span class="tooltiptext">Filter by date to explore intrusion trends and attack distributions.</span>
     </div>
@@ -721,6 +458,11 @@ def show_historical_analysis():
         title="Intrusion and Normal Traffic Over Time",
         labels={'value': 'Count', 'variable': 'Traffic Type'}
     )
+    fig.update_layout(
+        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+    )
     st.plotly_chart(fig, use_container_width=True)
     
     st.subheader("Attack Type Distribution")
@@ -736,13 +478,17 @@ def show_historical_analysis():
             values=attack_types.values,
             title="Distribution of Attack Types"
         )
+        fig.update_layout(
+            paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+            font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+        )
         st.plotly_chart(fig, use_container_width=True)
 
 def show_alert_log():
     st.header("Alert Log")
     
     if not st.session_state.alert_log:
-        st.info("No alerts generated yet. Analyze a PCAP file with a high confidence threshold.")
+        st.info("No alerts generated yet. Run a simulation with a high confidence threshold.")
         return
     
     st.markdown("""
@@ -769,14 +515,14 @@ def show_retrain_model():
         return
     
     st.markdown("""
-    Improve the model using feedback from PCAP analyses.
+    Improve the model using feedback from analyses.
     <div class="tooltip">ℹ️
         <span class="tooltiptext">Active learning prioritizes uncertain predictions for feedback.</span>
     </div>
     """, unsafe_allow_html=True)
     
     if not st.session_state.feedback_data:
-        st.info("No feedback data available. Provide feedback on PCAP analysis results first.")
+        st.info("No feedback data available. Provide feedback on analysis results first.")
         return
     
     feedback_df = pd.DataFrame(st.session_state.feedback_data)
@@ -950,6 +696,11 @@ def show_train_model():
                         labels={'x': 'False Positive Rate', 'y': 'True Positive Rate'}
                     )
                     fig_roc.add_shape(type='line', line=dict(dash='dash'), x0=0, x1=1, y0=0, y1=1)
+                    fig_roc.update_layout(
+                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+                    )
                     st.plotly_chart(fig_roc, use_container_width=True)
                     
                     precision, recall, _ = precision_recall_curve(y_test, y_pred_prob, pos_label=le_class.transform(['normal'])[0])
@@ -957,6 +708,11 @@ def show_train_model():
                         x=recall, y=precision,
                         title="Precision-Recall Curve",
                         labels={'x': 'Recall', 'y': 'Precision'}
+                    )
+                    fig_pr.update_layout(
+                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
                     )
                     st.plotly_chart(fig_pr, use_container_width=True)
                     
@@ -1031,6 +787,11 @@ def show_test_model():
                         text_auto=True,
                         title="Confusion Matrix",
                         color_continuous_scale='Blues'
+                    )
+                    fig_cm.update_layout(
+                        paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                        font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
                     )
                     st.plotly_chart(fig_cm, use_container_width=True)
                     
@@ -1188,7 +949,7 @@ def show_realtime_detection():
             if is_intrusion:
                 intrusion_count += 1
                 st.balloons()
-                st.markdown(f"<div style='background-color:#ff4d4d;padding:10px;border-radius:5px;'>🚨 Intrusion detected: {prediction} (Confidence: {confidence:.2%})</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ff4d4d;padding:10px;border-radius:5px;color:#ffffff;'>🚨 Intrusion detected: {prediction} (Confidence: {confidence:.2%})</div>", unsafe_allow_html=True)
             results.append(is_intrusion)
             
             status_placeholder.markdown(f"""
@@ -1204,6 +965,11 @@ def show_realtime_detection():
                 labels={'x': 'Sample', 'y': 'Status'},
             )
             fig.update_yaxes(range=[-0.1, 1.1], tickvals=[0, 1], ticktext=['Normal', 'Intrusion'])
+            fig.update_layout(
+                paper_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                plot_bgcolor='#2a2a3d' if st.session_state.theme == 'Dark' else '#ffffff',
+                font_color='#ffffff' if st.session_state.theme == 'Dark' else '#000000'
+            )
             chart_placeholder.plotly_chart(fig, use_container_width=True)
             
             log_placeholder.markdown(f"**Sample {i+1}**: {'🚨 Intrusion' if is_intrusion else '✅ Normal'} (Confidence: {confidence:.2%})")
@@ -1246,10 +1012,10 @@ def show_documentation():
     **Objectives**  
     - Detect network intrusions with high accuracy using ML models.
     - Provide actionable insights with Generative AI explanations.
-    - Enable real-time monitoring and historical analysis.
+    - Enable real-time monitoring and port scanning capabilities.
     
     **System Architecture**  
-    - **Data Ingestion**: Processes NSL-KDD datasets and PCAP files using Scapy.
+    - **Data Ingestion**: Processes NSL-KDD datasets and simulates NMAP scans.
     - **ML Models**: XGBoost for classification, LSTM for temporal patterns, Autoencoders for anomaly detection.
     - **Generative AI**: Integrates xAI/OpenAI APIs for threat explanations.
     - **Frontend**: Streamlit with Plotly for interactive visualizations.
@@ -1257,8 +1023,9 @@ def show_documentation():
     
     **Key Features**  
     - Real-time intrusion detection simulation.
+    - NMAP-like port scanning interface.
     - Interactive dashboards with Plotly visualizations.
-    - Multi-format report export (PDF, CSV, JSON).
+    - Multi-format report export (CSV).
     - Active learning for model improvement.
     - Mock threat intelligence feed.
     
@@ -1268,10 +1035,10 @@ def show_documentation():
     - **Evaluation**: Accuracy, ROC-AUC, Precision-Recall curves.
     
     **Technology Stack**  
-    - Python, Streamlit, Scikit-learn, TensorFlow, XGBoost, Scapy, Plotly, ReportLab.
+    - Python, Streamlit, Scikit-learn, TensorFlow, XGBoost, Plotly, ReportLab.
     
     **Future Improvements**  
-    - Integrate live network capture with Scapy.
+    - Integrate live NMAP scanning (requires network permissions).
     - Support additional datasets (e.g., CICIDS2017).
     - Enhance Generative AI with custom prompts.
     
@@ -1286,8 +1053,8 @@ def main():
     
     app_mode = st.sidebar.selectbox(
         "Navigation",
-        ["Home", "Train Model", "Test Model", "Real-time Detection", "PCAP Analysis", "Historical Analysis", "Alert Log", "Retrain Model", "Threat Intelligence", "Documentation"],
-        format_func=lambda x: f"{'🛠️' if x in ['Train Model', 'Retrain Model'] else '📊' if x in ['Historical Analysis', 'Test Model'] else '🚨' if x == 'Alert Log' else '🌐' if x == 'Real-time Detection' else '🔍' if x == 'PCAP Analysis' else 'ℹ️' if x == 'Documentation' else '📰' if x == 'Threat Intelligence' else '🏠'} {x}"
+        ["Home", "Train Model", "Test Model", "Real-time Detection", "NMAP Analysis", "Historical Analysis", "Alert Log", "Retrain Model", "Threat Intelligence", "Documentation"],
+        format_func=lambda x: f"{'🛠️' if x in ['Train Model', 'Retrain Model'] else '📊' if x in ['Historical Analysis', 'Test Model'] else '🚨' if x == 'Alert Log' else '🌐' if x == 'Real-time Detection' else '🔍' if x == 'NMAP Analysis' else 'ℹ️' if x == 'Documentation' else '📰' if x == 'Threat Intelligence' else '🏠'} {x}"
     )
     
     if app_mode == "Home":
@@ -1300,9 +1067,10 @@ def main():
         - **Anomaly Detection**: Autoencoders for zero-day attacks.
         - **Generative AI**: Threat explanations via xAI/OpenAI APIs.
         - **Interactive Dashboards**: Visualize threats with Plotly.
+        - **NMAP Analysis**: Simulate port scanning to identify open services.
         - **Real-time Alerts**: Instant notifications for intrusions.
         
-        Start by training a model or analyzing a PCAP file!
+        Start by training a model or running an NMAP scan!
         """)
         if model is not None:
             st.success(f"Loaded {model_type} model is ready!")
@@ -1315,8 +1083,8 @@ def main():
         show_test_model()
     elif app_mode == "Real-time Detection":
         show_realtime_detection()
-    elif app_mode == "PCAP Analysis":
-        show_pcap_analysis()
+    elif app_mode == "NMAP Analysis":
+        show_nmap_analysis()
     elif app_mode == "Historical Analysis":
         show_historical_analysis()
     elif app_mode == "Alert Log":
