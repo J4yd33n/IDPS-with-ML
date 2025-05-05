@@ -52,69 +52,41 @@ LOW_IMPORTANCE_FEATURES = [
 ]
 CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
-# NAMA logo (SVG)
+# Updated NAMA logo (SVG) with Nigerian colors and aviation theme
 NAMA_LOGO_SVG = """
 <svg width="150" height="150" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="50" cy="50" r="45" fill="#003087"/>
-    <path d="M50 20 L70 50 L50 80 L30 50 Z" fill="#ffffff"/>
-    <text x="50" y="55" font-family="Arial" font-size="20" fill="#FFD700" text-anchor="middle">NAMA</text>
+    <rect width="100" height="100" fill="#009A49"/>
+    <rect x="33.33" width="33.34" height="100" fill="#FFFFFF"/>
+    <path d="M50 30 L70 50 L50 70 L30 50 Z" fill="#009A49" transform="rotate(45 50 50)"/>
+    <text x="50" y="90" font-family="Arial" font-size="12" fill="#FFFFFF" text-anchor="middle">NAMA</text>
 </svg>
 """
 
-# Language translations
+# English-only translations
 TRANSLATIONS = {
-    "en": {
-        "title": "NAMA AI-Enhanced IDPS",
-        "login": "Login",
-        "username": "Username",
-        "password": "Password",
-        "login_button": "Login",
-        "invalid_credentials": "Invalid credentials",
-        "home": "AI-Enhanced Intrusion Detection and Prevention System",
-        "welcome": "Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.",
-        "nmap_analysis": "NMAP Analysis",
-        "nmap_desc": "Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.",
-        "atc_monitoring": "ATC Network Monitoring",
-        "atc_desc": "Monitor aviation-specific protocols (ADS-B, ACARS) for NAMA's network.",
-        "compliance_dashboard": "NCAA/ICAO Compliance Dashboard",
-        "compliance_desc": "Track cybersecurity compliance for NAMA operations.",
-        "alert_log": "Alert Log",
-        "documentation": "Project Documentation",
-        "toggle_theme": "Toggle Theme",
-        "run_scan": "Run Scan",
-        "simulate_atc": "Simulate ATC Traffic",
-        "generate_report": "Generate Compliance Report",
-        "clear_log": "Clear Alert Log",
-        "download_audit": "Download Audit Trail",
-        "threat_intel": "Aviation Threat Intelligence",
-        "language": "Language"
-    },
-    "ha": {
-        "title": "NAMA IDPS Mai Haɓaka AI",
-        "login": "Shiga",
-        "username": "Sunan Mai Amfani",
-        "password": "Kalmar Sirri",
-        "login_button": "Shiga",
-        "invalid_credentials": "Bayanan shiga ba daidai ba",
-        "home": "Tsarin Kariya da Hannun Jari na AI",
-        "welcome": "Maraba da zuwa NAMA's IDPS na zamani, wanda aka tsara don kare sararin samaniyar Najeriya tare da fasahar AI.",
-        "nmap_analysis": "Binciken NMAP",
-        "nmap_desc": "Yi binciken hanyar sadarwa don gano tashoshi masu buɗe da ayyuka. NMAP na ainihi yana buƙatar ikon root da python-nmap.",
-        "atc_monitoring": "Sa ido kan Hanyar ATC",
-        "atc_desc": "Saka idanu akan ka'idojin musamman na jirgin sama (ADS-B, ACARS) don hanyar NAMA.",
-        "compliance_dashboard": "Dashboard na NCAA/ICAO",
-        "compliance_desc": "Bin diddigin yarda da ka'idojin tsaro na NAMA.",
-        "alert_log": "Log na Faɗakarwa",
-        "documentation": "Takardun Aiki",
-        "toggle_theme": "Canza Jigo",
-        "run_scan": "Gudanar da Bincike",
-        "simulate_atc": "Kwaikwayi Hanyar ATC",
-        "generate_report": "Samar da Rahoton Yarda",
-        "clear_log": "Share Log na Faɗakarwa",
-        "download_audit": "Zazzage Hanyar Dubawa",
-        "threat_intel": "Bayanan Barazanar Jirgin Sama",
-        "language": "Yare"
-    }
+    "title": "NAMA AI-Enhanced IDPS",
+    "login": "Login",
+    "username": "Username",
+    "password": "Password",
+    "login_button": "Login",
+    "invalid_credentials": "Invalid credentials",
+    "home": "AI-Enhanced Intrusion Detection and Prevention System",
+    "welcome": "Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.",
+    "nmap_analysis": "NMAP Analysis",
+    "nmap_desc": "Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.",
+    "atc_monitoring": "ATC Network Monitoring",
+    "atc_desc": "Monitor aviation-specific protocols (ADS-B, ACARS) for NAMA's network.",
+    "compliance_dashboard": "NCAA/ICAO Compliance Dashboard",
+    "compliance_desc": "Track cybersecurity compliance for NAMA operations.",
+    "alert_log": "Alert Log",
+    "documentation": "Project Documentation",
+    "toggle_theme": "Toggle Theme",
+    "run_scan": "Run Scan",
+    "simulate_atc": "Simulate ATC Traffic",
+    "generate_report": "Generate Compliance Report",
+    "clear_log": "Clear Alert Log",
+    "download_audit": "Download Audit Trail",
+    "threat_intel": "Aviation Threat Intelligence"
 }
 
 # Theme configuration
@@ -228,8 +200,6 @@ if 'alert_log' not in st.session_state:
     st.session_state.alert_log = []
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
-if 'language' not in st.session_state:
-    st.session_state.language = "en"
 if 'atc_data' not in st.session_state:
     st.session_state.atc_data = []
 
@@ -567,21 +537,13 @@ def generate_geo_map(atc_results):
 
 # Main Streamlit app
 def main():
-    t = TRANSLATIONS[st.session_state.language]
     apply_theme_css(st.session_state.theme)
     
     # Sidebar (shown after login)
     if st.session_state.authenticated:
         st.sidebar.markdown(NAMA_LOGO_SVG, unsafe_allow_html=True)
-        st.sidebar.title(t["title"])
-        st.sidebar.selectbox(
-            t["language"],
-            ["English", "Hausa"],
-            index=0 if st.session_state.language == "en" else 1,
-            key="language_select",
-            on_change=lambda: setattr(st.session_state, "language", "en" if st.session_state.language_select == "English" else "ha")
-        )
-        if st.sidebar.button(t["toggle_theme"]):
+        st.sidebar.title(TRANSLATIONS["title"])
+        if st.sidebar.button(TRANSLATIONS["toggle_theme"]):
             st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
             apply_theme_css(st.session_state.theme)
     
@@ -591,22 +553,22 @@ def main():
             f"""
             <div class="login-container">
                 <div class="login-card">
-                    <h2>{t["login"]}</h2>
+                    <h2>{TRANSLATIONS["login"]}</h2>
                     <div class="login-form">
             """, unsafe_allow_html=True
         )
         
         with st.form("login_form"):
-            username = st.text_input(t["username"])
-            password = st.text_input(t["password"], type="password")
-            if st.form_submit_button(t["login_button"]):
+            username = st.text_input(TRANSLATIONS["username"])
+            password = st.text_input(TRANSLATIONS["password"], type="password")
+            if st.form_submit_button(TRANSLATIONS["login_button"]):
                 if authenticate_user(username, password):
                     st.session_state.authenticated = True
                     log_action(username, "User logged in")
-                    st.success("Login successful!" if t["language"] == "en" else "Shiga cikin nasara!")
+                    st.success("Login successful!")
                     st.rerun()
                 else:
-                    st.error(t["invalid_credentials"])
+                    st.error(TRANSLATIONS["invalid_credentials"])
         
         st.markdown(
             """
@@ -623,7 +585,7 @@ def main():
         scaler = joblib.load('scaler.pkl')
         label_encoders = joblib.load('label_encoders.pkl')
         le_class = joblib.load('le_class.pkl')
-        st.sidebar.success("Model loaded successfully." if t["language"] == "en" else "An loda samfurin cikin nasara.")
+        st.sidebar.success("Model loaded successfully.")
     except Exception as e:
         st.error(f"Failed to load model: {str(e)}. Please upload model files.")
         logger.error(f"Model loading error: {str(e)}")
@@ -633,12 +595,12 @@ def main():
     app_mode = st.sidebar.selectbox(
         "Navigation",
         ["Home", "NMAP Analysis", "ATC Monitoring", "Compliance Dashboard", "Alert Log", "Threat Intelligence", "Documentation"],
-        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '📰' if x == 'Threat Intelligence' else '📖'} {t[x.lower().replace(' ', '_')]}"
+        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '📰' if x == 'Threat Intelligence' else '📖'} {TRANSLATIONS[x.lower().replace(' ', '_')]}"
     )
     
     if app_mode == "Home":
-        st.header(t["home"])
-        st.markdown(t["welcome"])
+        st.header(TRANSLATIONS["home"])
+        st.markdown(TRANSLATIONS["welcome"])
         st.markdown("""
         ### Features
         - **NMAP Analysis**: Real or simulated port scanning to identify vulnerabilities.
@@ -647,42 +609,41 @@ def main():
         - **Threat Intelligence**: Aviation-specific cyberthreat updates.
         - **Real-time Alerts**: Email and UI notifications for threats.
         - **Geo-Visualization**: Map-based intrusion tracking.
-        - **Multilingual**: English and Hausa support.
         
         Start exploring now!
         """)
         if model is not None:
-            st.success("Loaded XGBoost model is ready!" if t["language"] == "en" else "Samfurin XGBoost a shirye yake!")
+            st.success("Loaded XGBoost model is ready!")
         if not NMAP_AVAILABLE:
-            st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans." if t["language"] == "en" else "Binciken NMAP na ainihi ba ya nan (ba a shigar da python-nmap ba). Ana amfani da bincike na kwaikwayo.")
+            st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans.")
     
     elif app_mode == "NMAP Analysis":
-        st.header(t["nmap_analysis"])
-        st.markdown(t["nmap_desc"])
+        st.header(TRANSLATIONS["nmap_analysis"])
+        st.markdown(TRANSLATIONS["nmap_desc"])
         
-        use_real_nmap = st.checkbox("Use Real NMAP (requires root and python-nmap)" if t["language"] == "en" else "Amfani da NMAP na Ainihi (yana buƙatar root da python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
+        use_real_nmap = st.checkbox("Use Real NMAP (requires root and python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
         
         with st.form("nmap_scan_form"):
             col1, col2 = st.columns(2)
             with col1:
-                target = st.text_input("Target IP/Hostname" if t["language"] == "en" else "IP/Hostname na Manufa", value="192.168.1.1")
-                scan_type = st.selectbox("Scan Type" if t["language"] == "en" else "Nau'in Bincike", ["TCP SYN", "TCP Connect", "UDP"])
+                target = st.text_input("Target IP/Hostname", value="192.168.1.1")
+                scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
             with col2:
-                port_range = st.text_input("Port Range (e.g., 1-1000)" if t["language"] == "en" else "Kewayen Tashoshi (misali, 1-1000)", value="1-1000")
-            submit = st.form_submit_button(t["run_scan"])
+                port_range = st.text_input("Port Range (e.g., 1-1000)", value="1-1000")
+            submit = st.form_submit_button(TRANSLATIONS["run_scan"])
         
         if submit:
-            with st.spinner("Running NMAP scan..." if t["language"] == "en" else "Ana gudanar da binciken NMAP..."):
+            with st.spinner("Running NMAP scan..."):
                 try:
                     if not target:
-                        st.error("Please provide a target IP or hostname." if t["language"] == "en" else "Da fatan za a bayar da IP ko hostname na manufa.")
+                        st.error("Please provide a target IP or hostname.")
                         return
                     if not port_range or '-' not in port_range:
-                        st.error("Please provide a valid port range (e.g., 1-1000)." if t["language"] == "en" else "Da fatan za a bayar da kewayen tashoshi mai inganci (misali, 1-1000).")
+                        st.error("Please provide a valid port range (e.g., 1-1000).")
                         return
                     start_port, end_port = map(int, port_range.split('-'))
                     if start_port < 1 or end_port > 65535 or start_port > end_port:
-                        st.error("Port range must be between 1 and 65535." if t["language"] == "en" else "Kewayen tashoshi dole ne ya kasance tsakanin 1 da 65535.")
+                        st.error("Port range must be between 1 and 65535.")
                         return
                     
                     if use_real_nmap and NMAP_AVAILABLE:
@@ -692,9 +653,9 @@ def main():
                     
                     open_ports = [r for r in scan_results if r['state'] == 'open']
                     if not open_ports:
-                        st.warning("No open ports detected." if t["language"] == "en" else "Ba a gano tashoshi masu buɗe ba.")
+                        st.warning("No open ports detected.")
                     else:
-                        st.success(f"Found {len(open_ports)} open ports." if t["language"] == "en" else f"An gano tashoshi masu buɗe {len(open_ports)}.")
+                        st.success(f"Found {len(open_ports)} open ports.")
                         df = pd.DataFrame(open_ports)
                         st.dataframe(df[['port', 'protocol', 'state', 'service']], use_container_width=True)
                         
@@ -723,15 +684,15 @@ def main():
                     st.error(f"Error during scan: {str(e)}")
     
     elif app_mode == "ATC Monitoring":
-        st.header(t["atc_monitoring"])
-        st.markdown(t["atc_desc"])
+        st.header(TRANSLATIONS["atc_monitoring"])
+        st.markdown(TRANSLATIONS["atc_desc"])
         
-        num_samples = st.slider("Number of samples to simulate" if t["language"] == "en" else "Yawan samfuran da za a kwaikwaya", 5, 50, 10)
-        threshold = st.slider("Detection Threshold" if t["language"] == "en" else "Matsakaicin Ganowa", 0.1, 0.9, 0.5, 0.05)
-        auto_refresh = st.checkbox("Enable Real-Time Monitoring (updates every 10s)" if t["language"] == "en" else "Kunna Sa ido na Ainihi (sabon bayani kowane 10s)", value=False)
+        num_samples = st.slider("Number of samples to simulate", 5, 50, 10)
+        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.5, 0.05)
+        auto_refresh = st.checkbox("Enable Real-Time Monitoring (updates every 10s)", value=False)
         
-        if st.button(t["simulate_atc"]) or auto_refresh:
-            with st.spinner("Simulating ATC traffic..." if t["language"] == "en" else "Kwaikwayi hanyar ATC..."):
+        if st.button(TRANSLATIONS["simulate_atc"]) or auto_refresh:
+            with st.spinner("Simulating ATC traffic..."):
                 try:
                     atc_data = simulate_aviation_traffic(num_samples)
                     df = pd.DataFrame(atc_data)
@@ -751,7 +712,7 @@ def main():
                                  use_container_width=True)
                     
                     if not intrusions.empty:
-                        st.error(f"Detected {len(intrusions)} intrusions!" if t["language"] == "en" else f"An gano kutse {len(intrusions)}!")
+                        st.error(f"Detected {len(intrusions)} intrusions!")
                         for _, row in intrusions.iterrows():
                             alert = {
                                 'timestamp': row['timestamp'],
@@ -765,7 +726,7 @@ def main():
                                 'security@nama.gov.ng'
                             )
                     else:
-                        st.success("No intrusions detected." if t["language"] == "en" else "Ba a gano kutse ba.")
+                        st.success("No intrusions detected.")
                     
                     fig = px.scatter(
                         df, x='timestamp', y='confidence', color='prediction', size='src_bytes',
@@ -799,8 +760,8 @@ def main():
                     st.error(f"Error during ATC simulation: {str(e)}")
     
     elif app_mode == "Compliance Dashboard":
-        st.header(t["compliance_dashboard"])
-        st.markdown(t["compliance_desc"])
+        st.header(TRANSLATIONS["compliance_dashboard"])
+        st.markdown(TRANSLATIONS["compliance_desc"])
         
         compliance_score = calculate_compliance_score(None, st.session_state.atc_data)
         compliance_data = {
@@ -821,9 +782,9 @@ def main():
         st.plotly_chart(fig, use_container_width=True)
         
         st.markdown(f"**Overall Compliance Score**: {int(df['Score'].mean())}%")
-        st.markdown("**Recommendations**: Ensure firewall updates, reduce incident response time, and secure open ports." if t["language"] == "en" else "**Shawara**: Tabbatar da sabunta firewall, rage lokacin amsawa ga abubuwan da suka faru, da kuma tsare tashoshi masu buɗe.")
+        st.markdown("**Recommendations**: Ensure firewall updates, reduce incident response time, and secure open ports.")
         
-        if st.button(t["generate_report"]):
+        if st.button(TRANSLATIONS["generate_report"]):
             chart_buffer = io.BytesIO()
             fig.write_image(chart_buffer, format="png")
             chart_buffer.seek(0)
@@ -834,25 +795,25 @@ def main():
                 st.markdown(href, unsafe_allow_html=True)
     
     elif app_mode == "Alert Log":
-        st.header(t["alert_log"])
+        st.header(TRANSLATIONS["alert_log"])
         if not st.session_state.alert_log:
-            st.info("No alerts generated yet." if t["language"] == "en" else "Ba a samar da faɗakarwa ba tukuna.")
+            st.info("No alerts generated yet.")
         else:
             alert_df = pd.DataFrame(st.session_state.alert_log)
             st.dataframe(alert_df[['timestamp', 'message', 'recipient']], use_container_width=True)
-            if st.button(t["clear_log"]):
+            if st.button(TRANSLATIONS["clear_log"]):
                 st.session_state.alert_log = []
-                st.success("Alert log cleared." if t["language"] == "en" else "An share log na faɗakarwa.")
+                st.success("Alert log cleared.")
     
     elif app_mode == "Threat Intelligence":
-        st.header(t["threat_intel"])
-        st.markdown("Latest aviation cybersecurity threats affecting NAMA operations." if t["language"] == "en" else "Sabbin barazanar tsaro na jirgin sama da ke shafar ayyukan NAMA.")
+        st.header(TRANSLATIONS["threat_intel"])
+        st.markdown("Latest aviation cybersecurity threats affecting NAMA operations.")
         threats = get_threat_intelligence()
         df = pd.DataFrame(threats)
         st.dataframe(df, use_container_width=True)
     
     elif app_mode == "Documentation":
-        st.header(t["documentation"])
+        st.header(TRANSLATIONS["documentation"])
         st.markdown("""
         ### NAMA AI-Enhanced IDPS
         
@@ -870,7 +831,6 @@ def main():
         - Dynamic compliance scoring.
         - Aviation threat intelligence.
         - Email alerts and PDF reports.
-        - Multilingual support (English, Hausa).
         
         **Technology Stack**  
         - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, Folium, python-nmap (optional).
@@ -881,34 +841,6 @@ def main():
         
         **Contact**  
         For feedback, contact [security@nama.gov.ng](mailto:security@nama.gov.ng).
-        """ if t["language"] == "en" else """
-        ### NAMA IDPS Mai Haɓaka AI
-        
-        **Bayanin Gabaɗaya**  
-        Wannan IDPS yana amfani da ilimin na'ura da binciken hanyar sadarwa don tabbatar da tsaron hanyar sadarwar NAMA, yana tabbatar da ayyukan sararin samaniya cikin aminci.
-        
-        **Manufofi**  
-        - Gano kutse tare da babban daidaito ta amfani da XGBoost.
-        - Saka idanu akan ka'idojin ATC don gano abubuwan da ba daidai ba.
-        - Tabbatar da yarda da ka'idojin NCAA/ICAO.
-        
-        **Manyan Fasali**  
-        - Binciken NMAP na ainihi ko kwaikwayo.
-        - Sa ido kan ATC na ainihi tare da ganin ƙasa.
-        - Ƙididdigar yarda mai ƙarfi.
-        - Bayanan barazanar jirgin sama.
-        - Faɗakarwar imel da rahotannin PDF.
-        - Tallafin yare da yawa (Turanci, Hausa).
-        
-        **Tsarin Fasaha**  
-        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, Folium, python-nmap (na zaɓi).
-        
-        **Ci gaba na Gaba**  
-        - Haɗa binciken NMAP na ainihi tare da izinin hanyar sadarwa.
-        - Faɗaɗa bayanan barazana tare da abubuwan waje.
-        
-        **Tuntuɓa**  
-        Don ra'ayoyin, tuntuɓi [security@nama.gov.ng](mailto:security@nama.gov.ng).
         """)
     
     # Audit trail download
@@ -920,7 +852,7 @@ def main():
         csv_buffer = io.StringIO()
         log_df.to_csv(csv_buffer, index=False)
         b64 = base64.b64encode(csv_buffer.getvalue().encode()).decode()
-        href = f'<a href="data:text/csv;base64,{b64}" download="nama_audit_trail.csv">{t["download_audit"]}</a>'
+        href = f'<a href="data:text/csv;base64,{b64}" download="nama_audit_trail.csv">{TRANSLATIONS["download_audit"]}</a>'
         st.sidebar.markdown(href, unsafe_allow_html=True)
 
 if __name__ == "__main__":
