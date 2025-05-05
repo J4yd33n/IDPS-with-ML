@@ -13,3 +13,8 @@ joblib
 requests
 plotly 
 dash
+nmap
+redis
+flask
+reportlab
+pyjwt
