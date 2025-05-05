@@ -6,6 +6,7 @@ import plotly.express as px
 from datetime import datetime
 import logging
 import os
+import sys
 from sklearn.preprocessing import LabelEncoder
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -14,7 +15,16 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet
 import base64
 import io
-import sys
+
+# Configure Streamlit page settings (must be the first Streamlit command)
+st.set_page_config(page_title="NAMA IDPS", page_icon="✈️", layout="wide")
+
+# Check for optional nmap dependency
+try:
+    import nmap
+    NMAP_AVAILABLE = True
+except ImportError:
+    NMAP_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps.log', 
@@ -93,7 +103,6 @@ if 'authenticated' not in st.session_state:
 
 # Authentication
 def authenticate_user(username, password):
-    # Mock authentication (replace with real credentials in production)
     valid_credentials = {"nama_admin": "secure_password_2025"}
     return username in valid_credentials and valid_credentials[username] == password
 
@@ -144,6 +153,35 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
         st.error(f"Preprocessing error: {str(e)}")
         return None, label_encoders, le_class
 
+# Real NMAP scan
+def run_nmap_scan(target, scan_type, port_range):
+    try:
+        if not NMAP_AVAILABLE:
+            raise ImportError("python-nmap library is not installed.")
+        if not os.geteuid() == 0:
+            raise PermissionError("NMAP requires root privileges.")
+        nm = nmap.PortScanner()
+        scan_args = {'TCP SYN': '-sS', 'TCP Connect': '-sT', 'UDP': '-sU'}
+        nm.scan(target, port_range, arguments=scan_args[scan_type])
+        results = []
+        for host in nm.all_hosts():
+            for proto in nm[host].all_protocols():
+                for port in nm[host][proto].keys():
+                    state = nm[host][proto][port]['state']
+                    service = nm[host][proto][port].get('name', 'unknown')
+                    results.append({
+                        'port': port,
+                        'protocol': proto,
+                        'state': state,
+                        'service': service
+                    })
+        log_action("system", f"Real NMAP scan on {target}")
+        return results
+    except Exception as e:
+        logger.error(f"NMAP scan error: {str(e)}")
+        st.error(f"NMAP scan error: {str(e)}")
+        return []
+
 # Simulated NMAP scan
 def simulate_nmap_scan(target, scan_type, port_range):
     try:
@@ -175,40 +213,10 @@ def simulate_nmap_scan(target, scan_type, port_range):
         st.error(f"NMAP simulation error: {str(e)}")
         return []
 
-# Real NMAP scan (commented out for Streamlit Cloud)
-"""
-def run_nmap_scan(target, scan_type, port_range):
-    try:
-        import nmap
-        if not os.geteuid() == 0:
-            raise PermissionError("NMAP requires root privileges.")
-        nm = nmap.PortScanner()
-        scan_args = {'TCP SYN': '-sS', 'TCP Connect': '-sT', 'UDP': '-sU'}
-        nm.scan(target, port_range, arguments=scan_args[scan_type])
-        results = []
-        for host in nm.all_hosts():
-            for proto in nm[host].all_protocols():
-                for port in nm[host][proto].keys():
-                    state = nm[host][proto][port]['state']
-                    service = nm[host][proto][port].get('name', 'unknown')
-                    results.append({
-                        'port': port,
-                        'protocol': proto,
-                        'state': state,
-                        'service': service
-                    })
-        log_action("system", f"Real NMAP scan on {target}")
-        return results
-    except Exception as e:
-        logger.error(f"NMAP scan error: {str(e)}")
-        st.error(f"NMAP scan error: {str(e)}")
-        return []
-"""
-
 # ATC simulation
 def simulate_aviation_traffic(num_samples=10):
     try:
-        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']  # Nigerian airports
+        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
         data = {
             'timestamp': pd.date_range(start='now', periods=num_samples, freq='S'),
             'protocol_type': np.random.choice(['ads-b', 'acars', 'tcp'], num_samples),
@@ -348,8 +356,6 @@ def generate_nama_report(scan_results=None, atc_results=None):
 
 # Main Streamlit app
 def main():
-    st.set_page_config(page_title="NAMA IDPS", page_icon="✈️", layout="wide")
-    
     # Apply theme
     apply_theme_css(st.session_state.theme)
     
@@ -401,7 +407,7 @@ def main():
         Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.
         
         ### Features
-        - **NMAP Analysis**: Simulate network port scanning to identify vulnerabilities.
+        - **NMAP Analysis**: Real or simulated port scanning to identify vulnerabilities.
         - **ATC Monitoring**: Analyze aviation protocols (ADS-B, ACARS) for intrusions.
         - **Compliance Dashboard**: Track NCAA/ICAO cybersecurity standards.
         - **Real-time Alerts**: Instant notifications for detected threats.
@@ -411,10 +417,14 @@ def main():
         """)
         if model is not None:
             st.success("Loaded XGBoost model is ready!")
+        if not NMAP_AVAILABLE:
+            st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans.")
     
     elif app_mode == "NMAP Analysis":
         st.header("NMAP Analysis")
-        st.markdown("Simulate NMAP port scanning to identify open ports and services.")
+        st.markdown("Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.")
+        
+        use_real_nmap = st.checkbox("Use Real NMAP (requires root and python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
         
         with st.form("nmap_scan_form"):
             col1, col2 = st.columns(2)
@@ -426,7 +436,7 @@ def main():
             submit = st.form_submit_button("Run Scan")
         
         if submit:
-            with st.spinner("Running NMAP simulation..."):
+            with st.spinner("Running NMAP scan..."):
                 try:
                     if not target:
                         st.error("Please provide a target IP or hostname.")
@@ -439,7 +449,11 @@ def main():
                         st.error("Port range must be between 1 and 65535.")
                         return
                     
-                    scan_results = simulate_nmap_scan(target, scan_type, port_range)
+                    if use_real_nmap and NMAP_AVAILABLE:
+                        scan_results = run_nmap_scan(target, scan_type, port_range)
+                    else:
+                        scan_results = simulate_nmap_scan(target, scan_type, port_range)
+                    
                     open_ports = [r for r in scan_results if r['state'] == 'open']
                     if not open_ports:
                         st.warning("No open ports detected.")
@@ -574,7 +588,7 @@ def main():
         ### NAMA AI-Enhanced IDPS
         
         **Overview**  
-        This IDPS leverages machine learning and simulation to secure NAMA's network infrastructure, ensuring safe airspace operations.
+        This IDPS leverages machine learning and network scanning to secure NAMA's network infrastructure, ensuring safe airspace operations.
         
         **Objectives**  
         - Detect intrusions with high accuracy using XGBoost.
@@ -582,13 +596,13 @@ def main():
         - Ensure compliance with NCAA/ICAO standards.
         
         **Key Features**  
-        - Simulated NMAP scanning for network analysis.
+        - Real or simulated NMAP scanning for network analysis.
         - ATC protocol monitoring (ADS-B, ACARS).
         - Interactive compliance dashboard.
         - PDF report generation with NAMA branding.
         
         **Technology Stack**  
-        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab.
+        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, python-nmap (optional).
         
         **Future Improvements**  
         - Integrate real-time NMAP with network permissions.
