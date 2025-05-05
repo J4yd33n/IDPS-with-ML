@@ -68,7 +68,7 @@ THEME = {
     }
 }
 
-# Apply custom CSS for theming
+# Apply custom CSS for theming and responsive logo
 def apply_theme_css(theme):
     colors = THEME[theme]
     st.markdown(
@@ -86,6 +86,11 @@ def apply_theme_css(theme):
                 background-color: {colors['input_bg']};
                 color: {colors['text']};
                 border: 1px solid {colors['input_border']};
+            }}
+            .logo-image {{
+                width: 100%;
+                max-width: 150px;
+                height: auto;
             }}
         </style>
         """, unsafe_allow_html=True
@@ -360,7 +365,7 @@ def main():
     apply_theme_css(st.session_state.theme)
     
     # Sidebar
-    st.sidebar.image("https://via.placeholder.com/150?text=NAMA+Logo", use_container_width=True)
+    st.sidebar.image("https://via.placeholder.com/150?text=NAMA+Logo", width=150)
     st.sidebar.title("NAMA AI-Enhanced IDPS")
     if st.sidebar.button("Toggle Theme"):
         st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
