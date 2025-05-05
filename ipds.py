@@ -137,7 +137,7 @@ THEME = {
     }
 }
 
-# Apply custom CSS
+# Apply custom CSS with login animations
 def apply_theme_css(theme):
     colors = THEME[theme]
     st.markdown(
@@ -150,16 +150,70 @@ def apply_theme_css(theme):
             .stButton>button {{
                 background-color: {'#4CAF50' if theme == 'Light' else '#388E3C'};
                 color: #ffffff;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                transition: transform 0.3s ease;
+            }}
+            .stButton>button:hover {{
+                transform: scale(1.05);
             }}
             .stTextInput>div>input {{
                 background-color: {colors['input_bg']};
                 color: {colors['text']};
                 border: 1px solid {colors['input_border']};
+                border-radius: 5px;
+                padding: 8px;
             }}
             .logo-image {{
                 width: 100%;
                 max-width: 150px;
                 height: auto;
+            }}
+            /* Animated Login Page */
+            body {{
+                background: linear-gradient(45deg, #003087, #FFD700);
+                background-size: 400%;
+                animation: gradient 15s ease infinite;
+            }}
+            @keyframes gradient {{
+                0% {{ background-position: 0% 50%; }}
+                50% {{ background-position: 100% 50%; }}
+                100% {{ background-position: 0% 50%; }}
+            }}
+            .login-container {{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }}
+            .login-card {{
+                background-color: {'#ffffff' if theme == 'Light' else '#2a2a3d'};
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+                width: 100%;
+                max-width: 400px;
+                text-align: center;
+                animation: bounceIn 1s ease;
+            }}
+            @keyframes bounceIn {{
+                0% {{ transform: scale(0.5); opacity: 0; }}
+                60% {{ transform: scale(1.05); opacity: 1; }}
+                100% {{ transform: scale(1); }}
+            }}
+            .login-card h2 {{
+                color: {colors['text']};
+                margin-bottom: 20px;
+                animation: fadeIn 1s ease;
+            }}
+            .login-form {{
+                animation: fadeIn 1.5s ease;
+            }}
+            @keyframes fadeIn {{
+                0% {{ opacity: 0; }}
+                100% {{ opacity: 1; }}
             }}
         </style>
         """, unsafe_allow_html=True
@@ -181,7 +235,7 @@ if 'atc_data' not in st.session_state:
 
 # Authentication
 def authenticate_user(username, password):
-    valid_credentials = {"nama_admin": "secure_password_2025"}
+    valid_credentials = {"nama": "admin"}
     return username in valid_credentials and valid_credentials[username] == password
 
 # Audit logging
@@ -191,7 +245,6 @@ def log_action(user, action):
 # Send email alert (mocked for Streamlit Cloud)
 def send_email_alert(subject, body, recipient="security@nama.gov.ng"):
     try:
-        # Mock for Streamlit Cloud; configure real SMTP for local
         if os.environ.get("STREAMLIT_CLOUD"):
             logger.info(f"Mock email sent to {recipient}: {subject}")
             return True
@@ -517,23 +570,32 @@ def main():
     t = TRANSLATIONS[st.session_state.language]
     apply_theme_css(st.session_state.theme)
     
-    # Sidebar
-    st.sidebar.markdown(NAMA_LOGO_SVG, unsafe_allow_html=True)
-    st.sidebar.title(t["title"])
-    st.sidebar.selectbox(
-        t["language"],
-        ["English", "Hausa"],
-        index=0 if st.session_state.language == "en" else 1,
-        key="language_select",
-        on_change=lambda: setattr(st.session_state, "language", "en" if st.session_state.language_select == "English" else "ha")
-    )
-    if st.sidebar.button(t["toggle_theme"]):
-        st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
-        apply_theme_css(st.session_state.theme)
+    # Sidebar (shown after login)
+    if st.session_state.authenticated:
+        st.sidebar.markdown(NAMA_LOGO_SVG, unsafe_allow_html=True)
+        st.sidebar.title(t["title"])
+        st.sidebar.selectbox(
+            t["language"],
+            ["English", "Hausa"],
+            index=0 if st.session_state.language == "en" else 1,
+            key="language_select",
+            on_change=lambda: setattr(st.session_state, "language", "en" if st.session_state.language_select == "English" else "ha")
+        )
+        if st.sidebar.button(t["toggle_theme"]):
+            st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+            apply_theme_css(st.session_state.theme)
     
-    # Authentication
+    # Authentication with animated login page
     if not st.session_state.authenticated:
-        st.header(t["login"])
+        st.markdown(
+            f"""
+            <div class="login-container">
+                <div class="login-card">
+                    <h2>{t["login"]}</h2>
+                    <div class="login-form">
+            """, unsafe_allow_html=True
+        )
+        
         with st.form("login_form"):
             username = st.text_input(t["username"])
             password = st.text_input(t["password"], type="password")
@@ -545,6 +607,14 @@ def main():
                     st.rerun()
                 else:
                     st.error(t["invalid_credentials"])
+        
+        st.markdown(
+            """
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True
+        )
         return
     
     # Load model
@@ -639,12 +709,10 @@ def main():
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
-                        # Save chart for PDF
                         chart_buffer = io.BytesIO()
                         fig.write_image(chart_buffer, format="png")
                         chart_buffer.seek(0)
                         
-                        # Download report
                         report_buffer = generate_nama_report(scan_results=scan_results, chart_image=chart_buffer)
                         if report_buffer:
                             b64 = base64.b64encode(report_buffer.getvalue()).decode()
@@ -710,17 +778,14 @@ def main():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Geo-visualization
                     geo_map = generate_geo_map(df.to_dict('records'))
                     if geo_map:
                         st_folium(geo_map, width=700, height=400)
                     
-                    # Save chart for PDF
                     chart_buffer = io.BytesIO()
                     fig.write_image(chart_buffer, format="png")
                     chart_buffer.seek(0)
                     
-                    # Download report
                     report_buffer = generate_nama_report(atc_results=df.to_dict('records'), chart_image=chart_buffer)
                     if report_buffer:
                         b64 = base64.b64encode(report_buffer.getvalue()).decode()
