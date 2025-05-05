@@ -12,3 +12,4 @@ tensorflow-cpu
 joblib
 requests
 plotly 
+dash
