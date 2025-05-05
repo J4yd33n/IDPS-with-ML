@@ -89,16 +89,8 @@ TRANSLATIONS = {
     "threat_intel": "Aviation Threat Intelligence"
 }
 
-# Theme configuration
+# Theme configuration (only dark mode)
 THEME = {
-    "Light": {
-        "background": "#f0f2f6",
-        "text": "#000000",
-        "input_bg": "#ffffff",
-        "input_border": "#cccccc",
-        "chart_bg": "#ffffff",
-        "chart_text": "#000000"
-    },
     "Dark": {
         "background": "#1e1e2f",
         "text": "#ffffff",
@@ -109,9 +101,9 @@ THEME = {
     }
 }
 
-# Apply custom CSS with login animations
-def apply_theme_css(theme):
-    colors = THEME[theme]
+# Apply dark mode CSS
+def apply_theme_css():
+    colors = THEME["Dark"]
     st.markdown(
         f"""
         <style>
@@ -120,7 +112,7 @@ def apply_theme_css(theme):
                 color: {colors['text']};
             }}
             .stButton>button {{
-                background-color: {'#4CAF50' if theme == 'Light' else '#388E3C'};
+                background-color: #388E3C;
                 color: #ffffff;
                 border: none;
                 padding: 10px 20px;
@@ -161,7 +153,7 @@ def apply_theme_css(theme):
                 margin: 0;
             }}
             .login-card {{
-                background-color: {'#ffffff' if theme == 'Light' else '#2a2a3d'};
+                background-color: {colors['input_bg']};
                 padding: 40px;
                 border-radius: 15px;
                 box-shadow: 0 10px 20px rgba(0,0,0,0.2);
@@ -191,9 +183,9 @@ def apply_theme_css(theme):
         """, unsafe_allow_html=True
     )
 
-# Initialize session state
+# Initialize session state (force dark mode)
 if 'theme' not in st.session_state:
-    st.session_state.theme = "Light"
+    st.session_state.theme = "Dark"
 if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
 if 'alert_log' not in st.session_state:
@@ -537,15 +529,12 @@ def generate_geo_map(atc_results):
 
 # Main Streamlit app
 def main():
-    apply_theme_css(st.session_state.theme)
+    apply_theme_css()
     
     # Sidebar (shown after login)
     if st.session_state.authenticated:
         st.sidebar.markdown(NAMA_LOGO_SVG, unsafe_allow_html=True)
         st.sidebar.title(TRANSLATIONS["title"])
-        if st.sidebar.button(TRANSLATIONS["toggle_theme"]):
-            st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
-            apply_theme_css(st.session_state.theme)
     
     # Authentication with animated login page
     if not st.session_state.authenticated:
@@ -664,9 +653,9 @@ def main():
                             color_discrete_sequence=px.colors.sequential.Blues_r
                         )
                         fig.update_layout(
-                            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                            paper_bgcolor=THEME["Dark"]['chart_bg'],
+                            plot_bgcolor=THEME["Dark"]['chart_bg'],
+                            font=dict(color=THEME["Dark"]['chart_text'])
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
@@ -733,9 +722,9 @@ def main():
                         hover_data=['airport_code', 'airport_name', 'protocol_type'], title="ATC Traffic Analysis"
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=THEME["Dark"]['chart_bg'],
+                        plot_bgcolor=THEME["Dark"]['chart_bg'],
+                        font=dict(color=THEME["Dark"]['chart_text'])
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
@@ -775,9 +764,9 @@ def main():
             color="Score", color_continuous_scale="Blues"
         )
         fig.update_layout(
-            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-            font=dict(color=THEME[st.session_state.theme]['chart_text'])
+            paper_bgcolor=THEME["Dark"]['chart_bg'],
+            plot_bgcolor=THEME["Dark"]['chart_bg'],
+            font=dict(color=THEME["Dark"]['chart_text'])
         )
         st.plotly_chart(fig, use_container_width=True)
         
