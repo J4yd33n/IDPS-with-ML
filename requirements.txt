@@ -11,5 +11,5 @@ reportlab==4.2.2
 pyotp==2.9.0
 bcrypt==4.2.0
 python-nmap==0.7.1
-sqlite3
+
 requests==2.32.3
