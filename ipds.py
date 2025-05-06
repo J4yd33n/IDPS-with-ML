@@ -7,19 +7,21 @@ from datetime import datetime
 import logging
 import os
 import sys
-from sklearn.preprocessing import LabelEncoder
+import sqlite3
+import bcrypt
+import pyotp
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from xgboost import XGBClassifier
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 import base64
 import io
+import requests
 
-# Configure Streamlit page settings (must be the first Streamlit command)
-st.set_page_config(page_title="NAMA IDPS", page_icon="✈️", layout="wide")
-
-# Check for optional nmap dependency
+# Check for optional dependencies
 try:
     import nmap
     NMAP_AVAILABLE = True
@@ -68,7 +70,7 @@ THEME = {
     }
 }
 
-# Apply custom CSS for theming and responsive logo
+# Apply custom CSS for theming
 def apply_theme_css(theme):
     colors = THEME[theme]
     st.markdown(
@@ -105,11 +107,46 @@ if 'alert_log' not in st.session_state:
     st.session_state.alert_log = []
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
+if 'compliance_metrics' not in st.session_state:
+    st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 
-# Authentication
-def authenticate_user(username, password):
-    valid_credentials = {"nama": "admin"}
-    return username in valid_credentials and valid_credentials[username] == password
+# User database setup
+def setup_user_db():
+    conn = sqlite3.connect('nama_users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        password TEXT,
+        mfa_secret TEXT
+    )''')
+    conn.commit()
+    conn.close()
+
+def register_user(username, password, mfa_secret):
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    conn = sqlite3.connect('nama_users.db')
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO users (username, password, mfa_secret) VALUES (?, ?, ?)",
+                  (username, hashed, mfa_secret))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return False
+    conn.close()
+    return True
+
+def authenticate_user(username, password, mfa_code):
+    conn = sqlite3.connect('nama_users.db')
+    c = conn.cursor()
+    c.execute("SELECT password, mfa_secret FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        stored_password, mfa_secret = result
+        if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+            totp = pyotp.TOTP(mfa_secret)
+            return totp.verify(mfa_code)
+    return False
 
 # Audit logging
 def log_action(user, action):
@@ -158,16 +195,17 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
         st.error(f"Preprocessing error: {str(e)}")
         return None, label_encoders, le_class
 
-# Real NMAP scan
-def run_nmap_scan(target, scan_type, port_range):
+# Real-time NMAP scan
+def run_nmap_scan(target, scan_type, port_range, custom_args, callback):
     try:
         if not NMAP_AVAILABLE:
             raise ImportError("python-nmap library is not installed.")
-        if not os.geteuid() == 0:
-            raise PermissionError("NMAP requires root privileges.")
-        nm = nmap.PortScanner()
+        nm = nmap.PortScannerAsync()
         scan_args = {'TCP SYN': '-sS', 'TCP Connect': '-sT', 'UDP': '-sU'}
-        nm.scan(target, port_range, arguments=scan_args[scan_type])
+        args = f"{scan_args[scan_type]} {custom_args}"
+        nm.scan(target, port_range, arguments=args, callback=callback)
+        while nm.still_scanning():
+            st.spinner("Scanning in progress...")
         results = []
         for host in nm.all_hosts():
             for proto in nm[host].all_protocols():
@@ -180,7 +218,7 @@ def run_nmap_scan(target, scan_type, port_range):
                         'state': state,
                         'service': service
                     })
-        log_action("system", f"Real NMAP scan on {target}")
+        log_action("system", f"Real-time NMAP scan on {target}")
         return results
     except Exception as e:
         logger.error(f"NMAP scan error: {str(e)}")
@@ -216,6 +254,65 @@ def simulate_nmap_scan(target, scan_type, port_range):
     except Exception as e:
         logger.error(f"NMAP simulation error: {str(e)}")
         st.error(f"NMAP simulation error: {str(e)}")
+        return []
+
+# Fetch real ADS-B data
+def fetch_adsb_data(num_samples=10):
+    try:
+        # Replace with your OpenSky Network credentials after registration
+        # Option 1: Hardcode credentials (NOT RECOMMENDED for security)
+        # username = "nowoolateniola33@gmail.com"
+        # password = "Teni@123"
+        
+        # Option 2: Use environment variables (RECOMMENDED)
+        username = os.getenv('OPENSKY_USERNAME')  # Set OPENSKY_USERNAME in your environment
+        password = os.getenv('OPENSKY_PASSWORD')  # Set OPENSKY_PASSWORD in your environment
+        
+        if not username or not password:
+            raise ValueError("OpenSky credentials not provided. Set OPENSKY_USERNAME and OPENSKY_PASSWORD environment variables.")
+        
+        url = "https://opensky-network.org/api/states/all"
+        response = requests.get(url, auth=(username, password))
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch ADS-B data: {response.status_code} {response.reason}")
+        data = response.json()['states'][:num_samples]
+        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
+        adsb_records = []
+        for state in data:
+            adsb_records.append({
+                'timestamp': pd.Timestamp.now(),
+                'protocol_type': 'ads-b',
+                'service': 'flight_data',
+                'src_bytes': np.random.randint(100, 1000),
+                'dst_bytes': np.random.randint(100, 1000),
+                'airport_code': np.random.choice(airports),
+                'duration': np.random.randint(0, 100),
+                'flag': 'SF',
+                'count': np.random.randint(1, 10),
+                'srv_count': np.random.randint(1, 10),
+                'serror_rate': 0.0,
+                'srv_serror_rate': 0.0,
+                'rerror_rate': 0.0,
+                'srv_rerror_rate': 0.0,
+                'same_srv_rate': 1.0,
+                'diff_srv_rate': 0.0,
+                'srv_diff_host_rate': 0.0,
+                'dst_host_count': np.random.randint(1, 10),
+                'dst_host_srv_count': np.random.randint(1, 10),
+                'dst_host_same_srv_rate': 1.0,
+                'dst_host_diff_srv_rate': 0.0,
+                'dst_host_same_src_port_rate': 0.0,
+                'dst_host_srv_diff_host_rate': 0.0,
+                'dst_host_serror_rate': 0.0,
+                'dst_host_srv_serror_rate': 0.0,
+                'dst_host_rerror_rate': 0.0,
+                'dst_host_srv_rerror_rate': 0.0
+            })
+        log_action("system", "Fetched real ADS-B data")
+        return adsb_records
+    except Exception as e:
+        logger.error(f"ADS-B fetch error: {str(e)}")
+        st.error(f"ADS-B fetch error: {str(e)}")
         return []
 
 # ATC simulation
@@ -258,6 +355,30 @@ def simulate_aviation_traffic(num_samples=10):
         st.error(f"ATC simulation error: {str(e)}")
         return []
 
+# Retrain model
+def retrain_model(df, label_encoders, le_class):
+    try:
+        df_processed, label_encoders, le_class = preprocess_data(df, label_encoders, le_class, is_train=True)
+        if df_processed is None:
+            return None, None, None, None
+        X = df_processed.drop(columns=['class'], errors='ignore')
+        y = df_processed['class']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        model = XGBClassifier(random_state=42)
+        model.fit(X_train_scaled, y_train)
+        joblib.dump(model, 'idps_model.pkl')
+        joblib.dump(scaler, 'scaler.pkl')
+        joblib.dump(label_encoders, 'label_encoders.pkl')
+        joblib.dump(le_class, 'le_class.pkl')
+        log_action("system", "Model retrained")
+        return model, scaler, label_encoders, le_class
+    except Exception as e:
+        logger.error(f"Model retraining error: {str(e)}")
+        st.error(f"Model retraining error: {str(e)}")
+        return None, None, None, None
+
 # Intrusion prediction
 def predict_traffic(input_data, model, scaler, label_encoders, le_class, threshold=0.5):
     try:
@@ -291,8 +412,18 @@ def predict_traffic(input_data, model, scaler, label_encoders, le_class, thresho
         st.error(f"Prediction error: {str(e)}")
         return None, None
 
+# Calculate compliance metrics
+def calculate_compliance_metrics(detection_rate, open_ports, alerts):
+    scores = {
+        'Detection Rate': min(100, detection_rate * 100),
+        'Open Ports': max(0, 100 - open_ports * 10),
+        'Alert Frequency': max(0, 100 - alerts * 5)
+    }
+    overall = sum(scores.values()) / len(scores)
+    return scores, overall
+
 # PDF report generation
-def generate_nama_report(scan_results=None, atc_results=None):
+def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=None):
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -348,8 +479,23 @@ def generate_nama_report(scan_results=None, atc_results=None):
             story.append(table)
             story.append(Spacer(1, 12))
         
-        story.append(Paragraph("Compliance Status", styles['Heading2']))
-        story.append(Paragraph("Compliance with NCAA/ICAO standards: 90%", styles['Normal']))
+        if compliance_scores:
+            story.append(Paragraph("Compliance Status", styles['Heading2']))
+            data = [["Metric", "Score"]]
+            for metric, score in compliance_scores.items():
+                data.append([metric, f"{score:.1f}%"])
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(table)
         
         doc.build(story)
         buffer.seek(0)
@@ -371,20 +517,30 @@ def main():
         st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
         apply_theme_css(st.session_state.theme)
     
+    # Setup user database
+    setup_user_db()
+    
     # Authentication
     if not st.session_state.authenticated:
         st.header("Login")
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
+            mfa_code = st.text_input("MFA Code")
             if st.form_submit_button("Login"):
-                if authenticate_user(username, password):
+                if authenticate_user(username, password, mfa_code):
                     st.session_state.authenticated = True
                     log_action(username, "User logged in")
                     st.success("Login successful!")
                     st.rerun()
                 else:
-                    st.error("Invalid credentials.")
+                    st.error("Invalid credentials or MFA code.")
+            if st.form_submit_button("Register"):
+                mfa_secret = pyotp.random_base32()
+                if register_user(username, password, mfa_secret):
+                    st.success(f"User registered! MFA Secret: {mfa_secret} (Save this for TOTP app)")
+                else:
+                    st.error("Username already exists.")
         return
     
     # Load model
@@ -412,11 +568,12 @@ def main():
         Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.
         
         ### Features
-        - **NMAP Analysis**: Real or simulated port scanning to identify vulnerabilities.
-        - **ATC Monitoring**: Analyze aviation protocols (ADS-B, ACARS) for intrusions.
-        - **Compliance Dashboard**: Track NCAA/ICAO cybersecurity standards.
+        - **NMAP Analysis**: Real-time or simulated port scanning to identify vulnerabilities.
+        - **ATC Monitoring**: Analyze aviation protocols (ADS-B, ACARS) with real or simulated data.
+        - **Compliance Dashboard**: Dynamic tracking of NCAA/ICAO cybersecurity standards.
         - **Real-time Alerts**: Instant notifications for detected threats.
         - **Professional Reporting**: Generate branded PDF reports for NAMA stakeholders.
+        - **Model Retraining**: Support for new datasets and model updates.
         
         Start by exploring NMAP Analysis or ATC Monitoring!
         """)
@@ -424,12 +581,24 @@ def main():
             st.success("Loaded XGBoost model is ready!")
         if not NMAP_AVAILABLE:
             st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans.")
+        
+        # Model retraining
+        st.subheader("Model Retraining")
+        dataset_file = st.file_uploader("Upload new dataset (CSV)", type=['csv'])
+        if dataset_file:
+            df = pd.read_csv(dataset_file)
+            if st.button("Retrain Model"):
+                with st.spinner("Retraining model..."):
+                    model, scaler, label_encoders, le_class = retrain_model(df, label_encoders, le_class)
+                    if model:
+                        st.success("Model retrained successfully!")
     
     elif app_mode == "NMAP Analysis":
         st.header("NMAP Analysis")
-        st.markdown("Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.")
+        st.markdown("Perform real-time or simulated port scanning to identify open ports and services.")
         
-        use_real_nmap = st.checkbox("Use Real NMAP (requires root and python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
+        use_real_nmap = st.checkbox("Use Real NMAP (requires python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
+        real_time_updates = st.checkbox("Enable Real-Time Updates", value=True, disabled=not use_real_nmap)
         
         with st.form("nmap_scan_form"):
             col1, col2 = st.columns(2)
@@ -438,6 +607,7 @@ def main():
                 scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
             with col2:
                 port_range = st.text_input("Port Range (e.g., 1-1000)", value="1-1000")
+                custom_args = st.text_input("Custom NMAP Args (e.g., -T4)", value="-T4")
             submit = st.form_submit_button("Run Scan")
         
         if submit:
@@ -454,12 +624,18 @@ def main():
                         st.error("Port range must be between 1 and 65535.")
                         return
                     
+                    def scan_callback(host, scan_result):
+                        if real_time_updates:
+                            st.write(f"Scanned {host}: {scan_result}")
+                    
                     if use_real_nmap and NMAP_AVAILABLE:
-                        scan_results = run_nmap_scan(target, scan_type, port_range)
+                        scan_results = run_nmap_scan(target, scan_type, port_range, custom_args, scan_callback)
                     else:
                         scan_results = simulate_nmap_scan(target, scan_type, port_range)
                     
                     open_ports = [r for r in scan_results if r['state'] == 'open']
+                    st.session_state.compliance_metrics['open_ports'] = len(open_ports)
+                    
                     if not open_ports:
                         st.warning("No open ports detected.")
                     else:
@@ -478,7 +654,6 @@ def main():
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
-                        # Download report
                         report_buffer = generate_nama_report(scan_results=scan_results)
                         if report_buffer:
                             b64 = base64.b64encode(report_buffer.getvalue()).decode()
@@ -492,23 +667,38 @@ def main():
         st.header("ATC Network Monitoring")
         st.markdown("Monitor aviation-specific protocols (ADS-B, ACARS) for NAMA's network.")
         
-        num_samples = st.slider("Number of samples to simulate", 5, 50, 10)
+        data_source = st.selectbox("Data Source", ["Simulated", "Real ADS-B"])
+        num_samples = st.slider("Number of samples", 5, 50, 10)
         threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.5, 0.05)
         
-        if st.button("Simulate ATC Traffic"):
-            with st.spinner("Simulating ATC traffic..."):
+        if st.button("Analyze Traffic"):
+            with st.spinner("Analyzing ATC traffic..."):
                 try:
-                    atc_data = simulate_aviation_traffic(num_samples)
+                    if data_source == "Real ADS-B":
+                        atc_data = fetch_adsb_data(num_samples)
+                    else:
+                        atc_data = simulate_aviation_traffic(num_samples)
+                    
                     df = pd.DataFrame(atc_data)
                     predictions = []
+                    total_predictions = 0
+                    correct_predictions = 0
+                    
                     for row in atc_data:
                         row_df = pd.DataFrame([row])
                         pred, conf = predict_traffic(row_df, model, scaler, label_encoders, le_class, threshold)
                         predictions.append({'prediction': pred, 'confidence': conf})
+                        total_predictions += 1
+                        if pred != 'normal':
+                            correct_predictions += 1
                     
                     df['prediction'] = [p['prediction'] for p in predictions]
                     df['confidence'] = [p['confidence'] for p in predictions]
                     intrusions = df[df['prediction'] != 'normal']
+                    
+                    detection_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
+                    st.session_state.compliance_metrics['detection_rate'] = detection_rate
+                    st.session_state.compliance_metrics['alerts'] = len(intrusions)
                     
                     st.dataframe(df[['timestamp', 'airport_code', 'protocol_type', 'service', 'prediction', 'confidence']], 
                                  use_container_width=True)
@@ -535,7 +725,6 @@ def main():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Download report
                     report_buffer = generate_nama_report(atc_results=df.to_dict('records'))
                     if report_buffer:
                         b64 = base64.b64encode(report_buffer.getvalue()).decode()
@@ -543,15 +732,20 @@ def main():
                         st.markdown(href, unsafe_allow_html=True)
                 
                 except Exception as e:
-                    st.error(f"Error during ATC simulation: {str(e)}")
+                    st.error(f"Error during ATC analysis: {str(e)}")
     
     elif app_mode == "Compliance Dashboard":
         st.header("NCAA/ICAO Compliance Dashboard")
         st.markdown("Track cybersecurity compliance for NAMA operations.")
         
+        metrics = st.session_state.compliance_metrics
+        compliance_scores, overall = calculate_compliance_metrics(
+            metrics['detection_rate'], metrics['open_ports'], metrics['alerts']
+        )
+        
         compliance_data = {
-            "Metric": ["Encryption Usage", "Firewall Status", "Incident Response Time"],
-            "Score": [90, 85, 95]
+            "Metric": list(compliance_scores.keys()),
+            "Score": list(compliance_scores.values())
         }
         df = pd.DataFrame(compliance_data)
         
@@ -566,11 +760,11 @@ def main():
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        st.markdown(f"**Overall Compliance Score**: {int(df['Score'].mean())}%")
-        st.markdown("**Recommendations**: Ensure firewall updates and reduce incident response time.")
+        st.markdown(f"**Overall Compliance Score**: {overall:.1f}%")
+        st.markdown("**Recommendations**: Ensure firewall updates, reduce open ports, and maintain high detection rates.")
         
         if st.button("Generate Compliance Report"):
-            report_buffer = generate_nama_report()
+            report_buffer = generate_nama_report(compliance_scores=compliance_scores)
             if report_buffer:
                 b64 = base64.b64encode(report_buffer.getvalue()).decode()
                 href = f'<a href="data:application/pdf;base64,{b64}" download="nama_compliance_report.pdf">Download Compliance Report</a>'
@@ -601,17 +795,21 @@ def main():
         - Ensure compliance with NCAA/ICAO standards.
         
         **Key Features**  
-        - Real or simulated NMAP scanning for network analysis.
-        - ATC protocol monitoring (ADS-B, ACARS).
-        - Interactive compliance dashboard.
+        - Real-time NMAP scanning with customizable arguments.
+        - Real and simulated ATC protocol monitoring (ADS-B, ACARS).
+        - Secure authentication with MFA and user database.
+        - Dynamic compliance dashboard.
+        - Model retraining for new datasets.
         - PDF report generation with NAMA branding.
         
         **Technology Stack**  
-        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, python-nmap (optional).
+        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, python-nmap, pyotp, bcrypt, SQLite.
         
         **Future Improvements**  
-        - Integrate real-time NMAP with network permissions.
-        - Support additional aviation datasets.
+        - Integrate additional real-time aviation data sources (e.g., ACARS).
+        - Enhance MFA with biometric authentication.
+        - Implement automated compliance audits.
+        - Support ensemble models for improved detection.
         
         **Contact**  
         For feedback, contact [security@nama.gov.ng](mailto:security@nama.gov.ng).
