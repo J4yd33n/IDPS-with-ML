@@ -3,24 +3,20 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
 import logging
 import os
 import sys
-import smtplib
-from email.mime.text import MIMEText
+from sklearn.preprocessing import LabelEncoder
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 import base64
 import io
-import folium
-from streamlit_folium import st_folium
 
-# Configure Streamlit page settings (first Streamlit command)
+# Configure Streamlit page settings (must be the first Streamlit command)
 st.set_page_config(page_title="NAMA IDPS", page_icon="✈️", layout="wide")
 
 # Check for optional nmap dependency
@@ -52,45 +48,16 @@ LOW_IMPORTANCE_FEATURES = [
 ]
 CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
-# Updated NAMA logo (SVG) with Nigerian colors and aviation theme
-NAMA_LOGO_SVG = """
-<svg width="150" height="150" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100" height="100" fill="#009A49"/>
-    <rect x="33.33" width="33.34" height="100" fill="#FFFFFF"/>
-    <path d="M50 30 L70 50 L50 70 L30 50 Z" fill="#009A49" transform="rotate(45 50 50)"/>
-    <text x="50" y="90" font-family="Arial" font-size="12" fill="#FFFFFF" text-anchor="middle">NAMA</text>
-</svg>
-"""
-
-# English-only translations
-TRANSLATIONS = {
-    "title": "NAMA AI-Enhanced IDPS",
-    "login": "Login",
-    "username": "Username",
-    "password": "Password",
-    "login_button": "Login",
-    "invalid_credentials": "Invalid credentials",
-    "home": "AI-Enhanced Intrusion Detection and Prevention System",
-    "welcome": "Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.",
-    "nmap_analysis": "NMAP Analysis",
-    "nmap_desc": "Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.",
-    "atc_monitoring": "ATC Network Monitoring",
-    "atc_desc": "Monitor aviation-specific protocols (ADS-B, ACARS) for NAMA's network.",
-    "compliance_dashboard": "NCAA/ICAO Compliance Dashboard",
-    "compliance_desc": "Track cybersecurity compliance for NAMA operations.",
-    "alert_log": "Alert Log",
-    "documentation": "Project Documentation",
-    "toggle_theme": "Toggle Theme",
-    "run_scan": "Run Scan",
-    "simulate_atc": "Simulate ATC Traffic",
-    "generate_report": "Generate Compliance Report",
-    "clear_log": "Clear Alert Log",
-    "download_audit": "Download Audit Trail",
-    "threat_intel": "Aviation Threat Intelligence"
-}
-
-# Theme configuration (only dark mode)
+# Theme configuration
 THEME = {
+    "Light": {
+        "background": "#f0f2f6",
+        "text": "#000000",
+        "input_bg": "#ffffff",
+        "input_border": "#cccccc",
+        "chart_bg": "#ffffff",
+        "chart_text": "#000000"
+    },
     "Dark": {
         "background": "#1e1e2f",
         "text": "#ffffff",
@@ -101,9 +68,9 @@ THEME = {
     }
 }
 
-# Apply dark mode CSS
-def apply_theme_css():
-    colors = THEME["Dark"]
+# Apply custom CSS for theming and responsive logo
+def apply_theme_css(theme):
+    colors = THEME[theme]
     st.markdown(
         f"""
         <style>
@@ -112,118 +79,41 @@ def apply_theme_css():
                 color: {colors['text']};
             }}
             .stButton>button {{
-                background-color: #388E3C;
+                background-color: {'#4CAF50' if theme == 'Light' else '#388E3C'};
                 color: #ffffff;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                transition: transform 0.3s ease;
-            }}
-            .stButton>button:hover {{
-                transform: scale(1.05);
             }}
             .stTextInput>div>input {{
                 background-color: {colors['input_bg']};
                 color: {colors['text']};
                 border: 1px solid {colors['input_border']};
-                border-radius: 5px;
-                padding: 8px;
             }}
             .logo-image {{
                 width: 100%;
                 max-width: 150px;
                 height: auto;
             }}
-            /* Animated Login Page */
-            body {{
-                background: linear-gradient(45deg, #003087, #FFD700);
-                background-size: 400%;
-                animation: gradient 15s ease infinite;
-            }}
-            @keyframes gradient {{
-                0% {{ background-position: 0% 50%; }}
-                50% {{ background-position: 100% 50%; }}
-                100% {{ background-position: 0% 50%; }}
-            }}
-            .login-container {{
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-            }}
-            .login-card {{
-                background-color: {colors['input_bg']};
-                padding: 40px;
-                border-radius: 15px;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-                width: 100%;
-                max-width: 400px;
-                text-align: center;
-                animation: bounceIn 1s ease;
-            }}
-            @keyframes bounceIn {{
-                0% {{ transform: scale(0.5); opacity: 0; }}
-                60% {{ transform: scale(1.05); opacity: 1; }}
-                100% {{ transform: scale(1); }}
-            }}
-            .login-card h2 {{
-                color: {colors['text']};
-                margin-bottom: 20px;
-                animation: fadeIn 1s ease;
-            }}
-            .login-form {{
-                animation: fadeIn 1.5s ease;
-            }}
-            @keyframes fadeIn {{
-                0% {{ opacity: 0; }}
-                100% {{ opacity: 1; }}
-            }}
         </style>
         """, unsafe_allow_html=True
     )
 
-# Initialize session state (force dark mode)
+# Initialize session state
 if 'theme' not in st.session_state:
-    st.session_state.theme = "Dark"
+    st.session_state.theme = "Light"
 if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
 if 'alert_log' not in st.session_state:
     st.session_state.alert_log = []
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
-if 'atc_data' not in st.session_state:
-    st.session_state.atc_data = []
 
 # Authentication
 def authenticate_user(username, password):
-    valid_credentials = {"nama": "admin"}
+    valid_credentials = {"nama_admin": "secure_password_2025"}
     return username in valid_credentials and valid_credentials[username] == password
 
 # Audit logging
 def log_action(user, action):
     logger.info(f"User: {user}, Action: {action}")
-
-# Send email alert (mocked for Streamlit Cloud)
-def send_email_alert(subject, body, recipient="security@nama.gov.ng"):
-    try:
-        if os.environ.get("STREAMLIT_CLOUD"):
-            logger.info(f"Mock email sent to {recipient}: {subject}")
-            return True
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = "idps@nama.gov.ng"
-        msg['To'] = recipient
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login("your_email@gmail.com", "your_app_password")
-            server.send_message(msg)
-        logger.info(f"Email sent to {recipient}: {subject}")
-        return True
-    except Exception as e:
-        logger.error(f"Email error: {str(e)}")
-        st.error(f"Email error: {str(e)}")
-        return False
 
 # Preprocessing
 def preprocess_data(df, label_encoders, le_class, is_train=True):
@@ -331,19 +221,14 @@ def simulate_nmap_scan(target, scan_type, port_range):
 # ATC simulation
 def simulate_aviation_traffic(num_samples=10):
     try:
-        airports = [
-            {'code': 'DNMM', 'name': 'Lagos', 'lat': 6.577369, 'lon': 3.321156},
-            {'code': 'DNAA', 'name': 'Abuja', 'lat': 9.006792, 'lon': 7.263172},
-            {'code': 'DNKN', 'name': 'Kano', 'lat': 12.047589, 'lon': 8.524622},
-            {'code': 'DNPO', 'name': 'Port Harcourt', 'lat': 4.957056, 'lon': 7.013222}
-        ]
+        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
         data = {
             'timestamp': pd.date_range(start='now', periods=num_samples, freq='S'),
             'protocol_type': np.random.choice(['ads-b', 'acars', 'tcp'], num_samples),
             'service': np.random.choice(['atc', 'flight_data', 'other'], num_samples),
             'src_bytes': np.random.randint(100, 1000, num_samples),
             'dst_bytes': np.random.randint(100, 1000, num_samples),
-            'airport_code': np.random.choice([a['code'] for a in airports], num_samples),
+            'airport_code': np.random.choice(airports, num_samples),
             'duration': np.random.randint(0, 100, num_samples),
             'flag': np.random.choice(['SF', 'S0', 'REJ'], num_samples),
             'count': np.random.randint(1, 10, num_samples),
@@ -366,12 +251,8 @@ def simulate_aviation_traffic(num_samples=10):
             'dst_host_rerror_rate': np.random.uniform(0, 1, num_samples),
             'dst_host_srv_rerror_rate': np.random.uniform(0, 1, num_samples)
         }
-        df = pd.DataFrame(data)
-        df['airport_name'] = df['airport_code'].map({a['code']: a['name'] for a in airports})
-        df['lat'] = df['airport_code'].map({a['code']: a['lat'] for a in airports})
-        df['lon'] = df['airport_code'].map({a['code']: a['lon'] for a in airports})
         log_action("system", "Simulated ATC traffic")
-        return df.to_dict('records')
+        return pd.DataFrame(data).to_dict('records')
     except Exception as e:
         logger.error(f"ATC simulation error: {str(e)}")
         st.error(f"ATC simulation error: {str(e)}")
@@ -391,7 +272,7 @@ def predict_traffic(input_data, model, scaler, label_encoders, le_class, thresho
                     label_encoders[col].classes_ = np.append(label_encoders[col].classes_, 'unknown')
                 input_data[col] = label_encoders[col].transform(input_data[col].astype(str))
         
-        input_data = input_data.drop(columns=LOW_IMPORTANCE_FEATURES + ['airport_code', 'airport_name', 'lat', 'lon'], errors='ignore')
+        input_data = input_data.drop(columns=LOW_IMPORTANCE_FEATURES, errors='ignore')
         
         expected_features = [col for col in NSL_KDD_COLUMNS if col not in LOW_IMPORTANCE_FEATURES + ['class']]
         for col in expected_features:
@@ -410,28 +291,8 @@ def predict_traffic(input_data, model, scaler, label_encoders, le_class, thresho
         st.error(f"Prediction error: {str(e)}")
         return None, None
 
-# Simulate threat intelligence
-def get_threat_intelligence():
-    threats = [
-        {"time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "threat": "DDoS attempt on ATC network", "severity": "High"},
-        {"time": (datetime.now() - pd.Timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S'), "threat": "Malware detected in ADS-B stream", "severity": "Medium"},
-        {"time": (datetime.now() - pd.Timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'), "threat": "Unauthorized access to ACARS", "severity": "Critical"}
-    ]
-    return threats
-
-# Generate compliance score
-def calculate_compliance_score(scan_results, atc_results):
-    score = 90
-    if scan_results:
-        open_ports = len([r for r in scan_results if r['state'] == 'open'])
-        score -= open_ports * 2
-    if atc_results:
-        intrusions = len([r for r in atc_results if r.get('prediction') != 'normal'])
-        score -= intrusions * 5
-    return max(0, min(100, score))
-
-# Generate PDF report with chart
-def generate_nama_report(scan_results=None, atc_results=None, chart_image=None):
+# PDF report generation
+def generate_nama_report(scan_results=None, atc_results=None):
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -487,15 +348,8 @@ def generate_nama_report(scan_results=None, atc_results=None, chart_image=None):
             story.append(table)
             story.append(Spacer(1, 12))
         
-        if chart_image:
-            story.append(Paragraph("Analysis Visualization", styles['Heading2']))
-            img = Image(chart_image, width=400, height=200)
-            story.append(img)
-            story.append(Spacer(1, 12))
-        
-        compliance_score = calculate_compliance_score(scan_results, atc_results)
         story.append(Paragraph("Compliance Status", styles['Heading2']))
-        story.append(Paragraph(f"Compliance with NCAA/ICAO standards: {compliance_score}%", styles['Normal']))
+        story.append(Paragraph("Compliance with NCAA/ICAO standards: 90%", styles['Normal']))
         
         doc.build(story)
         buffer.seek(0)
@@ -505,67 +359,32 @@ def generate_nama_report(scan_results=None, atc_results=None, chart_image=None):
         st.error(f"Report generation error: {str(e)}")
         return None
 
-# Generate geo-visualization
-def generate_geo_map(atc_results):
-    try:
-        if not atc_results:
-            return None
-        df = pd.DataFrame(atc_results)
-        if 'lat' not in df or 'lon' not in df:
-            return None
-        m = folium.Map(location=[9.0, 8.0], zoom_start=6)
-        for _, row in df.iterrows():
-            if row.get('prediction') != 'normal':
-                folium.Marker(
-                    location=[row['lat'], row['lon']],
-                    popup=f"{row['airport_name']}: {row['prediction']} ({row['confidence']:.2%})",
-                    icon=folium.Icon(color='red')
-                ).add_to(m)
-        return m
-    except Exception as e:
-        logger.error(f"Geo-map error: {str(e)}")
-        st.error(f"Geo-map error: {str(e)}")
-        return None
-
 # Main Streamlit app
 def main():
-    apply_theme_css()
+    # Apply theme
+    apply_theme_css(st.session_state.theme)
     
-    # Sidebar (shown after login)
-    if st.session_state.authenticated:
-        st.sidebar.markdown(NAMA_LOGO_SVG, unsafe_allow_html=True)
-        st.sidebar.title(TRANSLATIONS["title"])
+    # Sidebar
+    st.sidebar.image("https://via.placeholder.com/150?text=NAMA+Logo", width=150)
+    st.sidebar.title("NAMA AI-Enhanced IDPS")
+    if st.sidebar.button("Toggle Theme"):
+        st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
+        apply_theme_css(st.session_state.theme)
     
-    # Authentication with animated login page
+    # Authentication
     if not st.session_state.authenticated:
-        st.markdown(
-            f"""
-            <div class="login-container">
-                <div class="login-card">
-                    <h2>{TRANSLATIONS["login"]}</h2>
-                    <div class="login-form">
-            """, unsafe_allow_html=True
-        )
-        
+        st.header("Login")
         with st.form("login_form"):
-            username = st.text_input(TRANSLATIONS["username"])
-            password = st.text_input(TRANSLATIONS["password"], type="password")
-            if st.form_submit_button(TRANSLATIONS["login_button"]):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            if st.form_submit_button("Login"):
                 if authenticate_user(username, password):
                     st.session_state.authenticated = True
                     log_action(username, "User logged in")
                     st.success("Login successful!")
                     st.rerun()
                 else:
-                    st.error(TRANSLATIONS["invalid_credentials"])
-        
-        st.markdown(
-            """
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
+                    st.error("Invalid credentials.")
         return
     
     # Load model
@@ -583,23 +402,23 @@ def main():
     # Navigation
     app_mode = st.sidebar.selectbox(
         "Navigation",
-        ["Home", "NMAP Analysis", "ATC Monitoring", "Compliance Dashboard", "Alert Log", "Threat Intelligence", "Documentation"],
-        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '📰' if x == 'Threat Intelligence' else '📖'} {TRANSLATIONS[x.lower().replace(' ', '_')]}"
+        ["Home", "NMAP Analysis", "ATC Monitoring", "Compliance Dashboard", "Alert Log", "Documentation"],
+        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '📖'} {x}"
     )
     
     if app_mode == "Home":
-        st.header(TRANSLATIONS["home"])
-        st.markdown(TRANSLATIONS["welcome"])
+        st.header("AI-Enhanced Intrusion Detection and Prevention System")
         st.markdown("""
+        Welcome to NAMA's state-of-the-art IDPS, designed to protect Nigeria's airspace with AI-driven cybersecurity.
+        
         ### Features
         - **NMAP Analysis**: Real or simulated port scanning to identify vulnerabilities.
-        - **ATC Monitoring**: Real-time analysis of aviation protocols (ADS-B, ACARS).
-        - **Compliance Dashboard**: Dynamic NCAA/ICAO compliance scoring.
-        - **Threat Intelligence**: Aviation-specific cyberthreat updates.
-        - **Real-time Alerts**: Email and UI notifications for threats.
-        - **Geo-Visualization**: Map-based intrusion tracking.
+        - **ATC Monitoring**: Analyze aviation protocols (ADS-B, ACARS) for intrusions.
+        - **Compliance Dashboard**: Track NCAA/ICAO cybersecurity standards.
+        - **Real-time Alerts**: Instant notifications for detected threats.
+        - **Professional Reporting**: Generate branded PDF reports for NAMA stakeholders.
         
-        Start exploring now!
+        Start by exploring NMAP Analysis or ATC Monitoring!
         """)
         if model is not None:
             st.success("Loaded XGBoost model is ready!")
@@ -607,8 +426,8 @@ def main():
             st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans.")
     
     elif app_mode == "NMAP Analysis":
-        st.header(TRANSLATIONS["nmap_analysis"])
-        st.markdown(TRANSLATIONS["nmap_desc"])
+        st.header("NMAP Analysis")
+        st.markdown("Perform network port scanning to identify open ports and services. Real NMAP requires root privileges and python-nmap.")
         
         use_real_nmap = st.checkbox("Use Real NMAP (requires root and python-nmap)", value=False, disabled=not NMAP_AVAILABLE)
         
@@ -619,7 +438,7 @@ def main():
                 scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
             with col2:
                 port_range = st.text_input("Port Range (e.g., 1-1000)", value="1-1000")
-            submit = st.form_submit_button(TRANSLATIONS["run_scan"])
+            submit = st.form_submit_button("Run Scan")
         
         if submit:
             with st.spinner("Running NMAP scan..."):
@@ -653,17 +472,14 @@ def main():
                             color_discrete_sequence=px.colors.sequential.Blues_r
                         )
                         fig.update_layout(
-                            paper_bgcolor=THEME["Dark"]['chart_bg'],
-                            plot_bgcolor=THEME["Dark"]['chart_bg'],
-                            font=dict(color=THEME["Dark"]['chart_text'])
+                            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+                            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+                            font=dict(color=THEME[st.session_state.theme]['chart_text'])
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         
-                        chart_buffer = io.BytesIO()
-                        fig.write_image(chart_buffer, format="png")
-                        chart_buffer.seek(0)
-                        
-                        report_buffer = generate_nama_report(scan_results=scan_results, chart_image=chart_buffer)
+                        # Download report
+                        report_buffer = generate_nama_report(scan_results=scan_results)
                         if report_buffer:
                             b64 = base64.b64encode(report_buffer.getvalue()).decode()
                             href = f'<a href="data:application/pdf;base64,{b64}" download="nama_nmap_report.pdf">Download NMAP Report</a>'
@@ -673,14 +489,13 @@ def main():
                     st.error(f"Error during scan: {str(e)}")
     
     elif app_mode == "ATC Monitoring":
-        st.header(TRANSLATIONS["atc_monitoring"])
-        st.markdown(TRANSLATIONS["atc_desc"])
+        st.header("ATC Network Monitoring")
+        st.markdown("Monitor aviation-specific protocols (ADS-B, ACARS) for NAMA's network.")
         
         num_samples = st.slider("Number of samples to simulate", 5, 50, 10)
         threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.5, 0.05)
-        auto_refresh = st.checkbox("Enable Real-Time Monitoring (updates every 10s)", value=False)
         
-        if st.button(TRANSLATIONS["simulate_atc"]) or auto_refresh:
+        if st.button("Simulate ATC Traffic"):
             with st.spinner("Simulating ATC traffic..."):
                 try:
                     atc_data = simulate_aviation_traffic(num_samples)
@@ -695,67 +510,48 @@ def main():
                     df['confidence'] = [p['confidence'] for p in predictions]
                     intrusions = df[df['prediction'] != 'normal']
                     
-                    st.session_state.atc_data = df.to_dict('records')
-                    
-                    st.dataframe(df[['timestamp', 'airport_code', 'airport_name', 'protocol_type', 'service', 'prediction', 'confidence']], 
+                    st.dataframe(df[['timestamp', 'airport_code', 'protocol_type', 'service', 'prediction', 'confidence']], 
                                  use_container_width=True)
                     
                     if not intrusions.empty:
                         st.error(f"Detected {len(intrusions)} intrusions!")
                         for _, row in intrusions.iterrows():
-                            alert = {
+                            st.session_state.alert_log.append({
                                 'timestamp': row['timestamp'],
-                                'message': f"Intrusion: {row['prediction']} at {row['airport_name']} (Confidence: {row['confidence']:.2%})",
+                                'message': f"Intrusion: {row['prediction']} at {row['airport_code']} (Confidence: {row['confidence']:.2%})",
                                 'recipient': 'security@nama.gov.ng'
-                            }
-                            st.session_state.alert_log.append(alert)
-                            send_email_alert(
-                                "NAMA IDPS Intrusion Alert",
-                                f"Intrusion detected at {row['airport_name']} ({row['airport_code']}): {row['prediction']} (Confidence: {row['confidence']:.2%})",
-                                'security@nama.gov.ng'
-                            )
+                            })
                     else:
                         st.success("No intrusions detected.")
                     
                     fig = px.scatter(
                         df, x='timestamp', y='confidence', color='prediction', size='src_bytes',
-                        hover_data=['airport_code', 'airport_name', 'protocol_type'], title="ATC Traffic Analysis"
+                        hover_data=['airport_code', 'protocol_type'], title="ATC Traffic Analysis"
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME["Dark"]['chart_bg'],
-                        plot_bgcolor=THEME["Dark"]['chart_bg'],
-                        font=dict(color=THEME["Dark"]['chart_text'])
+                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    geo_map = generate_geo_map(df.to_dict('records'))
-                    if geo_map:
-                        st_folium(geo_map, width=700, height=400)
-                    
-                    chart_buffer = io.BytesIO()
-                    fig.write_image(chart_buffer, format="png")
-                    chart_buffer.seek(0)
-                    
-                    report_buffer = generate_nama_report(atc_results=df.to_dict('records'), chart_image=chart_buffer)
+                    # Download report
+                    report_buffer = generate_nama_report(atc_results=df.to_dict('records'))
                     if report_buffer:
                         b64 = base64.b64encode(report_buffer.getvalue()).decode()
                         href = f'<a href="data:application/pdf;base64,{b64}" download="nama_atc_report.pdf">Download ATC Report</a>'
                         st.markdown(href, unsafe_allow_html=True)
-                    
-                    if auto_refresh:
-                        st.experimental_rerun()
                 
                 except Exception as e:
                     st.error(f"Error during ATC simulation: {str(e)}")
     
     elif app_mode == "Compliance Dashboard":
-        st.header(TRANSLATIONS["compliance_dashboard"])
-        st.markdown(TRANSLATIONS["compliance_desc"])
+        st.header("NCAA/ICAO Compliance Dashboard")
+        st.markdown("Track cybersecurity compliance for NAMA operations.")
         
-        compliance_score = calculate_compliance_score(None, st.session_state.atc_data)
         compliance_data = {
-            "Metric": ["Encryption Usage", "Firewall Status", "Incident Response Time", "Network Security"],
-            "Score": [90, 85, 95, compliance_score]
+            "Metric": ["Encryption Usage", "Firewall Status", "Incident Response Time"],
+            "Score": [90, 85, 95]
         }
         df = pd.DataFrame(compliance_data)
         
@@ -764,45 +560,35 @@ def main():
             color="Score", color_continuous_scale="Blues"
         )
         fig.update_layout(
-            paper_bgcolor=THEME["Dark"]['chart_bg'],
-            plot_bgcolor=THEME["Dark"]['chart_bg'],
-            font=dict(color=THEME["Dark"]['chart_text'])
+            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
+            font=dict(color=THEME[st.session_state.theme]['chart_text'])
         )
         st.plotly_chart(fig, use_container_width=True)
         
         st.markdown(f"**Overall Compliance Score**: {int(df['Score'].mean())}%")
-        st.markdown("**Recommendations**: Ensure firewall updates, reduce incident response time, and secure open ports.")
+        st.markdown("**Recommendations**: Ensure firewall updates and reduce incident response time.")
         
-        if st.button(TRANSLATIONS["generate_report"]):
-            chart_buffer = io.BytesIO()
-            fig.write_image(chart_buffer, format="png")
-            chart_buffer.seek(0)
-            report_buffer = generate_nama_report(chart_image=chart_buffer)
+        if st.button("Generate Compliance Report"):
+            report_buffer = generate_nama_report()
             if report_buffer:
                 b64 = base64.b64encode(report_buffer.getvalue()).decode()
                 href = f'<a href="data:application/pdf;base64,{b64}" download="nama_compliance_report.pdf">Download Compliance Report</a>'
                 st.markdown(href, unsafe_allow_html=True)
     
     elif app_mode == "Alert Log":
-        st.header(TRANSLATIONS["alert_log"])
+        st.header("Alert Log")
         if not st.session_state.alert_log:
             st.info("No alerts generated yet.")
         else:
             alert_df = pd.DataFrame(st.session_state.alert_log)
             st.dataframe(alert_df[['timestamp', 'message', 'recipient']], use_container_width=True)
-            if st.button(TRANSLATIONS["clear_log"]):
+            if st.button("Clear Alert Log"):
                 st.session_state.alert_log = []
                 st.success("Alert log cleared.")
     
-    elif app_mode == "Threat Intelligence":
-        st.header(TRANSLATIONS["threat_intel"])
-        st.markdown("Latest aviation cybersecurity threats affecting NAMA operations.")
-        threats = get_threat_intelligence()
-        df = pd.DataFrame(threats)
-        st.dataframe(df, use_container_width=True)
-    
     elif app_mode == "Documentation":
-        st.header(TRANSLATIONS["documentation"])
+        st.header("Project Documentation")
         st.markdown("""
         ### NAMA AI-Enhanced IDPS
         
@@ -815,34 +601,21 @@ def main():
         - Ensure compliance with NCAA/ICAO standards.
         
         **Key Features**  
-        - Real or simulated NMAP scanning.
-        - Real-time ATC monitoring with geo-visualization.
-        - Dynamic compliance scoring.
-        - Aviation threat intelligence.
-        - Email alerts and PDF reports.
+        - Real or simulated NMAP scanning for network analysis.
+        - ATC protocol monitoring (ADS-B, ACARS).
+        - Interactive compliance dashboard.
+        - PDF report generation with NAMA branding.
         
         **Technology Stack**  
-        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, Folium, python-nmap (optional).
+        - Python, Streamlit, Scikit-learn, XGBoost, Plotly, ReportLab, python-nmap (optional).
         
         **Future Improvements**  
         - Integrate real-time NMAP with network permissions.
-        - Expand threat intelligence with external feeds.
+        - Support additional aviation datasets.
         
         **Contact**  
         For feedback, contact [security@nama.gov.ng](mailto:security@nama.gov.ng).
         """)
-    
-    # Audit trail download
-    if os.path.exists('nama_idps.log'):
-        with open('nama_idps.log', 'r') as f:
-            log_data = f.readlines()
-        log_df = pd.DataFrame([line.strip().split(' - ') for line in log_data if ' - ' in line], 
-                              columns=['Timestamp', 'Level', 'Message'])
-        csv_buffer = io.StringIO()
-        log_df.to_csv(csv_buffer, index=False)
-        b64 = base64.b64encode(csv_buffer.getvalue().encode()).decode()
-        href = f'<a href="data:text/csv;base64,{b64}" download="nama_audit_trail.csv">{TRANSLATIONS["download_audit"]}</a>'
-        st.sidebar.markdown(href, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     try:
