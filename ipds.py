@@ -108,7 +108,7 @@ if 'authenticated' not in st.session_state:
 
 # Authentication
 def authenticate_user(username, password):
-    valid_credentials = {"nama_admin": "secure_password_2025"}
+    valid_credentials = {"nama": "admin"}
     return username in valid_credentials and valid_credentials[username] == password
 
 # Audit logging
