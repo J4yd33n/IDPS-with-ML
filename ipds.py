@@ -732,7 +732,7 @@ def main():
     apply_theme_css(st.session_state.theme)
     
     # Sidebar
-    st.sidebar.image("https://via.placeholder.com/150?text=NAMA+Logo", width=150)
+    st.sidebar.image("nama_logo.jpg", width=150, use_column_width=False)
     st.sidebar.title("NAMA AI-Enhanced IDPS")
     if st.sidebar.button("Toggle Theme"):
         st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
