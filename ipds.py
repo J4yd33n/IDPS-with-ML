@@ -8,7 +8,6 @@ import logging
 import os
 import sys
 import sqlite3
-import bcrypt
 import pyotp
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
@@ -27,6 +26,12 @@ try:
     NMAP_AVAILABLE = True
 except ImportError:
     NMAP_AVAILABLE = False
+
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps.log', 
@@ -123,6 +128,9 @@ def setup_user_db():
     conn.close()
 
 def register_user(username, password, mfa_secret):
+    if not BCRYPT_AVAILABLE:
+        logger.error("Cannot register user: bcrypt module is missing")
+        return False
     hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
@@ -136,6 +144,9 @@ def register_user(username, password, mfa_secret):
     return True
 
 def authenticate_user(username, password, mfa_code):
+    if not BCRYPT_AVAILABLE:
+        logger.error("Authentication disabled: bcrypt module is missing")
+        return False
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
     c.execute("SELECT password, mfa_secret FROM users WHERE username = ?", (username,))
@@ -259,17 +270,12 @@ def simulate_nmap_scan(target, scan_type, port_range):
 # Fetch real ADS-B data
 def fetch_adsb_data(num_samples=10):
     try:
-        # Replace with your OpenSky Network credentials after registration
-        # Option 1: Hardcode credentials (NOT RECOMMENDED for security)
-        # username = "nowoolateniola33@gmail.com"
-        # password = "Teni@123"
-        
-        # Option 2: Use environment variables (RECOMMENDED)
-        username = os.getenv('OPENSKY_USERNAME')  # Set OPENSKY_USERNAME in your environment
-        password = os.getenv('OPENSKY_PASSWORD')  # Set OPENSKY_PASSWORD in your environment
+        # Use Streamlit secrets or environment variables for credentials
+        username = st.secrets.get('OPENSKY_USERNAME', os.getenv('OPENSKY_USERNAME'))
+        password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('OPENSKY_PASSWORD'))
         
         if not username or not password:
-            raise ValueError("OpenSky credentials not provided. Set OPENSKY_USERNAME and OPENSKY_PASSWORD environment variables.")
+            raise ValueError("OpenSky credentials not provided. Set OPENSKY_USERNAME and OPENSKY_PASSWORD environment variables or secrets.")
         
         url = "https://opensky-network.org/api/states/all"
         response = requests.get(url, auth=(username, password))
@@ -517,11 +523,19 @@ def main():
         st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
         apply_theme_css(st.session_state.theme)
     
+    # Dependency warnings
+    if not BCRYPT_AVAILABLE:
+        st.warning("bcrypt module is missing. Authentication features are disabled. Please install bcrypt (pip install bcrypt).")
+        st.session_state.authenticated = True  # Bypass authentication for testing
+    if not NMAP_AVAILABLE:
+        st.warning("python-nmap module is missing. Real NMAP scanning is disabled. Please install python-nmap (pip install python-nmap).")
+    
     # Setup user database
-    setup_user_db()
+    if BCRYPT_AVAILABLE:
+        setup_user_db()
     
     # Authentication
-    if not st.session_state.authenticated:
+    if not st.session_state.authenticated and BCRYPT_AVAILABLE:
         st.header("Login")
         with st.form("login_form"):
             username = st.text_input("Username")
@@ -540,7 +554,7 @@ def main():
                 if register_user(username, password, mfa_secret):
                     st.success(f"User registered! MFA Secret: {mfa_secret} (Save this for TOTP app)")
                 else:
-                    st.error("Username already exists.")
+                    st.error("Username already exists or registration failed.")
         return
     
     # Load model
@@ -579,8 +593,6 @@ def main():
         """)
         if model is not None:
             st.success("Loaded XGBoost model is ready!")
-        if not NMAP_AVAILABLE:
-            st.warning("Real NMAP scanning unavailable (python-nmap not installed). Using simulated scans.")
         
         # Model retraining
         st.subheader("Model Retraining")
@@ -679,7 +691,18 @@ def main():
                     else:
                         atc_data = simulate_aviation_traffic(num_samples)
                     
+                    if not atc_data:
+                        st.error("No data retrieved. Please check credentials for Real ADS-B or try Simulated data.")
+                        if st.button("Switch to Simulated Data"):
+                            atc_data = simulate_aviation_traffic(num_samples)
+                        else:
+                            return
+                    
                     df = pd.DataFrame(atc_data)
+                    if df.empty:
+                        st.error("No valid data to analyze. Please try again or use Simulated data.")
+                        return
+                    
                     predictions = []
                     total_predictions = 0
                     correct_predictions = 0
@@ -700,8 +723,12 @@ def main():
                     st.session_state.compliance_metrics['detection_rate'] = detection_rate
                     st.session_state.compliance_metrics['alerts'] = len(intrusions)
                     
-                    st.dataframe(df[['timestamp', 'airport_code', 'protocol_type', 'service', 'prediction', 'confidence']], 
-                                 use_container_width=True)
+                    display_columns = ['timestamp', 'airport_code', 'protocol_type', 'service', 'prediction', 'confidence']
+                    available_columns = [col for col in display_columns if col in df.columns]
+                    if not available_columns:
+                        st.error("No valid columns available for display.")
+                        return
+                    st.dataframe(df[available_columns], use_container_width=True)
                     
                     if not intrusions.empty:
                         st.error(f"Detected {len(intrusions)} intrusions!")
@@ -732,7 +759,8 @@ def main():
                         st.markdown(href, unsafe_allow_html=True)
                 
                 except Exception as e:
-                    st.error(f"Error during ATC analysis: {str(e)}")
+                    logger.error(f"ATC analysis error: {str(e)}")
+                    st.error(f"ATC analysis error: {str(e)}")
     
     elif app_mode == "Compliance Dashboard":
         st.header("NCAA/ICAO Compliance Dashboard")
