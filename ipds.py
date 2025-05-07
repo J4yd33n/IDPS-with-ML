@@ -7,7 +7,6 @@ from datetime import datetime
 import logging
 import os
 import sqlite3
-import pyotp
 import base64
 import io
 import requests
@@ -61,57 +60,127 @@ LOW_IMPORTANCE_FEATURES = [
 ]
 CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
-# Theme configuration
-THEME = {
-    "Light": {
-        "background": "#f0f2f6",
-        "text": "#000000",
-        "input_bg": "#ffffff",
-        "input_border": "#cccccc",
-        "chart_bg": "#ffffff",
-        "chart_text": "#000000"
-    },
-    "Dark": {
-        "background": "#1e1e2f",
-        "text": "#ffffff",
-        "input_bg": "#2a2a3d",
-        "input_border": "#555555",
-        "chart_bg": "#1c1c2c",
-        "chart_text": "#ffffff"
-    }
+# Wicket-inspired theme configuration
+WICKET_THEME = {
+    "primary_bg": "#2c3e50",
+    "secondary_bg": "#ffffff",
+    "accent": "#3498db",
+    "text": "#333333",
+    "text_light": "#ffffff",
+    "card_bg": "#f8f9fa",
+    "border": "#e0e0e0",
+    "button_bg": "#3498db",
+    "button_text": "#ffffff",
+    "hover": "#2980b9"
 }
 
-# Apply custom CSS for theming
-def apply_theme_css(theme):
-    colors = THEME[theme]
+# Apply Wicket-inspired CSS
+def apply_wicket_css():
     st.markdown(
         f"""
         <style>
+            /* Main app styling */
             .stApp {{
-                background-color: {colors['background']};
-                color: {colors['text']};
+                background-color: {WICKET_THEME['secondary_bg']};
+                color: {WICKET_THEME['text']};
+                font-family: 'Roboto', sans-serif;
             }}
+
+            /* Sidebar styling */
+            .css-1d391kg {{
+                background-color: {WICKET_THEME['primary_bg']};
+                color: {WICKET_THEME['text_light']};
+                padding: 20px;
+                border-right: 1px solid {WICKET_THEME['border']};
+            }}
+            .css-1d391kg .stSelectbox, .css-1d391kg .stButton>button {{
+                background-color: {WICKET_THEME['card_bg']};
+                color: {WICKET_THEME['text']};
+                border-radius: 8px;
+                border: 1px solid {WICKET_THEME['border']};
+            }}
+            .css-1d391kg .stButton>button {{
+                background-color: {WICKET_THEME['button_bg']};
+                color: {WICKET_THEME['button_text']};
+                transition: background-color 0.3s;
+            }}
+            .css-1d391kg .stButton>button:hover {{
+                background-color: {WICKET_THEME['hover']};
+            }}
+
+            /* Main content styling */
+            .main .block-container {{
+                padding: 30px;
+                max-width: 1200px;
+                margin: auto;
+            }}
+
+            /* Card styling for widgets */
+            .card {{
+                background-color: {WICKET_THEME['card_bg']};
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                transition: transform 0.2s;
+            }}
+            .card:hover {{
+                transform: translateY(-5px);
+            }}
+
+            /* Form inputs */
+            .stTextInput>div>input, .stSelectbox>div>select {{
+                background-color: {WICKET_THEME['card_bg']};
+                border: 1px solid {WICKET_THEME['border']};
+                border-radius: 8px;
+                padding: 10px;
+                color: {WICKET_THEME['text']};
+            }}
+
+            /* Buttons */
             .stButton>button {{
-                background-color: {'#4CAF50' if theme == 'Light' else '#388E3C'};
-                color: #ffffff;
+                background-color: {WICKET_THEME['button_bg']};
+                color: {WICKET_THEME['button_text']};
+                border-radius: 8px;
+                padding: 10px 20px;
+                border: none;
+                transition: background-color 0.3s;
             }}
-            .stTextInput>div>input {{
-                background-color: {colors['input_bg']};
-                color: {colors['text']};
-                border: 1px solid {colors['input_border']};
+            .stButton>button:hover {{
+                background-color: {WICKET_THEME['hover']};
             }}
+
+            /* Charts */
+            .plotly-graph-div {{
+                background-color: {WICKET_THEME['card_bg']};
+                border-radius: 8px;
+                padding: 10px;
+            }}
+
+            /* Logo */
             .logo-image {{
                 width: 100%;
-                max-width: 150px;
+                max-width: 120px;
                 height: auto;
+                margin-bottom: 20px;
+            }}
+
+            /* Headings */
+            h1, h2, h3 {{
+                color: {WICKET_THEME['text']};
+                font-weight: 500;
+            }}
+
+            /* Alerts */
+            .stAlert {{
+                border-radius: 8px;
+                padding: 15px;
             }}
         </style>
         """, unsafe_allow_html=True
     )
 
 # Initialize session state
-if 'theme' not in st.session_state:
-    st.session_state.theme = "Light"
 if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
 if 'alert_log' not in st.session_state:
@@ -131,8 +200,7 @@ def setup_user_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY,
-        password TEXT,
-        mfa_secret TEXT
+        password TEXT
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_activity (
         username TEXT,
@@ -142,7 +210,7 @@ def setup_user_db():
     conn.commit()
     conn.close()
 
-def register_user(username, password, mfa_secret):
+def register_user(username, password):
     if not BCRYPT_AVAILABLE:
         logger.error("Cannot register user: bcrypt module is missing")
         return False
@@ -150,28 +218,26 @@ def register_user(username, password, mfa_secret):
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password, mfa_secret) VALUES (?, ?, ?)",
-                  (username, hashed, mfa_secret))
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)",
+                  (username, hashed))
         conn.commit()
     except sqlite3.IntegrityError:
         return False
     conn.close()
     return True
 
-def authenticate_user(username, password, mfa_code):
+def authenticate_user(username, password):
     if not BCRYPT_AVAILABLE:
         logger.error("Authentication disabled: bcrypt module is missing")
         return False
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
-    c.execute("SELECT password, mfa_secret FROM users WHERE username = ?", (username,))
+    c.execute("SELECT password FROM users WHERE username = ?", (username,))
     result = c.fetchone()
     conn.close()
     if result:
-        stored_password, mfa_secret = result
-        if bcrypt.checkpw(password.encode('utf-8'), stored_password):
-            totp = pyotp.TOTP(mfa_secret)
-            return totp.verify(mfa_code)
+        stored_password = result[0]
+        return bcrypt.checkpw(password.encode('utf-8'), stored_password)
     return False
 
 def log_user_activity(username, action):
@@ -347,7 +413,7 @@ def fetch_adsb_data(num_samples=10):
 # Simulate aviation traffic
 def simulate_aviation_traffic(num_samples=10):
     try:
-        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
+        airports = ['DNMM', 'DNAA', 'DNHT', 'DNPO']
         data = {
             'timestamp': pd.date_range(start='now', periods=num_samples, freq='S'),
             'protocol_type': np.random.choice(['ads-b', 'acars', 'tcp'], num_samples),
@@ -728,15 +794,12 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
 
 # Main Streamlit app
 def main():
-    # Apply theme
-    apply_theme_css(st.session_state.theme)
+    # Apply Wicket CSS
+    apply_wicket_css()
     
     # Sidebar
-    st.sidebar.image("nama_logo.jpg", width=150, use_column_width=False)
-    st.sidebar.title("NAMA AI-Enhanced IDPS")
-    if st.sidebar.button("Toggle Theme"):
-        st.session_state.theme = "Dark" if st.session_state.theme == "Light" else "Light"
-        apply_theme_css(st.session_state.theme)
+    st.sidebar.image("nama_logo.jpg", use_column_width=True, caption="NAMA IDPS")
+    st.sidebar.title("Navigation")
     
     # Dependency warnings
     if not BCRYPT_AVAILABLE:
@@ -751,24 +814,29 @@ def main():
     
     # Authentication
     if not st.session_state.authenticated and BCRYPT_AVAILABLE:
-        st.header("Login")
-        with st.form("login_form"):
+        st.header("Login to NAMA IDPS")
+        with st.form("login_form", clear_on_submit=True):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
-            mfa_code = st.text_input("MFA Code")
-            if st.form_submit_button("Login"):
-                if authenticate_user(username, password, mfa_code):
+            col1, col2 = st.columns(2)
+            with col1:
+                login_submit = st.form_submit_button("Login")
+            with col2:
+                register_submit = st.form_submit_button("Register")
+            
+            if login_submit:
+                if authenticate_user(username, password):
                     st.session_state.authenticated = True
                     st.session_state.username = username
                     log_user_activity(username, "User logged in")
                     st.success("Login successful!")
                     st.rerun()
                 else:
-                    st.error("Invalid credentials or MFA code.")
-            if st.form_submit_button("Register"):
-                mfa_secret = pyotp.random_base32()
-                if register_user(username, password, mfa_secret):
-                    st.success(f"User registered! MFA Secret: {mfa_secret}")
+                    st.error("Invalid username or password.")
+            
+            if register_submit:
+                if register_user(username, password):
+                    st.success("User registered successfully!")
                 else:
                     st.error("Username exists or registration failed.")
         return
@@ -787,36 +855,48 @@ def main():
     
     # Navigation
     app_mode = st.sidebar.selectbox(
-        "Navigation",
+        "Select Module",
         ["Home", "NMAP Analysis", "ATC Monitoring", "Compliance Dashboard", "Alert Log", 
          "Anomaly Detection", "RF Signal Analysis", "Insider Threat Detection", 
          "Predictive Maintenance", "Threat Intelligence", "Drone Detection", 
          "SCADA Log Analysis", "CPS Attack Simulation", "Documentation"],
-        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '🛰' if x == 'Anomaly Detection' else '📡' if x == 'RF Signal Analysis' else '🕵️' if x == 'Insider Threat Detection' else '🔧' if x == 'Predictive Maintenance' else '📰' if x == 'Threat Intelligence' else '🛩' if x == 'Drone Detection' else '📜' if x == 'SCADA Log Analysis' else '⚔️' if x == 'CPS Attack Simulation' else '📖'} {x}"
+        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '🛰' if x == 'Anomaly Detection' else '📡' if x == 'RF Signal Analysis' else '🕵️' if x == 'Insider Threat Detection' else '🔧' if x == 'Predictive Maintenance' else '📰' if            'Threat Intelligence', '🛩' if x == 'Drone Detection' else '📜' if x == 'SCADA Log Analysis' else '⚔️' if x == 'CPS Attack Simulation' else '📖'} {x}"
     )
     
     if app_mode == "Home":
-        st.header("AI-Enhanced Intrusion Detection and Prevention System")
-        st.markdown("""
-        Welcome to NAMA's advanced IDPS, securing Nigeria's airspace with AI-driven cybersecurity.
+        st.header("NAMA AI-Enhanced IDPS")
+        st.markdown(
+            """
+            <div class="card">
+                <h3>Welcome</h3>
+                <p>Secure Nigeria's airspace with our advanced AI-driven Intrusion Detection and Prevention System.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
-        ### Features
-        - **NMAP Analysis**: Real-time or simulated port scanning.
-        - **ATC Monitoring**: Analyze ADS-B, ACARS with real or simulated data.
-        - **Anomaly Detection**: Detect unusual flight patterns.
-        - **RF Signal Analysis**: Identify spoofed or jammed signals.
-        - **Insider Threat Detection**: Monitor employee behavior.
-        - **Predictive Maintenance**: Detect equipment anomalies.
-        - **Threat Intelligence**: Analyze real-time threat feeds.
-        - **Drone Detection**: Classify unauthorized drones.
-        - **SCADA Log Analysis**: Detect malicious activity in ATC logs.
-        - **CPS Attack Simulation**: Simulate and detect cyberattacks.
-        - **Compliance Dashboard**: Track NCAA/ICAO standards.
-        - **Real-time Alerts**: Instant threat notifications.
-        - **Professional Reporting**: Branded PDF reports.
+        st.markdown(
+            """
+            <div class="card">
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>NMAP Analysis</strong>: Real-time or simulated port scanning.</li>
+                    <li><strong>ATC Monitoring</strong>: Analyze ADS-B, ACARS with real or simulated data.</li>
+                    <li><strong>Anomaly Detection</strong>: Detect unusual flight patterns.</li>
+                    <li><strong>RF Signal Analysis</strong>: Identify spoofed or jammed signals.</li>
+                    <li><strong>Insider Threat Detection</strong>: Monitor employee behavior.</li>
+                    <li><strong>Predictive Maintenance</strong>: Detect equipment anomalies.</li>
+                    <li><strong>Threat Intelligence</strong>: Analyze real-time threat feeds.</li>
+                    <li><strong>Drone Detection</strong>: Classify unauthorized drones.</li>
+                    <li><strong>SCADA Log Analysis</strong>: Detect malicious activity in ATC logs.</li>
+                    <li><strong>CPS Attack Simulation</strong>: Simulate and detect cyberattacks.</li>
+                    <li><strong>Compliance Dashboard</strong>: Track NCAA/ICAO standards.</li>
+                    <li><strong>Real-time Alerts</strong>: Instant threat notifications.</li>
+                    <li><strong>Professional Reporting</strong>: Branded PDF reports.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
-        Start exploring the features!
-        """)
         if model is not None:
             st.success("Loaded XGBoost model is ready!")
         
@@ -833,7 +913,13 @@ def main():
     
     elif app_mode == "NMAP Analysis":
         st.header("NMAP Analysis")
-        st.markdown("Perform port scanning to identify vulnerabilities.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Perform port scanning to identify vulnerabilities.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         use_real_nmap = st.checkbox("Use Real NMAP", value=False, disabled=not NMAP_AVAILABLE)
         real_time_updates = st.checkbox("Enable Real-Time Updates", value=True, disabled=not use_real_nmap)
@@ -886,9 +972,9 @@ def main():
                             color_discrete_sequence=px.colors.sequential.Blues_r
                         )
                         fig.update_layout(
-                            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                            paper_bgcolor=WICKET_THEME['card_bg'],
+                            plot_bgcolor=WICKET_THEME['card_bg'],
+                            font=dict(color=WICKET_THEME['text'])
                         )
                         st.plotly_chart(fig)
                         
@@ -903,7 +989,13 @@ def main():
     
     elif app_mode == "ATC Monitoring":
         st.header("ATC Network Monitoring")
-        st.markdown("Monitor aviation protocols (ADS-B, ACARS).")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Monitor aviation protocols (ADS-B, ACARS).</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         data_source = st.selectbox("Data Source", ["Simulated", "Real ADS-B"])
         num_samples = st.slider("Number of samples", 5, 50, 10)
@@ -968,9 +1060,9 @@ def main():
                         hover_data=['airport_code', 'protocol_type'], title="ATC Traffic Analysis"
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                     
@@ -986,7 +1078,13 @@ def main():
     
     elif app_mode == "Anomaly Detection":
         st.header("Air Traffic Anomaly Detection")
-        st.markdown("Detect anomalous flight paths or communication patterns.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Detect anomalous flight paths or communication patterns.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         data_source = st.selectbox("Data Source", ["Simulated", "Real ADS-B"])
         num_samples = st.slider("Number of samples", 5, 50, 10)
@@ -1023,16 +1121,16 @@ def main():
                         scene=dict(
                             xaxis_title='Latitude', yaxis_title='Longitude', zaxis_title='Altitude'
                         ),
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                     
                     report_buffer = generate_nama_report(anomalies=anomalies)
                     if report_buffer:
                         b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                        href = f'<a href="data:application/pdf;base64,{b64}" download="nama_anomaly_report.pdf">Download Anomaly Report</a>'
+                        href = f'<a href="data:application/pdf;base64,{b64}" download="nama_anomaly_report.pdf">Discover Anomaly Report</a>'
                         st.markdown(href, unsafe_allow_html=True)
                 
                 except Exception as e:
@@ -1040,7 +1138,13 @@ def main():
     
     elif app_mode == "RF Signal Analysis":
         st.header("RF Signal Intrusion Detection")
-        st.markdown("Detect spoofed or jammed RF signals (simulated).")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Detect spoofed or jammed RF signals (simulated).</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         num_samples = st.slider("Number of samples", 5, 50, 10)
         
@@ -1074,9 +1178,9 @@ def main():
                         title="RF Signal Analysis", size='noise_level'
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                 
@@ -1085,7 +1189,13 @@ def main():
     
     elif app_mode == "Insider Threat Detection":
         st.header("Insider Threat Detection")
-        st.markdown("Monitor employee behavior for potential threats.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Monitor employee behavior for potential threats.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         username = st.text_input("Username to Monitor", value=st.session_state.get('username', ''))
         action = st.selectbox("Action", ["Login", "File Access", "Command Input", "Logout"])
@@ -1115,9 +1225,9 @@ def main():
                             title=f"User Activity for {username}"
                         )
                         fig.update_layout(
-                            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                            font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                            paper_bgcolor=WICKET_THEME['card_bg'],
+                            plot_bgcolor=WICKET_THEME['card_bg'],
+                            font=dict(color=WICKET_THEME['text'])
                         )
                         st.plotly_chart(fig)
                 
@@ -1126,7 +1236,13 @@ def main():
     
     elif app_mode == "Predictive Maintenance":
         st.header("Predictive Maintenance with Security Alerts")
-        st.markdown("Detect anomalies in air traffic equipment.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Detect anomalies in air traffic equipment.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         num_samples = st.slider("Number of samples", 5, 50, 10)
         
@@ -1160,9 +1276,9 @@ def main():
                         title="Equipment Status", size='uptime'
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                 
@@ -1171,7 +1287,13 @@ def main():
     
     elif app_mode == "Threat Intelligence":
         st.header("Real-time Cyber Threat Intelligence")
-        st.markdown("Analyze threat feeds for aviation risks.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Analyze threat feeds for aviation risks.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         sample_feeds = [
             "New CVE discovered in ATC software.",
@@ -1210,7 +1332,13 @@ def main():
     
     elif app_mode == "Drone Detection":
         st.header("Autonomous Drone Intrusion Detection")
-        st.markdown("Detect unauthorized drones in airspace.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Detect unauthorized drones in airspace.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         num_samples = st.slider("Number of samples", 5, 50, 10)
         
@@ -1243,9 +1371,9 @@ def main():
                         title="Drone Signal Analysis"
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                 
@@ -1254,7 +1382,13 @@ def main():
     
     elif app_mode == "SCADA Log Analysis":
         st.header("SCADA Log File Analysis")
-        st.markdown("Detect malicious activity in SCADA logs.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Detect malicious activity in SCADA logs.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         sample_logs = [
             "INFO: System started",
@@ -1288,7 +1422,13 @@ def main():
     
     elif app_mode == "CPS Attack Simulation":
         st.header("Cyber-Physical System Attack Simulation")
-        st.markdown("Simulate and detect cyberattacks on ATC infrastructure.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Simulate and detect cyberattacks on ATC infrastructure.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         num_samples = st.slider("Number of samples", 5, 50, 10)
         attack_type = st.selectbox("Attack Type", ["MITM", "DoS"])
@@ -1321,9 +1461,9 @@ def main():
                         title=f"{attack_type} Attack Simulation"
                     )
                     fig.update_layout(
-                        paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-                        font=dict(color=THEME[st.session_state.theme]['chart_text'])
+                        paper_bgcolor=WICKET_THEME['card_bg'],
+                        plot_bgcolor=WICKET_THEME['card_bg'],
+                        font=dict(color=WICKET_THEME['text'])
                     )
                     st.plotly_chart(fig)
                 
@@ -1332,7 +1472,13 @@ def main():
     
     elif app_mode == "Compliance Dashboard":
         st.header("NCAA/ICAO Compliance Dashboard")
-        st.markdown("Track cybersecurity compliance.")
+        st.markdown(
+            """
+            <div class="card">
+                <p>Track cybersecurity compliance.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         
         metrics = st.session_state.compliance_metrics
         compliance_scores, overall = calculate_compliance_metrics(
@@ -1350,9 +1496,9 @@ def main():
             color="Score", color_continuous_scale="Blues"
         )
         fig.update_layout(
-            paper_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-            plot_bgcolor=THEME[st.session_state.theme]['chart_bg'],
-            font=dict(color=THEME[st.session_state.theme]['chart_text'])
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            font=dict(color=WICKET_THEME['text'])
         )
         st.plotly_chart(fig)
         
@@ -1368,6 +1514,14 @@ def main():
     
     elif app_mode == "Alert Log":
         st.header("Alert Log")
+        st.markdown(
+            """
+            <div class="card">
+                <p>View and manage security alerts.</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
+        
         if not st.session_state.alert_log:
             st.info("No alerts generated.")
         else:
@@ -1379,43 +1533,40 @@ def main():
     
     elif app_mode == "Documentation":
         st.header("Project Documentation")
-        st.markdown("""
-        ### NAMA AI-Enhanced IDPS
-        
-        **Overview**  
-        Advanced IDPS securing NAMA's network and airspace operations.
-        
-        **Objectives**  
-        - High-accuracy intrusion detection with XGBoost.
-        - Monitor ATC protocols and flight anomalies.
-        - Detect RF, insider, and drone threats.
-        - Ensure NCAA/ICAO compliance.
-        
-        **Key Features**  
-        - NMAP scanning with customizable arguments.
-        - ATC protocol monitoring (ADS-B, ACARS).
-        - Anomaly detection for flight paths.
-        - RF signal and drone intrusion detection.
-        - Insider threat detection with LSTM.
-        - Predictive maintenance for equipment.
-        - Real-time threat intelligence with NLP.
-        - SCADA log analysis and CPS attack simulation.
-        - Secure authentication with MFA.
-        - Dynamic compliance dashboard.
-        - PDF report generation.
-        
-        **Technology Stack**  
-        - Python, Streamlit, Scikit-learn, XGBoost, TensorFlow, Transformers, Plotly, ReportLab, python-nmap, pyotp, bcrypt, SQLite.
-        
-        **Future Improvements**  
-        - Integrate ACARS data sources.
-        - Enhance MFA with biometrics.
-        - Automate compliance audits.
-        - Support ensemble models.
-        
-        **Contact**  
-        [security@nama.gov.ng](mailto:security@nama.gov.ng).
-        """)
+        st.markdown(
+            """
+            <div class="card">
+                <h3>NAMA AI-Enhanced IDPS</h3>
+                <p><strong>Overview</strong><br>Advanced IDPS securing NAMA's network and airspace operations.</p>
+                <p><strong>Objectives</strong><br>
+                - High-accuracy intrusion detection with XGBoost.<br>
+                - Monitor ATC protocols and flight anomalies.<br>
+                - Detect RF, insider, and drone threats.<br>
+                - Ensure NCAA/ICAO compliance.</p>
+                <p><strong>Key Features</strong><br>
+                - NMAP scanning with customizable arguments.<br>
+                - ATC protocol monitoring (ADS-B, ACARS).<br>
+                - Anomaly detection for flight paths.<br>
+                - RF signal and drone intrusion detection.<br>
+                - Insider threat detection with LSTM.<br>
+                - Predictive maintenance for equipment.<br>
+                - Real-time threat intelligence with NLP.<br>
+                - SCADA log analysis and CPS attack simulation.<br>
+                - Secure authentication.<br>
+                - Dynamic compliance dashboard.<br>
+                - PDF report generation.</p>
+                <p><strong>Technology Stack</strong><br>
+                - Python, Streamlit, Scikit-learn, XGBoost, TensorFlow, Transformers, Plotly, ReportLab, python-nmap, bcrypt, SQLite.</p>
+                <p><strong>Future Improvements</strong><br>
+                - Integrate ACARS data sources.<br>
+                - Enhance authentication with biometrics.<br>
+                - Automate compliance audits.<br>
+                - Support ensemble models.</p>
+                <p><strong>Contact</strong><br>
+                <a href="mailto:security@nama.gov.ng">security@nama.gov.ng</a></p>
+            </div>
+            """, unsafe_allow_html=True
+        )
 
 if __name__ == "__main__":
     try:
