@@ -860,7 +860,7 @@ def main():
          "Anomaly Detection", "RF Signal Analysis", "Insider Threat Detection", 
          "Predictive Maintenance", "Threat Intelligence", "Drone Detection", 
          "SCADA Log Analysis", "CPS Attack Simulation", "Documentation"],
-        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '🛰' if x == 'Anomaly Detection' else '📡' if x == 'RF Signal Analysis' else '🕵️' if x == 'Insider Threat Detection' else '🔧' if x == 'Predictive Maintenance' else '📰' if            'Threat Intelligence', '🛩' if x == 'Drone Detection' else '📜' if x == 'SCADA Log Analysis' else '⚔️' if x == 'CPS Attack Simulation' else '📖'} {x}"
+        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '🛰' if x == 'Anomaly Detection' else '📡' if x == 'RF Signal Analysis' else '🕵️' if x == 'Insider Threat Detection' else '🔧' if x == 'Predictive Maintenance' else '📰' if x == 'Threat Intelligence' else '🛩' if x == 'Drone Detection' else '📜' if x == 'SCADA Log Analysis' else '⚔️' if x == 'CPS Attack Simulation' else '📖'} {x}"
     )
     
     if app_mode == "Home":
