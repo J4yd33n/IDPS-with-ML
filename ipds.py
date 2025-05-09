@@ -225,6 +225,71 @@ def apply_wicket_css(theme_mode='dark'):
                 50% {{ opacity: 0.4; }}
                 100% {{ opacity: 0.8; }}
             }}
+            /* Adapted CSS from provided code */
+            .auth-container {{
+                background-color: rgba(233, 233, 233, 0.9);
+                border-radius: 0.7rem;
+                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25),
+                    0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
+                max-width: 758px;
+                height: 420px;
+                overflow: hidden;
+                position: relative;
+                width: 100%;
+                margin: 0 auto;
+            }}
+            .auth-form {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                padding: 0 3rem;
+                height: 100%;
+                text-align: center;
+            }}
+            .auth-form h2 {{
+                font-weight: 300;
+                margin: 0;
+                margin-bottom: 1.25rem;
+                color: #333;
+            }}
+            .auth-input {{
+                background-color: #fff;
+                border: none;
+                padding: 0.9rem 0.9rem;
+                margin: 0.5rem 0;
+                width: 100%;
+                border-radius: 0.3rem;
+            }}
+            .auth-btn {{
+                background-image: linear-gradient(90deg, #0367a6 0%, #008997 74%);
+                border-radius: 20px;
+                border: 1px solid #0367a6;
+                color: #e9e9e9;
+                cursor: pointer;
+                font-size: 0.8rem;
+                font-weight: bold;
+                letter-spacing: 0.1rem;
+                padding: 0.9rem 4rem;
+                text-transform: uppercase;
+                transition: transform 80ms ease-in;
+                margin-top: 1.5rem;
+            }}
+            .auth-btn:hover {{
+                background-image: linear-gradient(90deg, #024e7a 0%, #006b76 74%);
+            }}
+            .auth-btn:active {{
+                transform: scale(0.95);
+            }}
+            .auth-link {{
+                color: #333;
+                font-size: 0.9rem;
+                margin: 1.5rem 0;
+                text-decoration: none;
+            }}
+            .auth-link:hover {{
+                color: #0367a6;
+            }}
         </style>
         <div class="particles-bg"></div>
     """
@@ -237,6 +302,8 @@ if 'alert_log' not in st.session_state:
     st.session_state.alert_log = []
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
 if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 if 'user_activity' not in st.session_state:
@@ -347,7 +414,7 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
                 le_class = LabelEncoder()
                 df['class'] = le_class.fit_transform(df['class'])
             else:
-                valid_classes = le_class.classes_
+                valid_classes = le_class.classes_', 'unknown')
                 df['class'] = df['class'].apply(lambda x: x if x in valid_classes else 'unknown')
                 if 'unknown' not in le_class.classes_:
                     le_class.classes_ = np.append(le_class.classes_, 'unknown')
@@ -908,26 +975,58 @@ def main():
     # Authentication
     if not st.session_state.authenticated:
         st.markdown("""
-            <div class="login-card" id="login-card">
-                <h1 class="glitch" style="font-family: 'Poppins', sans-serif; color: #F7FAFC; text-align: center; font-size: 2rem;">NAMA IDPS</h1>
+            <div class="auth-container">
+                <h1 class="glitch" style="font-family: 'Poppins', sans-serif; color: #F7FAFC; text-align: center; font-size: 2rem; margin-top: 1rem;">NAMA IDPS</h1>
             </div>
         """, unsafe_allow_html=True)
         
-        with st.form("login_form"):
-            username = st.text_input("Username", key="username")
-            password = st.text_input("Password", type="password", key="password")
-            submit = st.form_submit_button("Login")
-            if submit:
-                if authenticate_user(username, password):
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    log_user_activity(username, "Logged in")
-                    st.rerun()
-                else:
-                    st.markdown('<script>document.getElementById("login-card").classList.add("shake");'
-                                'setTimeout(() => document.getElementById("login-card").classList.remove("shake"), 400);</script>',
-                                unsafe_allow_html=True)
-                    st.error("Invalid credentials")
+        tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
+        
+        with tab1:
+            with st.form("signin_form"):
+                st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+                st.markdown('<h2 class="form__title">Sign In</h2>', unsafe_allow_html=True)
+                email = st.text_input("Email", key="signin_email", help="Enter your email")
+                password = st.text_input("Password", type="password", key="signin_password", help="Enter your password")
+                st.markdown('<a href="#" class="auth-link">Forgot your password?</a>', unsafe_allow_html=True)
+                submit = st.form_submit_button("Sign In", type="primary")
+                st.markdown('</div>', unsafe_allow_html=True)
+                if submit:
+                    if authenticate_user(email, password):
+                        try:
+                            st.session_state.authenticated = True
+                            st.session_state.username = email
+                            log_user_activity(email, "Logged in")
+                            st.success("Login successful!")
+                            st.rerun()
+                        except Exception as e:
+                            logger.error(f"Session state assignment error: {str(e)}")
+                            st.error("An error occurred during login. Please try again.")
+                    else:
+                        st.markdown("""
+                            <script>
+                                var container = document.querySelector('.auth-container');
+                                container.classList.add('shake');
+                                setTimeout(() => container.classList.remove('shake'), 400);
+                            </script>
+                        """, unsafe_allow_html=True)
+                        st.error("Invalid credentials")
+        
+        with tab2:
+            with st.form("signup_form"):
+                st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+                st.markdown('<h2 class="form__title">Sign Up</h2>', unsafe_allow_html=True)
+                username = st.text_input("User", key="signup_username", help="Enter your username")
+                email = st.text_input("Email", key="signup_email", help="Enter your email")
+                password = st.text_input("Password", type="password", key="signup_password", help="Enter your password")
+                submit = st.form_submit_button("Sign Up", type="primary")
+                st.markdown('</div>', unsafe_allow_html=True)
+                if submit:
+                    if register_user(username, password):
+                        st.success("User registered successfully! Please sign in.")
+                        log_user_activity(username, "Registered")
+                    else:
+                        st.error("Registration failed: Username already exists or bcrypt is missing")
         return
     
     # Main dashboard
@@ -939,7 +1038,7 @@ def main():
     if st.button("Logout"):
         st.session_state.authenticated = False
         st.session_state.username = None
-        log_user_activity(st.session_state.username, "Logged out")
+        log_user_activity(st.session_state.username or "unknown", "Logged out")
         st.rerun()
     
     menu = st.sidebar.selectbox(
