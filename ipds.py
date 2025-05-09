@@ -62,29 +62,29 @@ CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
 # Wicket-inspired theme with new color palette
 WICKET_THEME = {
-    "primary_bg": "#1A1F36",  # Midnight Blue
-    "secondary_bg": "#2D3748",
-    "accent": "#3B82F6",      # Electric Blue
-    "text": "#F7FAFC",
+    "primary_bg": "#0A0F2D",  # Deep Space Blue
+    "secondary_bg": "#1E2A44",
+    "accent": "#00D4FF",      # Neon Cyan
+    "text": "#E6E6FA",
     "text_light": "#FFFFFF",
-    "card_bg": "rgba(255, 255, 255, 0.05)",
-    "border": "#4A5568",
-    "button_bg": "#3B82F6",
-    "button_text": "#FFFFFF",
-    "hover": "#2563EB",
-    "error": "#EF4444",       # Soft Red
-    "success": "#10B981"      # Emerald Green
+    "card_bg": "rgba(30, 42, 68, 0.7)",
+    "border": "#3B82F6",      # Electric Blue
+    "button_bg": "#00D4FF",
+    "button_text": "#0A0F2D",
+    "hover": "#3B82F6",
+    "error": "#FF4D4D",       # Cyber Red
+    "success": "#00FF99"      # Neon Green
 }
 
-# Apply updated CSS with Poppins and Inter fonts
+# Apply updated CSS with futuristic fonts and airspace-themed elements
 def apply_wicket_css(theme_mode='dark'):
     css = f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&family=Inter:wght@400;500&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
                 background-color: {WICKET_THEME['primary_bg']};
                 color: {WICKET_THEME['text']};
-                font-family: 'Inter', sans-serif;
+                font-family: 'Roboto Mono', monospace;
             }}
             .css-1d391kg {{
                 background-color: {WICKET_THEME['secondary_bg']};
@@ -97,15 +97,16 @@ def apply_wicket_css(theme_mode='dark'):
                 color: {WICKET_THEME['text']};
                 border-radius: 8px;
                 border: 1px solid {WICKET_THEME['border']};
-                font-family: 'Inter', sans-serif;
+                font-family: 'Roboto Mono', monospace;
             }}
             .css-1d391kg .stButton>button {{
                 background-color: {WICKET_THEME['button_bg']};
                 color: {WICKET_THEME['button_text']};
-                transition: background-color 0.3s;
+                transition: all 0.3s ease;
             }}
             .css-1d391kg .stButton>button:hover {{
                 background-color: {WICKET_THEME['hover']};
+                box-shadow: 0 0 15px {WICKET_THEME['hover']};
             }}
             .main .block-container {{
                 padding: 30px;
@@ -114,12 +115,12 @@ def apply_wicket_css(theme_mode='dark'):
             }}
             .card {{
                 background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(10px);
+                backdrop-filter: blur(12px);
                 border-radius: 12px;
                 padding: 20px;
                 margin-bottom: 20px;
-                box-shadow: 5px 5px 15px rgba(0,0,0,0.4), -5px -5px 15px rgba(255,255,255,0.1);
-                transition: transform 0.2s;
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+                transition: transform 0.3s ease;
             }}
             .card:hover {{
                 transform: translateY(-5px);
@@ -128,25 +129,31 @@ def apply_wicket_css(theme_mode='dark'):
                 background-color: {WICKET_THEME['card_bg']};
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
-                padding: 10px;
+                padding: 12px;
                 color: {WICKET_THEME['text']};
-                font-family: 'Inter', sans-serif;
+                font-family: 'Roboto Mono', monospace;
+                transition: border-color 0.3s ease;
             }}
             .stTextInput input:focus {{
                 border-color: {WICKET_THEME['accent']};
-                box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+                box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
             .stButton>button {{
                 background-color: {WICKET_THEME['button_bg']};
                 color: {WICKET_THEME['button_text']};
-                border-radius: 8px;
-                padding: 10px 20px;
+                border-radius: 25px;
+                padding: 12px 30px;
                 border: none;
-                transition: background-color 0.3s;
-                font-family: 'Poppins', sans-serif;
+                font-family: 'Orbitron', sans-serif;
+                font-weight: 700;
+                letter-spacing: 1px;
+                transition: all 0.3s ease;
+                box-shadow: 0 0 10px {WICKET_THEME['button_bg']};
             }}
             .stButton>button:hover {{
                 background-color: {WICKET_THEME['hover']};
+                box-shadow: 0 0 20px {WICKET_THEME['hover']};
+                transform: scale(1.05);
             }}
             .plotly-graph-div {{
                 background-color: {WICKET_THEME['card_bg']};
@@ -155,143 +162,193 @@ def apply_wicket_css(theme_mode='dark'):
             }}
             .logo-image {{
                 width: 100%;
-                max-width: 120px;
+                max-width: 150px;
                 height: auto;
                 margin-bottom: 20px;
+                filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
             }}
             h1, h2, h3 {{
-                font-family: 'Poppins', sans-serif;
-                color: {WICKET_THEME['text']};
-                font-weight: 500;
+                font-family: 'Orbitron', sans-serif;
+                color: {WICKET_THEME['text_light']};
+                text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
             .stAlert {{
                 border-radius: 8px;
                 padding: 15px;
-                color: {WICKET_THEME['text']};
+                color: {WICKET_THEME['text_light']};
                 background-color: {WICKET_THEME['error']};
+                box-shadow: 0 0 10px {WICKET_THEME['error']};
             }}
             p, li, div, span {{
                 color: {WICKET_THEME['text']};
-                font-family: 'Inter', sans-serif;
+                font-family: 'Roboto Mono', monospace;
+            }}
+            /* Authentication UI */
+            .auth-container {{
+                background: url('https://raw.githubusercontent.com/yourusername/idps-with-ml/main/static/images/airplane.jpg') no-repeat center center fixed;
+                background-size: cover;
+                position: relative;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }}
+            .auth-overlay {{
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(135deg, rgba(10, 15, 45, 0.85), rgba(30, 42, 68, 0.75));
+                z-index: 1;
+            }}
+            .auth-card {{
+                background: {WICKET_THEME['card_bg']};
+                backdrop-filter: blur(15px);
+                border: 2px solid {WICKET_THEME['border']};
+                border-radius: 15px;
+                padding: 2.5rem;
+                max-width: 450px;
+                width: 100%;
+                box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+                z-index: 2;
+                animation: fadeIn 1s ease-in-out;
+            }}
+            .auth-form {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }}
+            .auth-form h2 {{
+                font-family: 'Orbitron', sans-serif;
+                color: {WICKET_THEME['text_light']};
+                margin-bottom: 1.5rem;
+                text-shadow: 0 0 8px {WICKET_THEME['accent']};
+            }}
+            .auth-input {{
+                background-color: rgba(255, 255, 255, 0.1);
+                border: 1px solid {WICKET_THEME['border']};
+                border-radius: 8px;
+                padding: 12px;
+                margin: 0.5rem 0;
+                width: 100%;
+                color: {WICKET_THEME['text']};
+                font-family: 'Roboto Mono', monospace;
+                transition: all 0.3s ease;
+            }}
+            .auth-input:focus {{
+                border-color: {WICKET_THEME['accent']};
+                box-shadow: 0 0 12px {WICKET_THEME['accent']};
+                outline: none;
+            }}
+            .auth-btn {{
+                background: {WICKET_THEME['button_bg']};
+                color: {WICKET_THEME['button_text']};
+                border-radius: 25px;
+                padding: 12px 0;
+                width: 100%;
+                border: none;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.9rem;
+                font-weight: 700;
+                letter-spacing: 1px;
+                cursor: pointer;
+                margin-top: 1.5rem;
+                transition: all 0.3s ease;
+                box-shadow: 0 0 15px {WICKET_THEME['button_bg']};
+            }}
+            .auth-btn:hover {{
+                background: {WICKET_THEME['hover']};
+                box-shadow: 0 0 25px {WICKET_THEME['hover']};
+                transform: scale(1.05);
+            }}
+            .auth-link {{
+                color: {WICKET_THEME['accent']};
+                font-size: 0.9rem;
+                margin-top: 1rem;
+                text-decoration: none;
+                font-family: 'Roboto Mono', monospace;
+                transition: color 0.3s ease;
+            }}
+            .auth-link:hover {{
+                color: {WICKET_THEME['hover']};
+                text-shadow: 0 0 8px {WICKET_THEME['hover']};
+            }}
+            /* Radar Animation */
+            .radar {{
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                width: 80px;
+                height: 80px;
+                border-radius: 50%;
+                background: radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%);
+                z-index: 2;
+                animation: radarSpin 4s linear infinite;
+            }}
+            .radar::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 50%;
+                width: 2px;
+                height: 50%;
+                background: {WICKET_THEME['accent']};
+                transform-origin: bottom;
+                animation: radarSweep 4s linear infinite;
+            }}
+            @keyframes radarSpin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            @keyframes radarSweep {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            @keyframes fadeIn {{
+                0% {{ opacity: 0; transform: translateY(20px); }}
+                100% {{ opacity: 1; transform: translateY(0); }}
             }}
             @keyframes shake {{
                 0%, 100% {{ transform: translateX(0); }}
                 20%, 60% {{ transform: translateX(-10px); }}
                 40%, 80% {{ transform: translateX(10px); }}
             }}
-            .login-card {{
-                background: rgba(255, 255, 255, 0.05);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                padding: 2rem;
-                max-width: 400px;
-                margin: 0 auto;
-            }}
             .shake {{
                 animation: shake 0.4s ease-in-out;
             }}
-            .particles-bg {{
-                position: fixed;
-                inset: 0;
-                background: linear-gradient(135deg, #1A1F36 0%, #2D3748 100%);
-                background-image: radial-gradient(circle, rgba(59, 130, 246, 0.2) 2px, transparent 2px);
-                background-size: 20px 20px;
-                z-index: -1;
-            }}
             .glitch {{
                 position: relative;
-                color: #F7FAFC;
+                color: {WICKET_THEME['text_light']};
+                font-family: 'Orbitron', sans-serif;
+                animation: glitchText 2s infinite;
             }}
             .glitch:before, .glitch:after {{
                 content: 'NAMA IDPS';
                 position: absolute;
                 top: 0;
                 left: 0;
-                opacity: 0.8;
+                width: 100%;
             }}
             .glitch:before {{
-                color: #3B82F6;
-                animation: glitch 1s infinite;
-                transform: translate(-2px, 2px);
+                color: {WICKET_THEME['accent']};
+                transform: translate(-3px, 3px);
+                animation: glitchShift 1s infinite;
             }}
             .glitch:after {{
-                color: #EF4444;
-                animation: glitch 1.5s infinite;
-                transform: translate(2px, -2px);
+                color: {WICKET_THEME['error']};
+                transform: translate(3px, -3px);
+                animation: glitchShift 1.5s infinite;
             }}
-            @keyframes glitch {{
-                0% {{ opacity: 0.8; }}
-                50% {{ opacity: 0.4; }}
-                100% {{ opacity: 0.8; }}
+            @keyframes glitchText {{
+                0%, 100% {{ opacity: 1; }}
+                50% {{ opacity: 0.8; }}
             }}
-            /* Adapted CSS from provided code */
-            .auth-container {{
-                background-color: rgba(233, 233, 233, 0.9);
-                border-radius: 0.7rem;
-                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25),
-                    0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
-                max-width: 758px;
-                height: 420px;
-                overflow: hidden;
-                position: relative;
-                width: 100%;
-                margin: 0 auto;
-            }}
-            .auth-form {{
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-direction: column;
-                padding: 0 3rem;
-                height: 100%;
-                text-align: center;
-            }}
-            .auth-form h2 {{
-                font-weight: 300;
-                margin: 0;
-                margin-bottom: 1.25rem;
-                color: #333;
-            }}
-            .auth-input {{
-                background-color: #fff;
-                border: none;
-                padding: 0.9rem 0.9rem;
-                margin: 0.5rem 0;
-                width: 100%;
-                border-radius: 0.3rem;
-            }}
-            .auth-btn {{
-                background-image: linear-gradient(90deg, #0367a6 0%, #008997 74%);
-                border-radius: 20px;
-                border: 1px solid #0367a6;
-                color: #e9e9e9;
-                cursor: pointer;
-                font-size: 0.8rem;
-                font-weight: bold;
-                letter-spacing: 0.1rem;
-                padding: 0.9rem 4rem;
-                text-transform: uppercase;
-                transition: transform 80ms ease-in;
-                margin-top: 1.5rem;
-            }}
-            .auth-btn:hover {{
-                background-image: linear-gradient(90deg, #024e7a 0%, #006b76 74%);
-            }}
-            .auth-btn:active {{
-                transform: scale(0.95);
-            }}
-            .auth-link {{
-                color: #333;
-                font-size: 0.9rem;
-                margin: 1.5rem 0;
-                text-decoration: none;
-            }}
-            .auth-link:hover {{
-                color: #0367a6;
+            @keyframes glitchShift {{
+                0% {{ clip-path: inset(0 0 20% 0); }}
+                50% {{ clip-path: inset(20% 0 0 0); }}
+                100% {{ clip-path: inset(0 0 20% 0); }}
             }}
         </style>
-        <div class="particles-bg"></div>
     """
     st.markdown(css, unsafe_allow_html=True)
 
@@ -976,8 +1033,10 @@ def main():
     if not st.session_state.authenticated:
         st.markdown("""
             <div class="auth-container">
-                <h1 class="glitch" style="font-family: 'Poppins', sans-serif; color: #F7FAFC; text-align: center; font-size: 2rem; margin-top: 1rem;">NAMA IDPS</h1>
-            </div>
+                <div class="auth-overlay"></div>
+                <div class="auth-card">
+                    <h1 class="glitch">NAMA IDPS</h1>
+                    <div class="radar"></div>
         """, unsafe_allow_html=True)
         
         tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
@@ -985,9 +1044,9 @@ def main():
         with tab1:
             with st.form("signin_form"):
                 st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-                st.markdown('<h2 class="form__title">Sign In</h2>', unsafe_allow_html=True)
-                email = st.text_input("Email", key="signin_email", help="Enter your email")
-                password = st.text_input("Password", type="password", key="signin_password", help="Enter your password")
+                st.markdown('<h2>SECURE LOGIN</h2>', unsafe_allow_html=True)
+                email = st.text_input("Email", key="signin_email", help="Enter your email", placeholder="user@domain.com")
+                password = st.text_input("Password", type="password", key="signin_password", help="Enter your password", placeholder="••••••••")
                 st.markdown('<a href="#" class="auth-link">Forgot your password?</a>', unsafe_allow_html=True)
                 submit = st.form_submit_button("Sign In", type="primary")
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -1005,9 +1064,9 @@ def main():
                     else:
                         st.markdown("""
                             <script>
-                                var container = document.querySelector('.auth-container');
-                                container.classList.add('shake');
-                                setTimeout(() => container.classList.remove('shake'), 400);
+                                var card = document.querySelector('.auth-card');
+                                card.classList.add('shake');
+                                setTimeout(() => card.classList.remove('shake'), 400);
                             </script>
                         """, unsafe_allow_html=True)
                         st.error("Invalid credentials")
@@ -1015,10 +1074,10 @@ def main():
         with tab2:
             with st.form("signup_form"):
                 st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-                st.markdown('<h2 class="form__title">Sign Up</h2>', unsafe_allow_html=True)
-                username = st.text_input("User", key="signup_username", help="Enter your username")
-                email = st.text_input("Email", key="signup_email", help="Enter your email")
-                password = st.text_input("Password", type="password", key="signup_password", help="Enter your password")
+                st.markdown('<h2>REGISTER</h2>', unsafe_allow_html=True)
+                username = st.text_input("Username", key="signup_username", help="Enter your username", placeholder="Choose a username")
+                email = st.text_input("Email", key="signup_email", help="Enter your email", placeholder="user@domain.com")
+                password = st.text_input("Password", type="password", key="signup_password", help="Enter your password", placeholder="••••••••")
                 submit = st.form_submit_button("Sign Up", type="primary")
                 st.markdown('</div>', unsafe_allow_html=True)
                 if submit:
@@ -1027,6 +1086,8 @@ def main():
                         log_user_activity(username, "Registered")
                     else:
                         st.error("Registration failed: Username already exists or bcrypt is missing")
+        
+        st.markdown('</div></div>', unsafe_allow_html=True)
         return
     
     # Main dashboard
