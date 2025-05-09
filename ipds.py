@@ -414,7 +414,7 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
                 le_class = LabelEncoder()
                 df['class'] = le_class.fit_transform(df['class'])
             else:
-                valid_classes = le_class.classes_', 'unknown')
+                valid_classes = np.append(le_class.classes_, 'unknown')
                 df['class'] = df['class'].apply(lambda x: x if x in valid_classes else 'unknown')
                 if 'unknown' not in le_class.classes_:
                     le_class.classes_ = np.append(le_class.classes_, 'unknown')
