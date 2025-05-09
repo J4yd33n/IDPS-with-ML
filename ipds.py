@@ -1091,7 +1091,7 @@ def main():
         return
     
     # Main dashboard
-    st.sidebar.image("https://via.placeholder.com/120x60.png?text=NAMA+IDPS", use_column_width=True)
+    st.sidebar.image("https://raw.githubusercontent.com/yourusername/idps-with-ml/main/static/images/nama_logo.jpg", use_column_width=True)
     st.sidebar.selectbox("Theme", ["Dark"], index=0)
     st.title("NAMA Intrusion Detection and Prevention System")
     st.markdown(f"Welcome, {st.session_state.username} | [Logout](#)", unsafe_allow_html=True)
