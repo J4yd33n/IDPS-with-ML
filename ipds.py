@@ -71,41 +71,67 @@ WICKET_THEME = {
     "border": "#e0e0e0",
     "button_bg": "#3498db",
     "button_text": "#ffffff",
-    "hover": "#2980b9"
+    "hover": "#2980b9",
+    "dark_primary_bg": "#1a252f",
+    "dark_secondary_bg": "#2d3748",
+    "dark_card_bg": "#4a5568",
+    "dark_border": "#718096",
+    "dark_text": "#f7fafc",
+    "dark_button_bg": "#3182ce",
+    "dark_button_text": "#ffffff",
+    "dark_hover": "#2b6cb0"
 }
 
-# Apply Wicket-inspired CSS
-def apply_wicket_css():
-    st.markdown(
-        f"""
+# Apply Wicket-inspired CSS with dark/light mode
+def apply_wicket_css(theme_mode='light'):
+    if theme_mode == 'dark':
+        primary_bg = WICKET_THEME['dark_primary_bg']
+        secondary_bg = WICKET_THEME['dark_secondary_bg']
+        card_bg = WICKET_THEME['dark_card_bg']
+        border = WICKET_THEME['dark_border']
+        text = WICKET_THEME['dark_text']
+        button_bg = WICKET_THEME['dark_button_bg']
+        button_text = WICKET_THEME['dark_button_text']
+        hover = WICKET_THEME['dark_hover']
+    else:
+        primary_bg = WICKET_THEME['primary_bg']
+        secondary_bg = WICKET_THEME['secondary_bg']
+        card_bg = WICKET_THEME['card_bg']
+        border = WICKET_THEME['border']
+        text = WICKET_THEME['text']
+        button_bg = WICKET_THEME['button_bg']
+        button_text = WICKET_THEME['button_text']
+        hover = WICKET_THEME['hover']
+
+    css = f"""
         <style>
             /* Main app styling */
             .stApp {{
-                background-color: {WICKET_THEME['secondary_bg']};
-                color: {WICKET_THEME['text']};
+                background-color: {secondary_bg};
+                color: {text};
                 font-family: 'Roboto', sans-serif;
             }}
 
             /* Sidebar styling */
             .css-1d391kg {{
-                background-color: {WICKET_THEME['primary_bg']};
-                color: {WICKET_THEME['text_light']};
+                background-color: {primary_bg};
+                color: {text};
                 padding: 20px;
-                border-right: 1px solid {WICKET_THEME['border']};
+                border-right: 1px solid {border};
             }}
             .css-1d391kg .stSelectbox, .css-1d391kg .stButton>button {{
-                background-color: {WICKET_THEME['card_bg']};
-                color: {WICKET_THEME['text']};
+                background-color: {card_bg};
+                color: {text};
                 border-radius: 8px;
-                border: 1px solid {WICKET_THEME['border']};
+                border: 1px solid {border};
             }}
             .css-1d391kg .stButton>button {{
-                background-color: {WICKET_THEME['button_bg']};
-                color: {WICKET_THEME['button_text']};
+                background-color: {button_bg};
+                color: {button_text};
                 transition: background-color 0.3s;
             }}
             .css-1d391kg .stButton>button:hover {{
-                background-color: {WICKET_THEME['hover']};
+                background-color: {hover};
             }}
 
             /* Main content styling */
@@ -117,7 +143,7 @@ def apply_wicket_css():
 
             /* Card styling for widgets */
             .card {{
-                background-color: {WICKET_THEME['card_bg']};
+                background-color: {card_bg};
                 border-radius: 12px;
                 padding: 20px;
                 margin-bottom: 20px;
@@ -130,29 +156,29 @@ def apply_wicket_css():
 
             /* Form inputs */
             .stTextInput>div>input, .stSelectbox>div>select {{
-                background-color: {WICKET_THEME['card_bg']};
-                border: 1px solid {WICKET_THEME['border']};
+                background-color: {card_bg};
+                border: 1px solid {border};
                 border-radius: 8px;
                 padding: 10px;
-                color: {WICKET_THEME['text']};
+                color: {text};
             }}
 
             /* Buttons */
             .stButton>button {{
-                background-color: {WICKET_THEME['button_bg']};
-                color: {WICKET_THEME['button_text']};
+                background-color: {button_bg};
+                color: {button_text};
                 border-radius: 8px;
                 padding: 10px 20px;
                 border: none;
                 transition: background-color 0.3s;
             }}
             .stButton>button:hover {{
-                background-color: {WICKET_THEME['hover']};
+                background-color: {hover};
             }}
 
             /* Charts */
             .plotly-graph-div {{
-                background-color: {WICKET_THEME['card_bg']};
+                background-color: {card_bg};
                 border-radius: 8px;
                 padding: 10px;
             }}
@@ -167,7 +193,7 @@ def apply_wicket_css():
 
             /* Headings */
             h1, h2, h3 {{
-                color: {WICKET_THEME['text']};
+                color: {text};
                 font-weight: 500;
             }}
 
@@ -175,10 +201,16 @@ def apply_wicket_css():
             .stAlert {{
                 border-radius: 8px;
                 padding: 15px;
+                color: {text};
+            }}
+
+            /* Markdown text */
+            p, li, div, span {{
+                color: {text};
             }}
         </style>
-        """, unsafe_allow_html=True
-    )
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 # Initialize session state
 if 'analysis_history' not in st.session_state:
@@ -193,6 +225,8 @@ if 'user_activity' not in st.session_state:
     st.session_state.user_activity = {}
 if 'equipment_status' not in st.session_state:
     st.session_state.equipment_status = []
+if 'theme_mode' not in st.session_state:
+    st.session_state.theme_mode = 'light'
 
 # User database setup
 def setup_user_db():
@@ -558,8 +592,8 @@ def classify_drone_intrusion(signal_data):
         log_user_activity("system", f"Detected {len(intrusions)} drone intrusions")
         return signal_data, intrusions
     except Exception as e:
-        logger.error(f"Drone intrusion detection error: {str(e)}")
-        st.error(f"Drone intrusion detection error: {str(e)}")
+        logger.error(f"Drone intrusion classification error: {str(e)}")
+        st.error(f"Drone intrusion classification error: {str(e)}")
         return signal_data, pd.DataFrame()
 
 # ML-based Log File Analyzer for SCADA
@@ -644,7 +678,9 @@ def predict_traffic(input_data, model, scaler, label_encoders, le_class, thresho
         
         expected_features = [col for col in NSL_KDD_COLUMNS if col not in LOW_IMPORTANCE_FEATURES + ['class']]
         for col in expected_features:
-            if col not in input_data.columns:
+            if col in input_data.columns:
+                input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+            else:
                 input_data[col] = 0
         
         input_data = input_data[expected_features]
@@ -685,15 +721,18 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
         story.append(Spacer(1, 12))
         
         story.append(Paragraph("Executive Summary", styles['Heading2']))
-        story.append(Paragraph("This report details cybersecurity findings for NAMA's network infrastructure.", styles['Normal']))
+        summary_text = ("This report details cybersecurity findings for NAMA's network infrastructure, "
+                       "including network scans, air traffic control monitoring, compliance metrics, "
+                       "anomaly detection, and threat intelligence.")
+        story.append(Paragraph(summary_text, styles['Normal']))
         story.append(Spacer(1, 12))
         
         if scan_results:
-            story.append(Paragraph("NMAP Scan Results", styles['Heading2']))
+            story.append(Paragraph("Network Scan Results", styles['Heading2']))
             data = [["Port", "Protocol", "State", "Service"]]
             open_ports = [r for r in scan_results if r['state'] == 'open']
-            for r in open_ports:
-                data.append([r['port'], r['protocol'], r['state'], r['service']])
+            for r in open_ports[:10]:  # Limit to 10 entries for brevity
+                data.append([str(r['port']), r['protocol'], r['state'], r['service']])
             table = Table(data)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -706,14 +745,15 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             story.append(table)
+            story.append(Paragraph(f"Total open ports: {len(open_ports)}", styles['Normal']))
             story.append(Spacer(1, 12))
         
         if atc_results:
             story.append(Paragraph("ATC Monitoring Results", styles['Heading2']))
             intrusions = [r for r in atc_results if r.get('prediction') != 'normal']
             data = [["Timestamp", "Airport Code", "Prediction", "Confidence"]]
-            for r in intrusions:
-                data.append([r['timestamp'], r['airport_code'], r['prediction'], f"{r['confidence']:.2%}"])
+            for r in intrusions[:10]:  # Limit to 10 entries
+                data.append([str(r['timestamp']), r['airport_code'], r['prediction'], f"{r['confidence']:.2%}"])
             table = Table(data)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -726,13 +766,20 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             story.append(table)
+            story.append(Paragraph(f"Total intrusions detected: {len(intrusions)}", styles['Normal']))
             story.append(Spacer(1, 12))
         
-        if anomalies:
+        if anomalies is not None and not anomalies.empty:
             story.append(Paragraph("Air Traffic Anomalies", styles['Heading2']))
             data = [["Timestamp", "Airport Code", "Latitude", "Longitude", "Altitude"]]
-            for _, row in anomalies.iterrows():
-                data.append([row['timestamp'], row['airport_code'], row['latitude'], row['longitude'], row['altitude']])
+            for _, row in anomalies.head(10).iterrows():  # Limit to 10 entries
+                data.append([
+                    str(row['timestamp']),
+                    row['airport_code'],
+                    f"{row['latitude']:.2f}",
+                    f"{row['longitude']:.2f}",
+                    f"{row['altitude']:.0f}"
+                ])
             table = Table(data)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -745,18 +792,20 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             story.append(table)
+            story.append(Paragraph(f"Total anomalies detected: {len(anomalies)}", styles['Normal']))
             story.append(Spacer(1, 12))
         
         if threats:
             story.append(Paragraph("Cyber Threat Intelligence", styles['Heading2']))
             data = [["Threat Description"]]
-            for threat in threats:
-                data.append([threat[:100] + "..." if len(threat) > 100 else threat])
+            for threat in threats[:10]:  # Limit to 10 entries
+                display_text = threat[:100] + "..." if len(threat) > 100 else threat
+                data.append([display_text])
             table = Table(data)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 12),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -764,6 +813,7 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             story.append(table)
+            story.append(Paragraph(f"Total threats identified: {len(threats)}", styles['Normal']))
             story.append(Spacer(1, 12))
         
         if compliance_scores:
@@ -783,9 +833,23 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
             story.append(table)
+            overall_score = sum(compliance_scores.values()) / len(compliance_scores)
+            story.append(Paragraph(f"Overall Compliance Score: {overall_score:.1f}%", styles['Normal']))
+        
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Recommendations", styles['Heading2']))
+        recommendations = (
+            "- Implement stricter firewall rules for open ports.\n"
+            "- Conduct regular security audits and penetration testing.\n"
+            "- Enhance monitoring of air traffic control systems.\n"
+            "- Train staff on recognizing insider threats.\n"
+            "- Update intrusion detection models with new data."
+        )
+        story.append(Paragraph(recommendations, styles['Normal']))
         
         doc.build(story)
         buffer.seek(0)
+        log_user_activity("system", "Generated NAMA cybersecurity report")
         return buffer
     except Exception as e:
         logger.error(f"Report generation error: {str(e)}")
@@ -794,783 +858,256 @@ def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=
 
 # Main Streamlit app
 def main():
-    # Apply Wicket CSS
-    apply_wicket_css()
+    setup_user_db()
+    apply_wicket_css(st.session_state.theme_mode)
     
-    # Sidebar
-    st.sidebar.image("nama_logo.jpg", use_column_width=True, caption="NAMA IDPS")
-    st.sidebar.title("Navigation")
-    
-    # Dependency warnings
-    if not BCRYPT_AVAILABLE:
-        st.warning("bcrypt module is missing. Authentication disabled.")
-        st.session_state.authenticated = True
-    if not NMAP_AVAILABLE:
-        st.warning("python-nmap module is missing. Real NMAP scanning disabled.")
-    
-    # Setup user database
-    if BCRYPT_AVAILABLE:
-        setup_user_db()
-    
-    # Authentication
-    if not st.session_state.authenticated and BCRYPT_AVAILABLE:
-        st.header("Login to NAMA IDPS")
-        with st.form("login_form", clear_on_submit=True):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            col1, col2 = st.columns(2)
-            with col1:
-                login_submit = st.form_submit_button("Login")
-            with col2:
-                register_submit = st.form_submit_button("Register")
-            
-            if login_submit:
-                if authenticate_user(username, password):
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    log_user_activity(username, "User logged in")
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
-            
-            if register_submit:
-                if register_user(username, password):
-                    st.success("User registered successfully!")
-                else:
-                    st.error("Username exists or registration failed.")
-        return
-    
-    # Load model
+    # Load models and encoders
     try:
         model = joblib.load('idps_model.pkl')
         scaler = joblib.load('scaler.pkl')
         label_encoders = joblib.load('label_encoders.pkl')
         le_class = joblib.load('le_class.pkl')
-        st.sidebar.success("Model loaded successfully.")
-    except Exception as e:
-        st.error(f"Failed to load model: {str(e)}")
-        logger.error(f"Model loading error: {str(e)}")
+    except FileNotFoundError:
+        st.error("Model files not found. Please train the model first.")
+        model, scaler, label_encoders, le_class = None, None, {}, None
+    
+    st.sidebar.image("https://via.placeholder.com/120x60.png?text=NAMA+IDPS", use_column_width=True)
+    
+    # Theme toggle
+    theme = st.sidebar.selectbox("Theme", ["Light", "Dark"], index=0 if st.session_state.theme_mode == 'light' else 1)
+    if theme.lower() != st.session_state.theme_mode:
+        st.session_state.theme_mode = theme.lower()
+        apply_wicket_css(st.session_state.theme_mode)
+    
+    # Authentication
+    if not st.session_state.authenticated:
+        st.title("NAMA IDPS - Login")
+        login_tab, register_tab = st.tabs(["Login", "Register"])
+        
+        with login_tab:
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            if st.button("Login"):
+                if authenticate_user(username, password):
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    log_user_activity(username, "Logged in")
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials")
+        
+        with register_tab:
+            new_username = st.text_input("New Username")
+            new_password = st.text_input("New Password", type="password")
+            if st.button("Register"):
+                if register_user(new_username, new_password):
+                    st.success("User registered successfully")
+                    log_user_activity(new_username, "Registered")
+                else:
+                    st.error("Username already exists or registration failed")
+        
         return
     
-    # Navigation
-    app_mode = st.sidebar.selectbox(
-        "Select Module",
-        ["Home", "NMAP Analysis", "ATC Monitoring", "Compliance Dashboard", "Alert Log", 
-         "Anomaly Detection", "RF Signal Analysis", "Insider Threat Detection", 
-         "Predictive Maintenance", "Threat Intelligence", "Drone Detection", 
-         "SCADA Log Analysis", "CPS Attack Simulation", "Documentation"],
-        format_func=lambda x: f"{'🏠' if x == 'Home' else '🔍' if x == 'NMAP Analysis' else '✈️' if x == 'ATC Monitoring' else '✅' if x == 'Compliance Dashboard' else '🚨' if x == 'Alert Log' else '🛰' if x == 'Anomaly Detection' else '📡' if x == 'RF Signal Analysis' else '🕵️' if x == 'Insider Threat Detection' else '🔧' if x == 'Predictive Maintenance' else '📰' if x == 'Threat Intelligence' else '🛩' if x == 'Drone Detection' else '📜' if x == 'SCADA Log Analysis' else '⚔️' if x == 'CPS Attack Simulation' else '📖'} {x}"
+    # Main dashboard
+    st.title("NAMA Intrusion Detection and Prevention System")
+    st.markdown(f"Welcome, {st.session_state.username} | [Logout](#)", unsafe_allow_html=True)
+    
+    if st.button("Logout"):
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        log_user_activity(st.session_state.username, "Logged out")
+        st.rerun()
+    
+    menu = st.sidebar.selectbox(
+        "Menu",
+        ["Dashboard", "Network Scan", "ATC Monitoring", "Threat Intelligence", "Predictive Maintenance", "Reports", "Model Training"]
     )
     
-    if app_mode == "Home":
-        st.header("NAMA AI-Enhanced IDPS")
-        st.markdown(
-            """
-            <div class="card">
-                <h3>Welcome</h3>
-                <p>Secure Nigeria's airspace with our advanced AI-driven Intrusion Detection and Prevention System.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+    if menu == "Dashboard":
+        st.header("System Dashboard")
+        col1, col2 = st.columns(2)
         
-        st.markdown(
-            """
-            <div class="card">
-                <h3>Features</h3>
-                <ul>
-                    <li><strong>NMAP Analysis</strong>: Real-time or simulated port scanning.</li>
-                    <li><strong>ATC Monitoring</strong>: Analyze ADS-B, ACARS with real or simulated data.</li>
-                    <li><strong>Anomaly Detection</strong>: Detect unusual flight patterns.</li>
-                    <li><strong>RF Signal Analysis</strong>: Identify spoofed or jammed signals.</li>
-                    <li><strong>Insider Threat Detection</strong>: Monitor employee behavior.</li>
-                    <li><strong>Predictive Maintenance</strong>: Detect equipment anomalies.</li>
-                    <li><strong>Threat Intelligence</strong>: Analyze real-time threat feeds.</li>
-                    <li><strong>Drone Detection</strong>: Classify unauthorized drones.</li>
-                    <li><strong>SCADA Log Analysis</strong>: Detect malicious activity in ATC logs.</li>
-                    <li><strong>CPS Attack Simulation</strong>: Simulate and detect cyberattacks.</li>
-                    <li><strong>Compliance Dashboard</strong>: Track NCAA/ICAO standards.</li>
-                    <li><strong>Real-time Alerts</strong>: Instant threat notifications.</li>
-                    <li><strong>Professional Reporting</strong>: Branded PDF reports.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True
-        )
+        with col1:
+            st.subheader("Compliance Metrics")
+            detection_rate = len([a for a in st.session_state.alert_log if a['severity'] == 'high']) / max(1, len(st.session_state.alert_log))
+            open_ports = st.session_state.compliance_metrics.get('open_ports', 0)
+            alerts = len(st.session_state.alert_log)
+            scores, overall = calculate_compliance_metrics(detection_rate, open_ports, alerts)
+            st.session_state.compliance_metrics = scores
+            fig = px.bar(
+                x=list(scores.keys()),
+                y=list(scores.values()),
+                title="Compliance Scores",
+                labels={'x': 'Metric', 'y': 'Score (%)'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            st.metric("Overall Compliance", f"{overall:.1f}%")
         
-        if model is not None:
-            st.success("Loaded XGBoost model is ready!")
+        with col2:
+            st.subheader("Recent Alerts")
+            if st.session_state.alert_log:
+                alert_df = pd.DataFrame(st.session_state.alert_log[-5:])  # Show last 5 alerts
+                st.dataframe(alert_df[['timestamp', 'type', 'severity']])
+            else:
+                st.info("No alerts recorded.")
         
-        # Model retraining
-        st.subheader("Model Retraining")
-        dataset_file = st.file_uploader("Upload new dataset (CSV)", type=['csv'])
-        if dataset_file:
-            df = pd.read_csv(dataset_file)
-            if st.button("Retrain Model"):
-                with st.spinner("Retraining model..."):
-                    model, scaler, label_encoders, le_class = retrain_model(df, label_encoders, le_class)
-                    if model:
-                        st.success("Model retrained successfully!")
+        st.subheader("Network Activity")
+        if st.session_state.analysis_history:
+            history_df = pd.DataFrame(st.session_state.analysis_history)
+            fig = px.line(
+                history_df,
+                x='timestamp',
+                y='confidence',
+                color='prediction',
+                title="Intrusion Detection History"
+            )
+            st.plotly_chart(fig, use_container_width=True)
     
-    elif app_mode == "NMAP Analysis":
-        st.header("NMAP Analysis")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Perform port scanning to identify vulnerabilities.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+    elif menu == "Network Scan":
+        st.header("Network Vulnerability Scan")
+        scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
+        target = st.text_input("Target IP/Hostname", "192.168.1.1")
+        port_range = st.text_input("Port Range", "1-1000")
+        custom_args = st.text_input("Custom NMAP Arguments", "-Pn")
         
-        use_real_nmap = st.checkbox("Use Real NMAP", value=False, disabled=not NMAP_AVAILABLE)
-        real_time_updates = st.checkbox("Enable Real-Time Updates", value=True, disabled=not use_real_nmap)
-        
-        with st.form("nmap_scan_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                target = st.text_input("Target IP/Hostname", value="192.168.1.1")
-                scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
-            with col2:
-                port_range = st.text_input("Port Range (e.g., 1-1000)", value="1-1000")
-                custom_args = st.text_input("Custom NMAP Args", value="-T4")
-            submit = st.form_submit_button("Run Scan")
-        
-        if submit:
-            with st.spinner("Running NMAP scan..."):
-                try:
-                    if not target:
-                        st.error("Provide a target IP or hostname.")
-                        return
-                    if not port_range or '-' not in port_range:
-                        st.error("Provide a valid port range (e.g., 1-1000).")
-                        return
-                    start_port, end_port = map(int, port_range.split('-'))
-                    if start_port < 1 or end_port > 65535 or start_port > end_port:
-                        st.error("Port range must be between 1 and 65535.")
-                        return
-                    
-                    def scan_callback(host, scan_result):
-                        if real_time_updates:
-                            st.write(f"Scanned {host}: {scan_result}")
-                    
-                    if use_real_nmap and NMAP_AVAILABLE:
-                        scan_results = run_nmap_scan(target, scan_type, port_range, custom_args, scan_callback)
-                    else:
-                        scan_results = simulate_nmap_scan(target, scan_type, port_range)
-                    
-                    open_ports = [r for r in scan_results if r['state'] == 'open']
-                    st.session_state.compliance_metrics['open_ports'] = len(open_ports)
-                    
-                    if not open_ports:
-                        st.warning("No open ports detected.")
-                    else:
-                        st.success(f"Found {len(open_ports)} open ports.")
-                        df = pd.DataFrame(open_ports)
-                        st.dataframe(df[['port', 'protocol', 'state', 'service']])
-                        
-                        fig = px.bar(
-                            df, x='port', y='service', color='protocol', title=f"Open Ports on {target}",
-                            color_discrete_sequence=px.colors.sequential.Blues_r
-                        )
-                        fig.update_layout(
-                            paper_bgcolor=WICKET_THEME['card_bg'],
-                            plot_bgcolor=WICKET_THEME['card_bg'],
-                            font=dict(color=WICKET_THEME['text'])
-                        )
-                        st.plotly_chart(fig)
-                        
-                        report_buffer = generate_nama_report(scan_results=scan_results)
-                        if report_buffer:
-                            b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                            href = f'<a href="data:application/pdf;base64,{b64}" download="nama_nmap_report.pdf">Download NMAP Report</a>'
-                            st.markdown(href, unsafe_allow_html=True)
-                
-                except Exception as e:
-                    st.error(f"Error during scan: {str(e)}")
+        if st.button("Run Scan"):
+            def scan_callback(host, result):
+                st.session_state.scan_results = result.get('scan', {})
+            
+            if NMAP_AVAILABLE:
+                scan_results = run_nmap_scan(target, scan_type, port_range, custom_args, scan_callback)
+            else:
+                scan_results = simulate_nmap_scan(target, scan_type, port_range)
+            
+            if scan_results:
+                st.session_state.compliance_metrics['open_ports'] = len([r for r in scan_results if r['state'] == 'open'])
+                st.dataframe(pd.DataFrame(scan_results))
+                st.session_state.alert_log.append({
+                    'timestamp': datetime.now(),
+                    'type': 'Network Scan',
+                    'severity': 'medium',
+                    'details': f"Scanned {target}, found {st.session_state.compliance_metrics['open_ports']} open ports"
+                })
     
-    elif app_mode == "ATC Monitoring":
-        st.header("ATC Network Monitoring")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Monitor aviation protocols (ADS-B, ACARS).</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        data_source = st.selectbox("Data Source", ["Simulated", "Real ADS-B"])
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        threshold = st.slider("Detection Threshold", 0.1, 0.9, 0.5, 0.05)
+    elif menu == "ATC Monitoring":
+        st.header("Air Traffic Control Monitoring")
+        data_source = st.radio("Data Source", ["Simulated", "Real ADS-B"])
+        num_samples = st.slider("Number of Samples", 1, 100, 10)
         
         if st.button("Analyze Traffic"):
-            with st.spinner("Analyzing ATC traffic..."):
-                try:
-                    if data_source == "Real ADS-B":
-                        atc_data = fetch_adsb_data(num_samples)
-                    else:
-                        atc_data = simulate_aviation_traffic(num_samples)
-                    
-                    if not atc_data:
-                        st.error("No data retrieved. Try Simulated data.")
-                        if st.button("Switch to Simulated Data"):
-                            atc_data = simulate_aviation_traffic(num_samples)
-                        else:
-                            return
-                    
-                    df = pd.DataFrame(atc_data)
-                    if df.empty:
-                        st.error("No valid data to analyze.")
-                        return
-                    
-                    predictions = []
-                    total_predictions = 0
-                    correct_predictions = 0
-                    
-                    for row in atc_data:
-                        row_df = pd.DataFrame([row])
-                        pred, conf = predict_traffic(row_df, model, scaler, label_encoders, le_class, threshold)
-                        predictions.append({'prediction': pred, 'confidence': conf})
-                        total_predictions += 1
-                        if pred != 'normal':
-                            correct_predictions += 1
-                    
-                    df['prediction'] = [p['prediction'] for p in predictions]
-                    df['confidence'] = [p['confidence'] for p in predictions]
-                    intrusions = df[df['prediction'] != 'normal']
-                    
-                    detection_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
-                    st.session_state.compliance_metrics['detection_rate'] = detection_rate
-                    st.session_state.compliance_metrics['alerts'] = len(intrusions)
-                    
-                    display_columns = ['timestamp', 'airport_code', 'protocol_type', 'service', 'prediction', 'confidence']
-                    st.dataframe(df[display_columns])
-                    
-                    if not intrusions.empty:
-                        st.error(f"Detected {len(intrusions)} intrusions!")
-                        for _, row in intrusions.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': row['timestamp'],
-                                'message': f"Intrusion: {row['prediction']} at {row['airport_code']} (Confidence: {row['confidence']:.2%})",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No intrusions detected.")
-                    
-                    fig = px.scatter(
-                        df, x='timestamp', y='confidence', color='prediction', size='src_bytes',
-                        hover_data=['airport_code', 'protocol_type'], title="ATC Traffic Analysis"
-                    )
-                    fig.update_layout(
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
-                    
-                    report_buffer = generate_nama_report(atc_results=df.to_dict('records'))
-                    if report_buffer:
-                        b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                        href = f'<a href="data:application/pdf;base64,{b64}" download="nama_atc_report.pdf">Download ATC Report</a>'
-                        st.markdown(href, unsafe_allow_html=True)
+            if data_source == "Real ADS-B":
+                traffic_data = fetch_adsb_data(num_samples)
+            else:
+                traffic_data = simulate_aviation_traffic(num_samples)
+            
+            if traffic_data:
+                traffic_df = pd.DataFrame(traffic_data)
+                traffic_df, anomalies = detect_air_traffic_anomalies(traffic_df)
                 
-                except Exception as e:
-                    logger.error(f"ATC analysis error: {str(e)}")
-                    st.error(f"ATC analysis error: {str(e)}")
-    
-    elif app_mode == "Anomaly Detection":
-        st.header("Air Traffic Anomaly Detection")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Detect anomalous flight paths or communication patterns.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        data_source = st.selectbox("Data Source", ["Simulated", "Real ADS-B"])
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        
-        if st.button("Detect Anomalies"):
-            with st.spinner("Analyzing air traffic..."):
-                try:
-                    if data_source == "Real ADS-B":
-                        atc_data = fetch_adsb_data(num_samples)
-                    else:
-                        atc_data = simulate_aviation_traffic(num_samples)
-                    
-                    df = pd.DataFrame(atc_data)
-                    df, anomalies = detect_air_traffic_anomalies(df)
-                    
-                    st.dataframe(df[['timestamp', 'airport_code', 'latitude', 'longitude', 'altitude', 'anomaly']])
-                    
-                    if not anomalies.empty:
-                        st.error(f"Detected {len(anomalies)} anomalies!")
-                        for _, row in anomalies.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': row['timestamp'],
-                                'message': f"Anomaly at {row['airport_code']} (Lat: {row['latitude']}, Lon: {row['longitude']})",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No anomalies detected.")
-                    
-                    fig = px.scatter_3d(
-                        df, x='latitude', y='longitude', z='altitude', color='anomaly',
-                        title="Air Traffic Anomalies", size='velocity'
+                results = []
+                for _, row in traffic_df.iterrows():
+                    prediction, confidence = predict_traffic(
+                        pd.DataFrame([row]), model, scaler, label_encoders, le_class
                     )
-                    fig.update_layout(
-                        scene=dict(
-                            xaxis_title='Latitude', yaxis_title='Longitude', zaxis_title='Altitude'
-                        ),
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
-                    
-                    report_buffer = generate_nama_report(anomalies=anomalies)
-                    if report_buffer:
-                        b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                        href = f'<a href="data:application/pdf;base64,{b64}" download="nama_anomaly_report.pdf">Discover Anomaly Report</a>'
-                        st.markdown(href, unsafe_allow_html=True)
-                
-                except Exception as e:
-                    st.error(f"Anomaly detection error: {str(e)}")
-    
-    elif app_mode == "RF Signal Analysis":
-        st.header("RF Signal Intrusion Detection")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Detect spoofed or jammed RF signals (simulated).</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        
-        if st.button("Analyze Signals"):
-            with st.spinner("Analyzing RF signals..."):
-                try:
-                    signal_data = pd.DataFrame({
-                        'frequency': np.random.uniform(100, 1000, num_samples),
-                        'amplitude': np.random.uniform(0, 1, num_samples),
-                        'noise_level': np.random.uniform(0, 0.1, num_samples),
-                        'label': np.random.choice([0, 1], num_samples, p=[0.9, 0.1])
+                    results.append({
+                        'timestamp': row['timestamp'],
+                        'airport_code': row['airport_code'],
+                        'prediction': prediction,
+                        'confidence': confidence
                     })
-                    
-                    signal_data, intrusions = detect_rf_signal_intrusion(signal_data)
-                    
-                    st.dataframe(signal_data)
-                    
-                    if not intrusions.empty:
-                        st.error(f"Detected {len(intrusions)} RF intrusions!")
-                        for _, row in intrusions.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"RF Intrusion: Frequency {row['frequency']:.2f} MHz",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No RF intrusions detected.")
-                    
-                    fig = px.scatter(
-                        signal_data, x='frequency', y='amplitude', color='intrusion',
-                        title="RF Signal Analysis", size='noise_level'
-                    )
-                    fig.update_layout(
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
                 
-                except Exception as e:
-                    st.error(f"RF signal analysis error: {str(e)}")
-    
-    elif app_mode == "Insider Threat Detection":
-        st.header("Insider Threat Detection")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Monitor employee behavior for potential threats.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        username = st.text_input("Username to Monitor", value=st.session_state.get('username', ''))
-        action = st.selectbox("Action", ["Login", "File Access", "Command Input", "Logout"])
-        
-        if st.button("Analyze Behavior"):
-            with st.spinner("Analyzing user behavior..."):
-                try:
-                    is_threat, score = detect_insider_threats(username, action)
-                    
-                    if is_threat:
-                        st.error(f"Insider threat detected for {username}! Score: {score:.2f}")
-                        st.session_state.alert_log.append({
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'message': f"Insider Threat: {username} (Score: {score:.2f})",
-                            'recipient': 'security@nama.gov.ng'
-                        })
-                    else:
-                        st.success(f"No insider threat detected. Score: {score:.2f}")
-                    
-                    conn = sqlite3.connect('nama_users.db')
-                    activity_df = pd.read_sql_query(f"SELECT * FROM user_activity WHERE username = '{username}'", conn)
-                    conn.close()
-                    
-                    if not activity_df.empty:
-                        fig = px.timeline(
-                            activity_df, x_start='timestamp', x_end='timestamp', y='action',
-                            title=f"User Activity for {username}"
-                        )
-                        fig.update_layout(
-                            paper_bgcolor=WICKET_THEME['card_bg'],
-                            plot_bgcolor=WICKET_THEME['card_bg'],
-                            font=dict(color=WICKET_THEME['text'])
-                        )
-                        st.plotly_chart(fig)
+                st.session_state.analysis_history.extend(results)
+                st.session_state.atc_results = results
                 
-                except Exception as e:
-                    st.error(f"Insider threat detection error: {str(e)}")
-    
-    elif app_mode == "Predictive Maintenance":
-        st.header("Predictive Maintenance with Security Alerts")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Detect anomalies in air traffic equipment.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        
-        if st.button("Analyze Equipment"):
-            with st.spinner("Analyzing equipment data..."):
-                try:
-                    equipment_data = pd.DataFrame({
-                        'temperature': np.random.uniform(20, 80, num_samples),
-                        'vibration': np.random.uniform(0, 5, num_samples),
-                        'uptime': np.random.uniform(0, 1000, num_samples)
+                st.subheader("Traffic Analysis")
+                st.dataframe(pd.DataFrame(results))
+                
+                if not anomalies.empty:
+                    st.subheader("Detected Anomalies")
+                    st.dataframe(anomalies[['timestamp', 'airport_code', 'latitude', 'longitude', 'altitude']])
+                    st.session_state.alert_log.append({
+                        'timestamp': datetime.now(),
+                        'type': 'ATC Anomaly',
+                        'severity': 'high',
+                        'details': f"Detected {len(anomalies)} air traffic anomalies"
                     })
-                    
-                    equipment_data, anomalies = predict_maintenance_anomalies(equipment_data)
-                    st.session_state.equipment_status = equipment_data.to_dict('records')
-                    
-                    st.dataframe(equipment_data)
-                    
-                    if not anomalies.empty:
-                        st.error(f"Detected {len(anomalies)} equipment anomalies!")
-                        for _, row in anomalies.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"Equipment Anomaly: Temp {row['temperature']:.2f}C, Vib {row['vibration']:.2f}",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No equipment anomalies detected.")
-                    
-                    fig = px.scatter(
-                        equipment_data, x='temperature', y='vibration', color='anomaly',
-                        title="Equipment Status", size='uptime'
-                    )
-                    fig.update_layout(
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
                 
-                except Exception as e:
-                    st.error(f"Equipment analysis error: {str(e)}")
+                # Visualization
+                fig = px.scatter(
+                    traffic_df,
+                    x='longitude',
+                    y='latitude',
+                    size='altitude',
+                    color='anomaly',
+                    hover_data=['airport_code', 'velocity'],
+                    title="Air Traffic Visualization"
+                )
+                st.plotly_chart(fig, use_container_width=True)
     
-    elif app_mode == "Threat Intelligence":
-        st.header("Real-time Cyber Threat Intelligence")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Analyze threat feeds for aviation risks.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        sample_feeds = [
-            "New CVE discovered in ATC software.",
-            "Normal system update scheduled.",
-            "Potential ransomware attack on aviation networks.",
-            "Routine maintenance completed."
-        ]
-        feed_text = st.text_area("Enter Threat Feed Text", value="\n".join(sample_feeds))
-        
+    elif menu == "Threat Intelligence":
+        st.header("Cyber Threat Intelligence")
+        threat_feed = st.text_area("Enter Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found")
         if st.button("Analyze Threats"):
-            with st.spinner("Analyzing threat feeds..."):
-                try:
-                    text_data = feed_text.split("\n")
-                    threats = analyze_threat_feeds(text_data)
-                    
-                    if threats:
-                        st.error(f"Detected {len(threats)} threats!")
-                        for threat in threats:
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"Cyber Threat: {threat[:50]}...",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                        st.write("Threats:", threats)
-                    else:
-                        st.success("No threats detected.")
-                    
-                    report_buffer = generate_nama_report(threats=threats)
-                    if report_buffer:
-                        b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                        href = f'<a href="data:application/pdf;base64,{b64}" download="nama_threat_report.pdf">Download Threat Report</a>'
-                        st.markdown(href, unsafe_allow_html=True)
-                
-                except Exception as e:
-                    st.error(f"Threat analysis error: {str(e)}")
+            threats = analyze_threat_feeds(threat_feed.split('\n'))
+            if threats:
+                st.session_state.threats = threats
+                st.write("Detected Threats:")
+                for threat in threats:
+                    st.write(f"- {threat}")
+                st.session_state.alert_log.append({
+                    'timestamp': datetime.now(),
+                    'type': 'Threat Intelligence',
+                    'severity': 'high',
+                    'details': f"Detected {len(threats)} cyber threats"
+                })
     
-    elif app_mode == "Drone Detection":
-        st.header("Autonomous Drone Intrusion Detection")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Detect unauthorized drones in airspace.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        
-        if st.button("Detect Drones"):
-            with st.spinner("Analyzing drone signals..."):
-                try:
-                    signal_data = pd.DataFrame({
-                        'frequency': np.random.uniform(2.4e9, 5.8e9, num_samples),
-                        'power_level': np.random.uniform(-100, -50, num_samples),
-                        'label': np.random.choice([0, 1], num_samples, p=[0.95, 0.05])
-                    })
-                    
-                    signal_data, intrusions = classify_drone_intrusion(signal_data)
-                    
-                    st.dataframe(signal_data)
-                    
-                    if not intrusions.empty:
-                        st.error(f"Detected {len(intrusions)} drone intrusions!")
-                        for _, row in intrusions.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"Drone Intrusion: Freq {row['frequency']/1e9:.2f} GHz",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No drone intrusions detected.")
-                    
-                    fig = px.scatter(
-                        signal_data, x='frequency', y='power_level', color='intrusion',
-                        title="Drone Signal Analysis"
-                    )
-                    fig.update_layout(
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
-                
-                except Exception as e:
-                    st.error(f"Drone detection error: {str(e)}")
+    elif menu == "Predictive Maintenance":
+        st.header("Predictive Maintenance")
+        equipment_data = st.file_uploader("Upload Equipment Data (CSV)", type="csv")
+        if equipment_data and st.button("Analyze Equipment"):
+            equip_df = pd.read_csv(equipment_data)
+            equip_df, anomalies = predict_maintenance_anomalies(equip_df)
+            st.dataframe(anomalies)
+            if not anomalies.empty:
+                st.session_state.alert_log.append({
+                    'timestamp': datetime.now(),
+                    'type': 'Equipment Anomaly',
+                    'severity': 'medium',
+                    'details': f"Detected {len(anomalies)} equipment anomalies"
+                })
     
-    elif app_mode == "SCADA Log Analysis":
-        st.header("SCADA Log File Analysis")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Detect malicious activity in SCADA logs.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        sample_logs = [
-            "INFO: System started",
-            "ERROR: Connection timeout",
-            "INFO: Data received",
-            "WARNING: Unauthorized access attempt"
-        ]
-        log_text = st.text_area("Enter SCADA Logs", value="\n".join(sample_logs))
-        
-        if st.button("Analyze Logs"):
-            with st.spinner("Analyzing SCADA logs..."):
-                try:
-                    logs = log_text.split("\n")
-                    log_scores = [1 if "ERROR" in log or "WARNING" in log else 0 for log in logs]
-                    anomalies = analyze_scada_logs(log_scores)
-                    
-                    if anomalies:
-                        st.error(f"Detected {len(anomalies)} log anomalies!")
-                        for anomaly in anomalies:
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"SCADA Log Anomaly: {anomaly}",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                        st.write("Anomalies:", anomalies)
-                    else:
-                        st.success("No log anomalies detected.")
-                
-                except Exception as e:
-                    st.error(f"SCADA log analysis error: {str(e)}")
-    
-    elif app_mode == "CPS Attack Simulation":
-        st.header("Cyber-Physical System Attack Simulation")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Simulate and detect cyberattacks on ATC infrastructure.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        num_samples = st.slider("Number of samples", 5, 50, 10)
-        attack_type = st.selectbox("Attack Type", ["MITM", "DoS"])
-        
-        if st.button("Simulate Attack"):
-            with st.spinner("Simulating CPS attack..."):
-                try:
-                    cps_data = pd.DataFrame({
-                        'latency': np.random.uniform(10, 50, num_samples),
-                        'packet_loss': np.random.uniform(0, 0.1, num_samples)
-                    })
-                    
-                    cps_data, attacks = simulate_cps_attack(cps_data, attack_type)
-                    
-                    st.dataframe(cps_data)
-                    
-                    if not attacks.empty:
-                        st.error(f"Detected {len(attacks)} CPS attacks!")
-                        for _, row in attacks.iterrows():
-                            st.session_state.alert_log.append({
-                                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                'message': f"CPS Attack: {attack_type}, Latency {row['latency']:.2f}ms",
-                                'recipient': 'security@nama.gov.ng'
-                            })
-                    else:
-                        st.success("No CPS attacks detected.")
-                    
-                    fig = px.scatter(
-                        cps_data, x='latency', y='packet_loss', color='attack',
-                        title=f"{attack_type} Attack Simulation"
-                    )
-                    fig.update_layout(
-                        paper_bgcolor=WICKET_THEME['card_bg'],
-                        plot_bgcolor=WICKET_THEME['card_bg'],
-                        font=dict(color=WICKET_THEME['text'])
-                    )
-                    st.plotly_chart(fig)
-                
-                except Exception as e:
-                    st.error(f"CPS attack simulation error: {str(e)}")
-    
-    elif app_mode == "Compliance Dashboard":
-        st.header("NCAA/ICAO Compliance Dashboard")
-        st.markdown(
-            """
-            <div class="card">
-                <p>Track cybersecurity compliance.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        metrics = st.session_state.compliance_metrics
-        compliance_scores, overall = calculate_compliance_metrics(
-            metrics['detection_rate'], metrics['open_ports'], metrics['alerts']
-        )
-        
-        compliance_data = {
-            "Metric": list(compliance_scores.keys()),
-            "Score": list(compliance_scores.values())
-        }
-        df = pd.DataFrame(compliance_data)
-        
-        fig = px.bar(
-            df, x="Metric", y="Score", title="Compliance Metrics",
-            color="Score", color_continuous_scale="Blues"
-        )
-        fig.update_layout(
-            paper_bgcolor=WICKET_THEME['card_bg'],
-            plot_bgcolor=WICKET_THEME['card_bg'],
-            font=dict(color=WICKET_THEME['text'])
-        )
-        st.plotly_chart(fig)
-        
-        st.markdown(f"**Overall Compliance Score**: {overall:.1f}%")
-        st.markdown("**Recommendations**: Update firewalls, reduce open ports, maintain detection rates.")
-        
-        if st.button("Generate Compliance Report"):
-            report_buffer = generate_nama_report(compliance_scores=compliance_scores)
+    elif menu == "Reports":
+        st.header("Generate Report")
+        if st.button("Generate Cybersecurity Report"):
+            report_buffer = generate_nama_report(
+                scan_results=st.session_state.get('scan_results', []),
+                atc_results=st.session_state.get('atc_results', []),
+                compliance_scores=st.session_state.compliance_metrics,
+                anomalies=pd.DataFrame(st.session_state.get('atc_results', [])).query("prediction != 'normal'"),
+                threats=st.session_state.get('threats', [])
+            )
             if report_buffer:
-                b64 = base64.b64encode(report_buffer.getvalue()).decode()
-                href = f'<a href="data:application/pdf;base64,{b64}" download="nama_compliance_report.pdf">Download Compliance Report</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Download Report",
+                    data=report_buffer,
+                    file_name="nama_cybersecurity_report.pdf",
+                    mime="application/pdf"
+                )
     
-    elif app_mode == "Alert Log":
-        st.header("Alert Log")
-        st.markdown(
-            """
-            <div class="card">
-                <p>View and manage security alerts.</p>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        
-        if not st.session_state.alert_log:
-            st.info("No alerts generated.")
-        else:
-            alert_df = pd.DataFrame(st.session_state.alert_log)
-            st.dataframe(alert_df[['timestamp', 'message', 'recipient']])
-            if st.button("Clear Alert Log"):
-                st.session_state.alert_log = []
-                st.success("Alert log cleared.")
+    elif menu == "Model Training":
+        st.header("Model Training")
+        training_data = st.file_uploader("Upload Training Data (CSV)", type="csv")
+        if training_data and st.button("Retrain Model"):
+            df = pd.read_csv(training_data, names=NSL_KDD_COLUMNS, low_memory=False)
+            model, scaler, label_encoders, le_class = retrain_model(df, label_encoders, le_class)
+            if model:
+                st.success("Model retrained successfully")
     
-    elif app_mode == "Documentation":
-        st.header("Project Documentation")
-        st.markdown(
-            """
-            <div class="card">
-                <h3>NAMA AI-Enhanced IDPS</h3>
-                <p><strong>Overview</strong><br>Advanced IDPS securing NAMA's network and airspace operations.</p>
-                <p><strong>Objectives</strong><br>
-                - High-accuracy intrusion detection with XGBoost.<br>
-                - Monitor ATC protocols and flight anomalies.<br>
-                - Detect RF, insider, and drone threats.<br>
-                - Ensure NCAA/ICAO compliance.</p>
-                <p><strong>Key Features</strong><br>
-                - NMAP scanning with customizable arguments.<br>
-                - ATC protocol monitoring (ADS-B, ACARS).<br>
-                - Anomaly detection for flight paths.<br>
-                - RF signal and drone intrusion detection.<br>
-                - Insider threat detection with LSTM.<br>
-                - Predictive maintenance for equipment.<br>
-                - Real-time threat intelligence with NLP.<br>
-                - SCADA log analysis and CPS attack simulation.<br>
-                - Secure authentication.<br>
-                - Dynamic compliance dashboard.<br>
-                - PDF report generation.</p>
-                <p><strong>Technology Stack</strong><br>
-                - Python, Streamlit, Scikit-learn, XGBoost, TensorFlow, Transformers, Plotly, ReportLab, python-nmap, bcrypt, SQLite.</p>
-                <p><strong>Future Improvements</strong><br>
-                - Integrate ACARS data sources.<br>
-                - Enhance authentication with biometrics.<br>
-                - Automate compliance audits.<br>
-                - Support ensemble models.</p>
-                <p><strong>Contact</strong><br>
-                <a href="mailto:security@nama.gov.ng">security@nama.gov.ng</a></p>
-            </div>
-            """, unsafe_allow_html=True
-        )
+    # Display alerts
+    if st.session_state.alert_log:
+        st.sidebar.subheader("Recent Alerts")
+        for alert in st.session_state.alert_log[-3:]:
+            st.sidebar.markdown(f"**{alert['timestamp']}**: {alert['type']} ({alert['severity']})")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Application error: {str(e)}")
-        st.error(f"Application error: {str(e)}")
+    main()
