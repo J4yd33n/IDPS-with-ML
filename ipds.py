@@ -199,6 +199,32 @@ def apply_wicket_css(theme_mode='dark'):
                 background-size: 20px 20px;
                 z-index: -1;
             }}
+            .glitch {{
+                position: relative;
+                color: #F7FAFC;
+            }}
+            .glitch:before, .glitch:after {{
+                content: 'NAMA IDPS';
+                position: absolute;
+                top: 0;
+                left: 0;
+                opacity: 0.8;
+            }}
+            .glitch:before {{
+                color: #3B82F6;
+                animation: glitch 1s infinite;
+                transform: translate(-2px, 2px);
+            }}
+            .glitch:after {{
+                color: #EF4444;
+                animation: glitch 1.5s infinite;
+                transform: translate(2px, -2px);
+            }}
+            @keyframes glitch {{
+                0% {{ opacity: 0.8; }}
+                50% {{ opacity: 0.4; }}
+                100% {{ opacity: 0.8; }}
+            }}
         </style>
         <div class="particles-bg"></div>
     """
@@ -233,6 +259,17 @@ def setup_user_db():
         timestamp TEXT,
         action TEXT
     )''')
+    # Check if default user exists, if not, create it
+    c.execute("SELECT username FROM users WHERE username = ?", ('nama',))
+    if not c.fetchone() and BCRYPT_AVAILABLE:
+        default_password = 'admin'
+        hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
+        try:
+            c.execute("INSERT INTO users (username, password) VALUES (?, ?)", ('nama', hashed))
+            conn.commit()
+            logger.info("Default user 'nama' created successfully")
+        except sqlite3.IntegrityError:
+            logger.error("Failed to create default user: username already exists")
     conn.commit()
     conn.close()
 
@@ -255,6 +292,7 @@ def register_user(username, password):
 def authenticate_user(username, password):
     if not BCRYPT_AVAILABLE:
         logger.error("Authentication disabled: bcrypt module is missing")
+        st.error("Authentication disabled: bcrypt module is missing")
         return False
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
@@ -263,7 +301,11 @@ def authenticate_user(username, password):
     conn.close()
     if result:
         stored_password = result[0]
-        return bcrypt.checkpw(password.encode('utf-8'), stored_password)
+        try:
+            return bcrypt.checkpw(password.encode('utf-8'), stored_password)
+        except Exception as e:
+            logger.error(f"Password verification error: {str(e)}")
+            return False
     return False
 
 def log_user_activity(username, action):
@@ -867,7 +909,7 @@ def main():
     if not st.session_state.authenticated:
         st.markdown("""
             <div class="login-card" id="login-card">
-                <h1 style="font-family: 'Poppins', sans-serif; color: #F7FAFC; text-align: center; font-size: 2rem;">NAMA IDPS</h1>
+                <h1 class="glitch" style="font-family: 'Poppins', sans-serif; color: #F7FAFC; text-align: center; font-size: 2rem;">NAMA IDPS</h1>
             </div>
         """, unsafe_allow_html=True)
         
