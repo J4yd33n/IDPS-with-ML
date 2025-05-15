@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -185,7 +186,7 @@ def apply_wicket_css(theme_mode='dark'):
             }}
             /* Authentication UI */
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/yourusername/idps-with-ml/main/static/images/airplane.jpg') no-repeat center center fixed;
+                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/airplane.jpg') no-repeat center center fixed;
                 background-size: cover;
                 position: relative;
                 min-height: 100vh;
@@ -550,12 +551,13 @@ def fetch_adsb_data(num_samples=10):
     try:
         username = st.secrets.get('OPENSKY_USERNAME', os.getenv('OPENSKY_USERNAME'))
         password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('OPENSKY_PASSWORD'))
-        
-        if not username or not password:
-            raise ValueError("OpenSky credentials not provided.")
-        
         url = "https://opensky-network.org/api/states/all"
-        response = requests.get(url, auth=(username, password))
+        if username and password:
+            response = requests.get(url, auth=(username, password))
+        else:
+            # Fallback to anonymous access
+            response = requests.get(url)
+            logger.info("No credentials provided; using anonymous ADS-B access")
         if response.status_code != 200:
             raise Exception(f"Failed to fetch ADS-B data: {response.status_code}")
         data = response.json()['states'][:num_samples]
@@ -599,8 +601,8 @@ def fetch_adsb_data(num_samples=10):
         return adsb_records
     except Exception as e:
         logger.error(f"ADS-B fetch error: {str(e)}")
-        st.error(f"ADS-B fetch error: {str(e)}")
-        return []
+        st.warning("Unable to fetch real ADS-B data. Using simulated data.")
+        return simulate_aviation_traffic(num_samples)
 
 # Simulate aviation traffic
 def simulate_aviation_traffic(num_samples=10):
@@ -1091,7 +1093,7 @@ def main():
         return
     
     # Main dashboard
-    st.sidebar.image("https://raw.githubusercontent.com/yourusername/idps-with-ml/main/static/images/nama_logo.jpg", use_column_width=True)
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/nama_logo.jpg", use_column_width=True)
     st.sidebar.selectbox("Theme", ["Dark"], index=0)
     st.title("NAMA Intrusion Detection and Prevention System")
     st.markdown(f"Welcome, {st.session_state.username} | [Logout](#)", unsafe_allow_html=True)
@@ -1295,3 +1297,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
