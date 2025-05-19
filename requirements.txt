@@ -13,3 +13,4 @@ requests==2.32.3
 bcrypt==4.2.0
 python-nmap==0.7.1
 huggingface_hub==0.24.7
+nmap
