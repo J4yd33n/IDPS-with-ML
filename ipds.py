@@ -25,6 +25,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from transformers import pipeline
 import re
 from collections import deque
+import time
 
 # Check for optional dependencies
 try:
@@ -186,7 +187,7 @@ def apply_wicket_css(theme_mode='dark'):
             }}
             /* Authentication UI */
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/airplane.jpg') no-repeat center center fixed;
+                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg') no-repeat center center fixed;
                 background-size: cover;
                 position: relative;
                 min-height: 100vh;
@@ -486,34 +487,42 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
         return None, label_encoders, le_class
 
 # Real-time NMAP scan
-def run_nmap_scan(target, scan_type, port_range, custom_args, callback):
+def run_nmap_scan(target, scan_type, port_range, custom_args, callback=None):
     try:
         if not NMAP_AVAILABLE:
             raise ImportError("python-nmap library is not installed.")
         nm = nmap.PortScannerAsync()
         scan_args = {'TCP SYN': '-sS', 'TCP Connect': '-sT', 'UDP': '-sU'}
         args = f"{scan_args[scan_type]} {custom_args}"
-        nm.scan(target, port_range, arguments=args, callback=callback)
-        while nm.still_scanning():
-            st.spinner("Scanning in progress...")
-        results = []
-        for host in nm.all_hosts():
-            for proto in nm[host].all_protocols():
-                for port in nm[host][proto].keys():
-                    state = nm[host][proto][port]['state']
-                    service = nm[host][proto][port].get('name', 'unknown')
-                    results.append({
-                        'port': port,
-                        'protocol': proto,
-                        'state': state,
-                        'service': service
-                    })
+        
+        # Store results in a list
+        scan_results = []
+        
+        def scan_callback(host, scan_data):
+            if scan_data and 'scan' in scan_data:
+                for host in scan_data['scan']:
+                    for proto in scan_data['scan'][host].all_protocols():
+                        for port in scan_data['scan'][host][proto].keys():
+                            state = scan_data['scan'][host][proto][port]['state']
+                            service = scan_data['scan'][host][proto][port].get('name', 'unknown')
+                            scan_results.append({
+                                'port': port,
+                                'protocol': proto,
+                                'state': state,
+                                'service': service
+                            })
+        
+        nm.scan(target, port_range, arguments=args, callback=scan_callback)
+        with st.spinner("Scanning in progress..."):
+            while nm.still_scanning():
+                time.sleep(0.1)  # Avoid blocking the UI
+        
         log_user_activity("system", f"Real-time NMAP scan on {target}")
-        return results
+        return scan_results
     except Exception as e:
         logger.error(f"NMAP scan error: {str(e)}")
-        st.error(f"NMAP scan error: {str(e)}")
-        return []
+        st.warning(f"NMAP scan error: {str(e)}. Using simulated scan.")
+        return simulate_nmap_scan(target, scan_type, port_range)
 
 # Simulated NMAP scan
 def simulate_nmap_scan(target, scan_type, port_range):
@@ -552,53 +561,58 @@ def fetch_adsb_data(num_samples=10):
         username = st.secrets.get('OPENSKY_USERNAME', os.getenv('OPENSKY_USERNAME'))
         password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('OPENSKY_PASSWORD'))
         url = "https://opensky-network.org/api/states/all"
-        if username and password:
-            response = requests.get(url, auth=(username, password))
-        else:
-            # Fallback to anonymous access
-            response = requests.get(url)
-            logger.info("No credentials provided; using anonymous ADS-B access")
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch ADS-B data: {response.status_code}")
-        data = response.json()['states'][:num_samples]
-        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
-        adsb_records = []
-        for state in data:
-            adsb_records.append({
-                'timestamp': pd.Timestamp.now(),
-                'protocol_type': 'ads-b',
-                'service': 'flight_data',
-                'src_bytes': np.random.randint(100, 1000),
-                'dst_bytes': np.random.randint(100, 1000),
-                'airport_code': np.random.choice(airports),
-                'duration': np.random.randint(0, 100),
-                'flag': 'SF',
-                'count': np.random.randint(1, 10),
-                'srv_count': np.random.randint(1, 10),
-                'serror_rate': 0.0,
-                'srv_serror_rate': 0.0,
-                'rerror_rate': 0.0,
-                'srv_rerror_rate': 0.0,
-                'same_srv_rate': 1.0,
-                'diff_srv_rate': 0.0,
-                'srv_diff_host_rate': 0.0,
-                'dst_host_count': np.random.randint(1, 10),
-                'dst_host_srv_count': np.random.randint(1, 10),
-                'dst_host_same_srv_rate': 1.0,
-                'dst_host_diff_srv_rate': 0.0,
-                'dst_host_same_src_port_rate': 0.0,
-                'dst_host_srv_diff_host_rate': 0.0,
-                'dst_host_serror_rate': 0.0,
-                'dst_host_srv_serror_rate': 0.0,
-                'dst_host_rerror_rate': 0.0,
-                'dst_host_srv_rerror_rate': 0.0,
-                'latitude': state[6] if state[6] is not None else 0.0,
-                'longitude': state[5] if state[5] is not None else 0.0,
-                'altitude': state[7] if state[7] is not None else 0.0,
-                'velocity': state[9] if state[9] is not None else 0.0
-            })
-        log_user_activity("system", "Fetched real ADS-B data")
-        return adsb_records
+        for attempt in range(2):
+            if username and password:
+                response = requests.get(url, auth=(username, password))
+            else:
+                response = requests.get(url)
+                logger.info("No credentials provided; using anonymous ADS-B access")
+            if response.status_code == 200:
+                data = response.json()['states'][:num_samples]
+                airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
+                adsb_records = []
+                for state in data:
+                    adsb_records.append({
+                        'timestamp': pd.Timestamp.now(),
+                        'protocol_type': 'ads-b',
+                        'service': 'flight_data',
+                        'src_bytes': np.random.randint(100, 1000),
+                        'dst_bytes': np.random.randint(100, 1000),
+                        'airport_code': np.random.choice(airports),
+                        'duration': np.random.randint(0, 100),
+                        'flag': 'SF',
+                        'count': np.random.randint(1, 10),
+                        'srv_count': np.random.randint(1, 10),
+                        'serror_rate': 0.0,
+                        'srv_serror_rate': 0.0,
+                        'rerror_rate': 0.0,
+                        'srv_rerror_rate': 0.0,
+                        'same_srv_rate': 1.0,
+                        'diff_srv_rate': 0.0,
+                        'srv_diff_host_rate': 0.0,
+                        'dst_host_count': np.random.randint(1, 10),
+                        'dst_host_srv_count': np.random.randint(1, 10),
+                        'dst_host_same_srv_rate': 1.0,
+                        'dst_host_diff_srv_rate': 0.0,
+                        'dst_host_same_src_port_rate': 0.0,
+                        'dst_host_srv_diff_host_rate': 0.0,
+                        'dst_host_serror_rate': 0.0,
+                        'dst_host_srv_serror_rate': 0.0,
+                        'dst_host_rerror_rate': 0.0,
+                        'dst_host_srv_rerror_rate': 0.0,
+                        'latitude': state[6] if state[6] is not None else 0.0,
+                        'longitude': state[5] if state[5] is not None else 0.0,
+                        'altitude': state[7] if state[7] is not None else 0.0,
+                        'velocity': state[9] if state[9] is not None else 0.0
+                    })
+                log_user_activity("system", "Fetched real ADS-B data")
+                return adsb_records
+            elif response.status_code == 429:
+                logger.warning("Rate limit exceeded. Retrying after delay...")
+                time.sleep(5)
+                continue
+            else:
+                raise Exception(f"Failed to fetch ADS-B data: {response.status_code}")
     except Exception as e:
         logger.error(f"ADS-B fetch error: {str(e)}")
         st.warning("Unable to fetch real ADS-B data. Using simulated data.")
@@ -1093,7 +1107,7 @@ def main():
         return
     
     # Main dashboard
-    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/nama_logo.jpg", use_column_width=True)
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
     st.sidebar.selectbox("Theme", ["Dark"], index=0)
     st.title("NAMA Intrusion Detection and Prevention System")
     st.markdown(f"Welcome, {st.session_state.username} | [Logout](#)", unsafe_allow_html=True)
@@ -1157,13 +1171,7 @@ def main():
         custom_args = st.text_input("Custom NMAP Arguments", "-Pn")
         
         if st.button("Run Scan"):
-            def scan_callback(host, result):
-                st.session_state.scan_results = result.get('scan', {})
-            
-            if NMAP_AVAILABLE:
-                scan_results = run_nmap_scan(target, scan_type, port_range, custom_args, scan_callback)
-            else:
-                scan_results = simulate_nmap_scan(target, scan_type, port_range)
+            scan_results = run_nmap_scan(target, scan_type, port_range, custom_args)
             
             if scan_results:
                 st.session_state.compliance_metrics['open_ports'] = len([r for r in scan_results if r['state'] == 'open'])
