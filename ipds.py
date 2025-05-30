@@ -63,86 +63,131 @@ LOW_IMPORTANCE_FEATURES = [
 ]
 CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
-# Wicket-inspired theme
+# Enhanced Cyberpunk Theme
 WICKET_THEME = {
     "primary_bg": "#0A0F2D",
     "secondary_bg": "#1E2A44",
     "accent": "#00D4FF",
+    "accent_alt": "#FF00FF",
     "text": "#E6E6FA",
     "text_light": "#FFFFFF",
-    "card_bg": "rgba(30, 42, 68, 0.7)",
+    "card_bg": "rgba(30, 42, 68, 0.5)",
     "border": "#3B82F6",
     "button_bg": "#00D4FF",
     "button_text": "#0A0F2D",
-    "hover": "#3B82F6",
+    "hover": "#FF00FF",
     "error": "#FF4D4D",
     "success": "#00FF99"
 }
 
-# Apply CSS
+# Enhanced CSS with Animations
 def apply_wicket_css():
     css = f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
+            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+            
             .stApp {{
-                background-color: {WICKET_THEME['primary_bg']};
+                background: linear-gradient(45deg, {WICKET_THEME['primary_bg']} 0%, {WICKET_THEME['secondary_bg']} 100%);
+                background-size: 200% 200%;
+                animation: gradientShift 15s ease-in-out infinite;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
+                overflow-x: hidden;
             }}
+            
+            @keyframes gradientShift {{
+                0% {{ background-position: 0% 50%; }}
+                50% {{ background-position: 100% 50%; }}
+                100% {{ background-position: 0% 50%; }}
+            }}
+            
             .css-1d391kg {{
-                background-color: {WICKET_THEME['secondary_bg']};
+                background: {WICKET_THEME['card_bg']};
+                backdrop-filter: blur(10px);
                 color: {WICKET_THEME['text']};
                 padding: 20px;
-                border-right: 1px solid {WICKET_THEME['border']};
+                border-right: 2px solid {WICKET_THEME['accent']};
+                animation: slideInLeft 0.5s ease-out;
             }}
-            .css-1d391kg .stSelectbox, .css-1d391kg .stButton>button {{
-                background-color: {WICKET_THEME['card_bg']};
-                color: {WICKET_THEME['text']};
+            
+            @keyframes slideInLeft {{
+                from {{ transform: translateX(-100%); opacity: 0; }}
+                to {{ transform: translateX(0); opacity: 1; }}
+            }}
+            
+            .sidebar .sidebar-content {{
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }}
+            
+            .sidebar-item {{
+                display: flex;
+                align-items: center;
+                padding: 12px 20px;
+                background: {WICKET_THEME['card_bg']};
                 border-radius: 8px;
-                border: 1px solid {WICKET_THEME['border']};
-                font-family: 'Roboto Mono', monospace;
-            }}
-            .css-1d391kg .stButton>button {{
-                background-color: {WICKET_THEME['button_bg']};
-                color: {WICKET_THEME['button_text']};
+                color: {WICKET_THEME['text']};
+                text-decoration: none;
                 transition: all 0.3s ease;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 16px;
             }}
-            .css-1d391kg .stButton>button:hover {{
-                background-color: {WICKET_THEME['hover']};
+            .sidebar-item:hover {{
+                background: {WICKET_THEME['hover']};
+                transform: translateX(10px);
                 box-shadow: 0 0 15px {WICKET_THEME['hover']};
             }}
+            .sidebar-item i {{
+                margin-right: 10px;
+                color: {WICKET_THEME['accent']};
+            }}
+            
             .main .block-container {{
                 padding: 30px;
-                max-width: 1200px;
+                max-width: 1400px;
                 margin: auto;
+                animation: fadeInUp 0.7s ease-out;
             }}
+            
+            @keyframes fadeInUp {{
+                0% {{ opacity: 0; transform: translateY(20px); }}
+                100% {{ opacity: 1; transform: translateY(0); }}
+            }}
+            
             .card {{
                 background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(12px);
-                border-radius: 12px;
+                backdrop-filter: blur(15px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 16px;
                 padding: 20px;
                 margin-bottom: 20px;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-                transition: transform 0.3s ease;
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+                animation: fadeIn 1s ease-in-out;
             }}
             .card:hover {{
                 transform: translateY(-5px);
+                box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
             }}
+            
             .stTextInput>div>input, .stSelectbox>div>select {{
-                background-color: {WICKET_THEME['card_bg']};
+                background: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
                 padding: 12px;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
-                transition: border-color 0.3s ease;
+                transition: border-color 0.3s ease, box-shadow 0.3s ease;
             }}
             .stTextInput input:focus {{
                 border-color: {WICKET_THEME['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
+            
             .stButton>button {{
-                background-color: {WICKET_THEME['button_bg']};
+                background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
                 color: {WICKET_THEME['button_text']};
                 border-radius: 25px;
                 padding: 12px 30px;
@@ -152,42 +197,83 @@ def apply_wicket_css():
                 letter-spacing: 1px;
                 transition: all 0.3s ease;
                 box-shadow: 0 0 10px {WICKET_THEME['button_bg']};
+                position: relative;
+                overflow: hidden;
             }}
             .stButton>button:hover {{
-                background-color: {WICKET_THEME['hover']};
-                box-shadow: 0 0 20px {WICKET_THEME['hover']};
                 transform: scale(1.05);
+                box-shadow: 0 0 20px {WICKET_THEME['hover']};
+                background: linear-gradient(45deg, {WICKET_THEME['hover']}, {WICKET_THEME['accent_alt']});
             }}
+            .stButton>button::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.2),
+                    transparent
+                );
+                transition: 0.5s;
+            }}
+            .stButton>button:hover::before {{
+                left: 100%;
+            }}
+            
             .plotly-graph-div {{
-                background-color: {WICKET_THEME['card_bg']};
-                border-radius: 8px;
+                background: {WICKET_THEME['card_bg']};
+                border-radius: 12px;
                 padding: 10px;
+                box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
             }}
+            
             .logo-image {{
                 width: 100%;
-                max-width: 150px;
+                max-width: 180px;
                 height: auto;
                 margin-bottom: 20px;
                 filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
+                animation: pulse 2s infinite;
             }}
+            
+            @keyframes pulse {{
+                0% {{ transform: scale(1); }}
+                50% {{ transform: scale(1.05); }}
+                100% {{ transform: scale(1); }}
+            }}
+            
             h1, h2, h3 {{
                 font-family: 'Orbitron', sans-serif;
                 color: {WICKET_THEME['text_light']};
                 text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
+            
             .stAlert {{
+                background: {WICKET_THEME['error']};
+                color: {WICKET_THEME['text_light']};
                 border-radius: 8px;
                 padding: 15px;
-                color: {WICKET_THEME['text_light']};
-                background-color: {WICKET_THEME['error']};
                 box-shadow: 0 0 10px {WICKET_THEME['error']};
+                animation: shake 0.5s;
             }}
+            
+            @keyframes shake {{
+                0%, 100% {{ transform: translateX(0); }}
+                25% {{ transform: translateX(-5px); }}
+                75% {{ transform: translateX(5px); }}
+            }}
+            
             p, li, div, span {{
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
             }}
+            
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/airplane.jpg') no-repeat center center fixed;
+                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg') no-repeat center center fixed;
                 background-size: cover;
                 position: relative;
                 min-height: 100vh;
@@ -196,12 +282,14 @@ def apply_wicket_css():
                 justify-content: center;
                 overflow: hidden;
             }}
+            
             .auth-overlay {{
                 position: absolute;
                 inset: 0;
                 background: linear-gradient(135deg, rgba(10, 15, 45, 0.85), rgba(30, 42, 68, 0.75));
                 z-index: 1;
             }}
+            
             .auth-card {{
                 background: {WICKET_THEME['card_bg']};
                 backdrop-filter: blur(15px);
@@ -212,22 +300,30 @@ def apply_wicket_css():
                 width: 100%;
                 box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
                 z-index: 2;
-                animation: fadeIn 1s ease-in-out;
+                animation: zoomIn 0.8s ease-in-out;
             }}
+            
+            @keyframes zoomIn {{
+                0% {{ transform: scale(0.8); opacity: 0; }}
+                100% {{ transform: scale(1); opacity: 1; }}
+            }}
+            
             .auth-form {{
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
             }}
+            
             .auth-form h2 {{
                 font-family: 'Orbitron', sans-serif;
                 color: {WICKET_THEME['text_light']};
                 margin-bottom: 1.5rem;
                 text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
+            
             .auth-input {{
-                background-color: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
                 padding: 12px;
@@ -242,8 +338,9 @@ def apply_wicket_css():
                 box-shadow: 0 0 12px {WICKET_THEME['accent']};
                 outline: none;
             }}
+            
             .auth-btn {{
-                background: {WICKET_THEME['button_bg']};
+                background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
                 color: {WICKET_THEME['button_text']};
                 border-radius: 25px;
                 padding: 12px 0;
@@ -263,6 +360,7 @@ def apply_wicket_css():
                 box-shadow: 0 0 25px {WICKET_THEME['hover']};
                 transform: scale(1.05);
             }}
+            
             .auth-link {{
                 color: {WICKET_THEME['accent']};
                 font-size: 0.9rem;
@@ -275,16 +373,17 @@ def apply_wicket_css():
                 color: {WICKET_THEME['hover']};
                 text-shadow: 0 0 8px {WICKET_THEME['hover']};
             }}
+            
             .radar {{
                 position: absolute;
                 bottom: 20px;
                 right: 20px;
-                width: 80px;
-                height: 80px;
+                width: 100px;
+                height: 100px;
                 border-radius: 50%;
-                background: radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%);
+                background: radial-gradient(circle, rgba(0, 212, 255, 0.3) 0%, transparent 70%);
                 z-index: 2;
-                animation: radarSpin 4s linear infinite;
+                animation: radarPulse 2s infinite;
             }}
             .radar::before {{
                 content: '';
@@ -297,17 +396,43 @@ def apply_wicket_css():
                 transform-origin: bottom;
                 animation: radarSweep 4s linear infinite;
             }}
-            @keyframes radarSpin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
+            
+            @keyframes radarPulse {{
+                0% {{ transform: scale(1); opacity: 0.8; }}
+                50% {{ transform: scale(1.2); opacity: 0.5; }}
+                100% {{ transform: scale(1); opacity: 0.8; }}
             }}
             @keyframes radarSweep {{
                 0% {{ transform: rotate(0deg); }}
                 100% {{ transform: rotate(360deg); }}
             }}
-            @keyframes fadeIn {{
-                0% {{ opacity: 0; transform: translateY(20px); }}
-                100% {{ opacity: 1; transform: translateY(0); }}
+            
+            .custom-spinner {{
+                border: 4px solid {WICKET_THEME['card_bg']};
+                border-top: 4px solid {WICKET_THEME['accent']};
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: auto;
+            }}
+            
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            
+            @media (max-width: 768px) {{
+                .main .block-container {{
+                    padding: 15px;
+                }}
+                .card {{
+                    padding: 15px;
+                }}
+                .sidebar-item {{
+                    font-size: 14px;
+                    padding: 10px;
+                }}
             }}
         </style>
     """
@@ -508,14 +633,17 @@ def display_radar(data):
             return None
         fig = go.Figure()
         # Radar sweep effect
+        theta = np.linspace(0, 360, 100)
+        r = np.ones(100) * 10
         fig.add_trace(go.Scatterpolar(
-            r=[0, 10, 0],
-            theta=[0, 45, 90],
+            r=r,
+            theta=theta,
             mode='lines',
             line=dict(color=WICKET_THEME['accent'], width=1),
             fill='toself',
             opacity=0.3,
-            name='Radar Sweep'
+            name='Radar Sweep',
+            subplot='polar'
         ))
         # Aircraft positions
         for source in df['source'].unique():
@@ -525,10 +653,11 @@ def display_radar(data):
                 lat=source_df['latitude'],
                 mode='markers',
                 marker=dict(
-                    size=10,
+                    size=12,
                     color=WICKET_THEME['accent'] if source == 'ads-b' else WICKET_THEME['error'],
                     symbol='circle',
-                    line=dict(width=1, color=WICKET_THEME['text'])
+                    line=dict(width=1, color=WICKET_THEME['text']),
+                    opacity=0.8
                 ),
                 text=source_df['target_id'],
                 hoverinfo='text',
@@ -548,11 +677,20 @@ def display_radar(data):
                 lataxis=dict(range=[4, 14]),
                 lonaxis=dict(range=[2, 15])
             ),
+            polar=dict(
+                radialaxis=dict(visible=False, range=[0, 10]),
+                angularaxis=dict(visible=False)
+            ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
-            margin=dict(l=10, r=10, t=30, b=10),
-            title=dict(text="Real-Time Radar Surveillance", font=dict(color=WICKET_THEME['text_light']))
+            margin=dict(l=10, r=10, t=50, b=10),
+            title=dict(
+                text="Real-Time Radar Surveillance",
+                font=dict(color=WICKET_THEME['text_light'], size=20),
+                x=0.5,
+                xanchor='center'
+            )
         )
         return fig
     except Exception as e:
@@ -709,7 +847,7 @@ def fetch_adsb_data(num_samples=10, region=None):
                 return adsb_records
             elif response.status_code == 429:
                 logger.warning("Rate limit exceeded. Retrying after delay...")
-                time.sleep(10 * (attempt + 1))
+                time.sleep(20 * (attempt + 1))
                 continue
             else:
                 raise Exception(f"Failed to fetch ADS-B data: {response.status_code}")
@@ -890,6 +1028,45 @@ def optimize_traffic_flow(traffic_data, num_clusters=3):
         st.error(f"Traffic flow optimization error: {str(e)}")
         return []
 
+# Drone Detection
+def periodic_drone_detection(interval=120):
+    try:
+        while 'drone_running' in st.session_state and st.session_state.drone_running:
+            # Simulate drone detection in the region
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}  # Default Nigeria region
+            num_drones = np.random.randint(0, 5)  # Random number of drones
+            drone_results = []
+            for i in range(num_drones):
+                altitude = np.random.uniform(0, 1000)  # Drones typically fly low
+                is_unauthorized = altitude < 400 and np.random.random() > 0.7  # Unauthorized if low and random chance
+                drone_results.append({
+                    'timestamp': pd.Timestamp.now(),
+                    'drone_id': f"DRN{i:03d}",
+                    'latitude': np.random.uniform(region['lat_min'], region['lat_max']),
+                    'longitude': np.random.uniform(region['lon_min'], region['lon_max']),
+                    'altitude': altitude,
+                    'status': 'unauthorized' if is_unauthorized else 'authorized',
+                    'severity': 'high' if is_unauthorized else 'low'
+                })
+            st.session_state.drone_results = drone_results
+            if any(d['status'] == 'unauthorized' for d in drone_results):
+                st.session_state.alert_log.append({
+                    'timestamp': datetime.now(),
+                    'type': 'Drone Intrusion',
+                    'severity': 'high',
+                    'details': f"Detected {sum(d['status'] == 'unauthorized' for d in drone_results)} unauthorized drones"
+                })
+            log_user_activity("system", f"Drone detection: {len(drone_results)} drones, {sum(d['status'] == 'unauthorized' for d in drone_results)} unauthorized")
+            time.sleep(interval)
+    except Exception as e:
+        logger.error(f"Drone detection error: {str(e)}")
+        st.session_state.alert_log.append({
+            'timestamp': datetime.now(),
+            'type': 'Drone Detection',
+            'severity': 'error',
+            'details': f"Drone detection failed: {str(e)}"
+        })
+
 # Threat Intelligence (Transformers Bypassed)
 def fetch_threat_feeds(api_key=None):
     try:
@@ -942,8 +1119,8 @@ def main():
     if not st.session_state.authenticated:
         st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
         st.markdown('<div class="auth-form"><h2>NAMA IDPS Login</h2>', unsafe_allow_html=True)
-        username = st.text_input("Username", key="login_username", placeholder="Enter username")
-        password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password")
+        username = st.text_input("Username", key="login_username", placeholder="Enter username", help="Enter your username")
+        password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password", help="Enter your password")
         
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -968,11 +1145,25 @@ def main():
         st.markdown('</div></div>', unsafe_allow_html=True)
         return
 
-    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/nama_logo.jpg", use_column_width=True)
-    menu = st.sidebar.selectbox("Select Module", [
-        "Dashboard", "Network Scan", "ATC Monitoring", "Radar Surveillance",
-        "Drone Detection", "Threat Intelligence", "Compliance & Reporting", "Settings"
-    ])
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
+    
+    # Enhanced Sidebar with Icons
+    menu_options = {
+        "Dashboard": "fas fa-tachometer-alt",
+        "Network Scan": "fas fa-network-wired",
+        "ATC Monitoring": "fas fa-plane",
+        "Radar Surveillance": "fas fa-radar",
+        "Drone Detection": "fas fa-drone",
+        "Threat Intelligence": "fas fa-shield-alt",
+        "Compliance & Reporting": "fas fa-file-alt",
+        "Settings": "fas fa-cog"
+    }
+    menu = st.sidebar.selectbox(
+        "Select Module",
+        list(menu_options.keys()),
+        format_func=lambda x: f"<i class='{menu_options[x]}'></i> {x}",
+        help="Navigate through IDPS modules"
+    )
 
     # Load ML models
     try:
@@ -1010,48 +1201,68 @@ def main():
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("System Overview")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Detection Rate", f"{st.session_state.compliance_metrics['detection_rate']}%")
-        col2.metric("Open Ports", st.session_state.compliance_metrics['open_ports'])
-        col3.metric("Active Alerts", st.session_state.compliance_metrics['alerts'])
+        with col1:
+            st.metric("Detection Rate", f"{st.session_state.compliance_metrics['detection_rate']}%", help="Percentage of threats detected")
+        with col2:
+            st.metric("Open Ports", st.session_state.compliance_metrics['open_ports'], help="Number of open network ports")
+        with col3:
+            st.metric("Active Alerts", st.session_state.compliance_metrics['alerts'], help="Current active alerts")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("Recent Alerts")
         if st.session_state.alert_log:
             alert_df = pd.DataFrame(st.session_state.alert_log)
-            st.dataframe(alert_df[['timestamp', 'type', 'severity', 'details']])
+            st.dataframe(
+                alert_df[['timestamp', 'type', 'severity', 'details']],
+                use_container_width=True,
+                column_config={
+                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+                    "severity": st.column_config.TextColumn("Severity", help="Alert severity level")
+                }
+            )
         else:
             st.write("No alerts yet.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Network Scan":
         st.header("Real-Time Network Vulnerability Scan")
-        scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
-        target = st.text_input("Target IP/Hostname", "192.168.1.1")
-        port_range = st.text_input("Port Range", "1-1000")
-        custom_args = st.text_input("Custom NMAP Arguments", "-Pn")
-        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"], help="Select NMAP scan type")
+        target = st.text_input("Target IP/Hostname", "192.168.1.1", help="Enter target IP or hostname")
+        port_range = st.text_input("Port Range", "1-1000", help="Specify port range (e.g., 1-1000)")
+        custom_args = st.text_input("Custom NMAP Arguments", "-Pn", help="Additional NMAP arguments")
+        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300, help="Frequency of scans")
         
         if 'nmap_running' not in st.session_state:
             st.session_state.nmap_running = False
             st.session_state.scan_results = []
         
-        if st.button("Start Real-Time Scan"):
-            st.session_state.nmap_running = True
-            threading.Thread(
-                target=periodic_nmap_scan,
-                args=(target, scan_type, port_range, custom_args, scan_interval),
-                daemon=True
-            ).start()
-            st.success("Real-time scanning started!")
-        
-        if st.button("Stop Scan"):
-            st.session_state.nmap_running = False
-            st.success("Real-time scanning stopped.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Real-Time Scan", key="start_nmap"):
+                st.session_state.nmap_running = True
+                threading.Thread(
+                    target=periodic_nmap_scan,
+                    args=(target, scan_type, port_range, custom_args, scan_interval),
+                    daemon=True
+                ).start()
+                st.success("Real-time scanning started!")
+        with col2:
+            if st.button("Stop Scan", key="stop_nmap"):
+                st.session_state.nmap_running = False
+                st.success("Real-time scanning stopped.")
         
         if st.session_state.scan_results:
             st.subheader("Latest Scan Results")
-            st.dataframe(pd.DataFrame(st.session_state.scan_results))
+            st.dataframe(
+                pd.DataFrame(st.session_state.scan_results),
+                use_container_width=True,
+                column_config={
+                    "port": st.column_config.NumberColumn("Port"),
+                    "state": st.column_config.TextColumn("State", help="Port status (open/closed)")
+                }
+            )
             open_ports = len([r for r in st.session_state.scan_results if r['state'] == 'open'])
             st.session_state.compliance_metrics['open_ports'] = open_ports
             st.session_state.alert_log.append({
@@ -1060,13 +1271,15 @@ def main():
                 'severity': 'medium',
                 'details': f"Scanned {target}, found {open_ports} open ports"
             })
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "ATC Monitoring":
         st.header("Real-Time Air Traffic Control Monitoring")
-        data_source = st.radio("Data Source", ["Simulated", "Real ADS-B"])
-        num_samples = st.slider("Number of Samples", 1, 100, 10)
-        fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60)
-        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"])
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        data_source = st.radio("Data Source", ["Simulated", "Real ADS-B"], help="Choose data source")
+        num_samples = st.slider("Number of Samples", 1, 100, 10, help="Number of aircraft to display")
+        fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Data refresh rate")
+        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select monitoring region")
         regions = {
             "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15},
             "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15},
@@ -1081,37 +1294,56 @@ def main():
             st.session_state.flight_conflicts = []
             st.session_state.optimized_routes = []
         
-        if st.button("Start Real-Time Monitoring"):
-            st.session_state.adsb_running = True
-            if data_source == "Simulated":
-                st.session_state.atc_results = simulate_aviation_traffic(num_samples, region)
-                st.session_state.atc_anomalies = pd.DataFrame()
-                st.session_state.flight_conflicts = []
-                st.session_state.optimized_routes = []
-            else:
-                threading.Thread(
-                    target=periodic_adsb_fetch,
-                    args=(num_samples, region, fetch_interval),
-                    daemon=True
-                ).start()
-            st.success("Real-time ATC monitoring started!")
-        
-        if st.button("Stop Monitoring"):
-            st.session_state.adsb_running = False
-            st.success("Real-time ATC monitoring stopped.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Real-Time Monitoring", key="start_atc"):
+                st.session_state.adsb_running = True
+                if data_source == "Simulated":
+                    st.session_state.atc_results = simulate_aviation_traffic(num_samples, region)
+                    st.session_state.atc_anomalies = pd.DataFrame()
+                    st.session_state.flight_conflicts = []
+                    st.session_state.optimized_routes = []
+                else:
+                    threading.Thread(
+                        target=periodic_adsb_fetch,
+                        args=(num_samples, region, fetch_interval),
+                        daemon=True
+                    ).start()
+                st.success("Real-time ATC monitoring started!")
+        with col2:
+            if st.button("Stop Monitoring", key="stop_atc"):
+                st.session_state.adsb_running = False
+                st.success("Real-time ATC monitoring stopped.")
         
         if st.session_state.atc_results:
             st.subheader("Latest ATC Data")
             results_df = pd.DataFrame(st.session_state.atc_results)
-            st.dataframe(results_df[['timestamp', 'icao24', 'airport_code', 'prediction', 'confidence', 'latitude', 'longitude', 'altitude']])
+            st.dataframe(
+                results_df[['timestamp', 'icao24', 'airport_code', 'prediction', 'confidence', 'latitude', 'longitude', 'altitude']],
+                use_container_width=True,
+                column_config={
+                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+                    "confidence": st.column_config.NumberColumn("Confidence", format="%.2f")
+                }
+            )
             
             if not st.session_state.atc_anomalies.empty:
                 st.subheader("Detected Anomalies")
-                st.dataframe(st.session_state.atc_anomalies[['timestamp', 'icao24', 'airport_code', 'latitude', 'longitude', 'altitude']])
+                st.dataframe(
+                    st.session_state.atc_anomalies[['timestamp', 'icao24', 'airport_code', 'latitude', 'longitude', 'altitude']],
+                    use_container_width=True
+                )
             
             if st.session_state.flight_conflicts:
                 st.subheader("Flight Conflicts")
-                st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
+                st.dataframe(
+                    pd.DataFrame(st.session_state.flight_conflicts),
+                    use_container_width=True,
+                    column_config={
+                        "distance_km": st.column_config.NumberColumn("Distance (km)", format="%.2f"),
+                        "time_to_collision_sec": st.column_config.NumberColumn("Time to Collision (s)", format="%.0f")
+                    }
+                )
             
             if st.session_state.optimized_routes:
                 st.subheader("Optimized Traffic Routes")
@@ -1122,7 +1354,7 @@ def main():
                      'suggested_altitude': r['suggested_route']['altitude']}
                     for r in st.session_state.optimized_routes
                 ])
-                st.dataframe(routes_df)
+                st.dataframe(routes_df, use_container_width=True)
                 fig_routes = px.scatter(
                     results_df,
                     x='longitude',
@@ -1130,7 +1362,8 @@ def main():
                     color='airport_code',
                     size='altitude',
                     title="Optimized Traffic Flow",
-                    hover_data=['icao24']
+                    hover_data=['icao24'],
+                    template='plotly_dark'
                 )
                 for route in st.session_state.optimized_routes:
                     fig_routes.add_trace(go.Scatter(
@@ -1149,15 +1382,18 @@ def main():
                 size='altitude',
                 color='prediction',
                 hover_data=['icao24', 'velocity'],
-                title="Real-Time Air Traffic Visualization"
+                title="Real-Time Air Traffic Visualization",
+                template='plotly_dark'
             )
             st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Radar Surveillance":
         st.header("Real-Time Radar Surveillance")
-        num_targets = st.slider("Number of Radar Targets", 1, 20, 5)
-        fetch_interval = st.slider("Update Interval (seconds)", 30, 300, 60)
-        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"])
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        num_targets = st.slider("Number of Radar Targets", 1, 20, 5, help="Number of radar targets to simulate")
+        fetch_interval = st.slider("Update Interval (seconds)", 30, 300, 60, help="Radar refresh rate")
+        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select radar region")
         regions = {
             "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15},
             "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15},
@@ -1169,128 +1405,159 @@ def main():
             st.session_state.radar_running = False
             st.session_state.radar_data = []
         
-        if st.button("Start Radar Surveillance"):
-            st.session_state.radar_running = True
-            threading.Thread(
-                target=periodic_radar_update,
-                args=(num_targets, region, fetch_interval),
-                daemon=True
-            ).start()
-            st.success("Radar surveillance started!")
-        
-        if st.button("Stop Radar Surveillance"):
-            st.session_state.radar_running = False
-            st.success("Radar surveillance stopped!")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Radar Surveillance", key="start_radar"):
+                st.session_state.radar_running = True
+                threading.Thread(
+                    target=periodic_radar_update,
+                    args=(num_targets, region, fetch_interval),
+                    daemon=True
+                ).start()
+                st.success("Radar surveillance started!")
+        with col2:
+            if st.button("Stop Radar Surveillance", key="stop_radar"):
+                st.session_state.radar_running = False
+                st.success("Radar surveillance stopped!")
         
         if st.session_state.radar_data:
             st.subheader("Radar and ADS-B Tracking")
             fig = display_radar(st.session_state.radar_data)
             if fig:
                 st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']])
+            st.dataframe(
+                pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']],
+                use_container_width=True,
+                column_config={
+                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+                    "latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+                    "longitude": st.column_config.NumberColumn("Longitude", format="%.4f")
+                }
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Drone Detection":
         st.header("Real-Time Drone Intrusion Detection")
-        detection_interval = st.slider("Detection Interval (seconds)", 60, 300, 120)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        detection_interval = st.slider("Detection Interval (seconds)", 60, 300, 120, help="Drone scan frequency")
         
         if 'drone_running' not in st.session_state:
             st.session_state.drone_running = False
             st.session_state.drone_results = []
         
-        if st.button("Start Drone Detection"):
-            st.session_state.drone_running = True
-            threading.Thread(
-                target=periodic_drone_detection,
-                args=(detection_interval,),
-                daemon=True
-            ).start()
-            st.success("Real-time drone detection started!")
-        
-        if st.button("Stop Drone Detection"):
-            st.session_state.drone_running = False
-            st.success("Real-time drone detection stopped.")
-        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Drone Detection", key="start_drone"):
+                st.session_state.drone_running = True
+                threading.Thread(
+                    target=periodic_drone_detection,
+                    args=(detection_interval,),
+                    daemon=True
+                ).start()
+                st.success("Real-time drone detection started!")
+        with col2:
+            if st.button("Stop Drone Detection", key="stop_drone"):
+                st.session_state.drone_running = False
+                st.success("Drone detection completed successfully.")
+            
         if st.session_state.drone_results:
             st.subheader("Detected Drone Intrusions")
-            st.dataframe(pd.DataFrame(st.session_state.drone_results))
+            st.dataframe(
+                pd.DataFrame(st.session_state.drone_results),
+                use_container_width=True,
+                column_config={
+                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+                    "altitude": st.column_config["altitude"]("Altitude", format="%.0f"),
+                    "status": st.column_config.TextColumn("Status", help="Drone authorization status")
+                })
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Threat Intelligence":
         st.header("Real-Time Cyber Threat Intelligence")
-        otx_api_key = st.text_input("AlienVault OTX API Key (optional)", type="password")
-        threat_feed = st.text_area("Manual Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found")
-        fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        otx_api_key = st.text_input("AlienVault OTX API Key (optional)", type="password", help="Enter your OTX API key (leave blank for sample data)")
+        threat_feed = st.text_area("Manual Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found", help="Enter manual threat feeds")
+        fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
         
         if 'threat_running' not in st.session_state:
             st.session_state.threat_running = False
             st.session_state.threats = []
         
-        if st.button("Start Real-Time Threat Analysis"):
-            st.session_state.threat_running = True
-            if threat_feed:
-                threats = analyze_threat_feeds(threat_feed.split('\n'))
-                st.session_state.threats = threats
-            threading.Thread(
-                target=periodic_threat_fetch,
-                args=(otx_api_key, fetch_interval),
-                daemon=True
-            ).start()
-            st.success("Real-time threat analysis started!")
-        
-        if st.button("Stop Threat Analysis"):
-            st.session_state.threat_running = False
-            st.success("Real-time threat analysis stopped.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Real-Time Threat Analysis", key="start_threat"):
+                st.session_state.threat_running = True
+                if threat_feed:
+                    threats = analyze_threat_feeds(threat_feed.split('\n"))
+                    st.session_state.threats = threats
+                threading.Thread(
+                    target=periodic_threat_fetch,
+                    args=(otx_api_key, fetch_interval),
+                    daemon=True
+                ).start()
+                st.success("Real-time threat analysis started!")
+        with col2:
+            if st.button("Stop Threat Analysis", key="stop_threat"):
+                st.session_state.threat_running = False
+                st.success("Real-time threat analysis stopped.")
         
         if st.session_state.threats:
-            st.write("Detected Threats:")
+            st.subheader("Detected Threats")
             for threat in st.session_state.threats:
                 st.write(f"- {threat}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Compliance & Reporting":
         st.header("Compliance & Reporting")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("Compliance Metrics")
         st.write(st.session_state.compliance_metrics)
         
-        if st.button("Generate Report"):
+        if st.button("Generate Report", key="generate_report", help="Download compliance report"):
             buffer = io.BytesIO()
             doc = SimpleDocTemplate(buffer, pagesize=letter)
-            styles = getSampleStyleSheet()
+            styles = doc.getSampleStyleSheet()
             elements = []
             
             elements.append(Paragraph("NAMA IDPS Report", styles['Title']))
             elements.append(Spacer(1, 12))
-            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
+            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal'])))
             elements.append(Spacer(1, 12))
             
             if st.session_state.alert_log:
                 elements.append(Paragraph("Recent Alerts", styles['Heading2']))
                 alert_data = [[a['timestamp'], a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
-                alert_table = Table([['Timestamp', 'Type', 'Severity', 'Details']] + alert_data)
+                alert_table = Table([[['Timestamp', 'Type', 'Severity', 'Details']] + alert_data)
                 alert_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('FONTSIZE', (0, 0), (-1, 0), 14),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                     ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
+                ])))
                 elements.append(alert_table)
             
             doc.build(elements)
             buffer.seek(0)
             b64 = base64.b64encode(buffer.getvalue()).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="nama_idps_report.pdf">Download Report</a>'
+            href = f'<a href="data:application/pdf;base64, {b64}" download="nama_idps_report.pdf">Download Report</a>'
             st.markdown(href, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     elif menu == "Settings":
         st.header("System Settings")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.write("Configure system settings here.")
-        st.session_state.theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
-        if st.button("Logout"):
+        st.session_state.theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1, help="Select theme")
+        if st.button("Logout", key="logout"):
             st.session_state.authenticated = False
             st.session_state.username = None
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
