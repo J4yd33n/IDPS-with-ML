@@ -1488,7 +1488,7 @@ def main():
             if st.button("Start Real-Time Threat Analysis", key="start_threat"):
                 st.session_state.threat_running = True
                 if threat_feed:
-                    threats = analyze_threat_feeds(threat_feed.split('\n"))
+                    threats = analyze_threat_feeds(threat_feed.split('\n'))
                     st.session_state.threats = threats
                 threading.Thread(
                     target=periodic_threat_fetch,
