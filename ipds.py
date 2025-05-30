@@ -1537,7 +1537,7 @@ def main():
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                     ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ])))
+                ]))
                 elements.append(alert_table)
             
             doc.build(elements)
