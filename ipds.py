@@ -1,9 +1,9 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 import logging
 import os
@@ -13,19 +13,20 @@ import io
 import requests
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.cluster import KMeans
 from xgboost import XGBClassifier
-from sklearn.ensemble import IsolationForest
-from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from transformers import pipeline
 import re
-from collections import deque
 import time
+import threading
+from scipy.interpolate import interp1d
+from geopy.distance import geodesic
 
 # Check for optional dependencies
 try:
@@ -62,24 +63,24 @@ LOW_IMPORTANCE_FEATURES = [
 ]
 CATEGORICAL_COLS = ['protocol_type', 'service', 'flag']
 
-# Wicket-inspired theme with new color palette
+# Wicket-inspired theme
 WICKET_THEME = {
-    "primary_bg": "#0A0F2D",  # Deep Space Blue
+    "primary_bg": "#0A0F2D",
     "secondary_bg": "#1E2A44",
-    "accent": "#00D4FF",      # Neon Cyan
+    "accent": "#00D4FF",
     "text": "#E6E6FA",
     "text_light": "#FFFFFF",
     "card_bg": "rgba(30, 42, 68, 0.7)",
-    "border": "#3B82F6",      # Electric Blue
+    "border": "#3B82F6",
     "button_bg": "#00D4FF",
     "button_text": "#0A0F2D",
     "hover": "#3B82F6",
-    "error": "#FF4D4D",       # Cyber Red
-    "success": "#00FF99"      # Neon Green
+    "error": "#FF4D4D",
+    "success": "#00FF99"
 }
 
-# Apply updated CSS with futuristic fonts and airspace-themed elements
-def apply_wicket_css(theme_mode='dark'):
+# Apply CSS
+def apply_wicket_css():
     css = f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap');
@@ -185,9 +186,8 @@ def apply_wicket_css(theme_mode='dark'):
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
             }}
-            /* Authentication UI */
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg') no-repeat center center fixed;
+                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/airplane.jpg') no-repeat center center fixed;
                 background-size: cover;
                 position: relative;
                 min-height: 100vh;
@@ -275,7 +275,6 @@ def apply_wicket_css(theme_mode='dark'):
                 color: {WICKET_THEME['hover']};
                 text-shadow: 0 0 8px {WICKET_THEME['hover']};
             }}
-            /* Radar Animation */
             .radar {{
                 position: absolute;
                 bottom: 20px;
@@ -310,46 +309,6 @@ def apply_wicket_css(theme_mode='dark'):
                 0% {{ opacity: 0; transform: translateY(20px); }}
                 100% {{ opacity: 1; transform: translateY(0); }}
             }}
-            @keyframes shake {{
-                0%, 100% {{ transform: translateX(0); }}
-                20%, 60% {{ transform: translateX(-10px); }}
-                40%, 80% {{ transform: translateX(10px); }}
-            }}
-            .shake {{
-                animation: shake 0.4s ease-in-out;
-            }}
-            .glitch {{
-                position: relative;
-                color: {WICKET_THEME['text_light']};
-                font-family: 'Orbitron', sans-serif;
-                animation: glitchText 2s infinite;
-            }}
-            .glitch:before, .glitch:after {{
-                content: 'NAMA IDPS';
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-            }}
-            .glitch:before {{
-                color: {WICKET_THEME['accent']};
-                transform: translate(-3px, 3px);
-                animation: glitchShift 1s infinite;
-            }}
-            .glitch:after {{
-                color: {WICKET_THEME['error']};
-                transform: translate(3px, -3px);
-                animation: glitchShift 1.5s infinite;
-            }}
-            @keyframes glitchText {{
-                0%, 100% {{ opacity: 1; }}
-                50% {{ opacity: 0.8; }}
-            }}
-            @keyframes glitchShift {{
-                0% {{ clip-path: inset(0 0 20% 0); }}
-                50% {{ clip-path: inset(20% 0 0 0); }}
-                100% {{ clip-path: inset(0 0 20% 0); }}
-            }}
         </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -371,6 +330,22 @@ if 'equipment_status' not in st.session_state:
     st.session_state.equipment_status = []
 if 'theme_mode' not in st.session_state:
     st.session_state.theme_mode = 'dark'
+if 'scan_results' not in st.session_state:
+    st.session_state.scan_results = []
+if 'atc_results' not in st.session_state:
+    st.session_state.atc_results = []
+if 'atc_anomalies' not in st.session_state:
+    st.session_state.atc_anomalies = pd.DataFrame()
+if 'threats' not in st.session_state:
+    st.session_state.threats = []
+if 'drone_results' not in st.session_state:
+    st.session_state.drone_results = []
+if 'radar_data' not in st.session_state:
+    st.session_state.radar_data = []
+if 'flight_conflicts' not in st.session_state:
+    st.session_state.flight_conflicts = []
+if 'optimized_routes' not in st.session_state:
+    st.session_state.optimized_routes = []
 
 # User database setup
 def setup_user_db():
@@ -385,7 +360,6 @@ def setup_user_db():
         timestamp TEXT,
         action TEXT
     )''')
-    # Check if default user exists, if not, create it
     c.execute("SELECT username FROM users WHERE username = ?", ('nama',))
     if not c.fetchone() and BCRYPT_AVAILABLE:
         default_password = 'admin'
@@ -407,8 +381,7 @@ def register_user(username, password):
     conn = sqlite3.connect('nama_users.db')
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)",
-                  (username, hashed))
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
         conn.commit()
     except sqlite3.IntegrityError:
         return False
@@ -486,8 +459,117 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
         st.error(f"Preprocessing error: {str(e)}")
         return None, label_encoders, le_class
 
+# Radar Surveillance
+def simulate_radar_data(num_targets=5, region=None):
+    try:
+        if region is None:
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
+        radar_data = []
+        for i in range(num_targets):
+            radar_data.append({
+                'target_id': f"RAD{i:03d}",
+                'timestamp': pd.Timestamp.now(),
+                'latitude': np.random.uniform(region['lat_min'], region['lat_max']),
+                'longitude': np.random.uniform(region['lon_min'], region['lon_max']),
+                'altitude': np.random.uniform(0, 40000),
+                'velocity': np.random.uniform(0, 600),
+                'heading': np.random.uniform(0, 360),
+                'source': 'radar'
+            })
+        log_user_activity("system", f"Simulated radar data for {num_targets} targets")
+        return radar_data
+    except Exception as e:
+        logger.error(f"Radar simulation error: {str(e)}")
+        st.error(f"Radar simulation error: {str(e)}")
+        return []
+
+def merge_radar_adsb(radar_data, adsb_data):
+    try:
+        radar_df = pd.DataFrame(radar_data)
+        adsb_df = pd.DataFrame(adsb_data)
+        if not radar_df.empty:
+            radar_df['icao24'] = radar_df['target_id']
+        if not adsb_df.empty:
+            adsb_df['target_id'] = adsb_df['icao24']
+            adsb_df['source'] = 'ads-b'
+            adsb_df['heading'] = np.random.uniform(0, 360, len(adsb_df))  # Simulated heading
+        combined = pd.concat([radar_df, adsb_df], ignore_index=True)
+        return combined.to_dict('records')
+    except Exception as e:
+        logger.error(f"Radar-ADS-B merge error: {str(e)}")
+        st.error(f"Radar-ADS-B merge error: {str(e)}")
+        return adsb_data
+
+def display_radar(data):
+    try:
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.warning("No radar data available")
+            return None
+        fig = go.Figure()
+        # Radar sweep effect
+        fig.add_trace(go.Scatterpolar(
+            r=[0, 10, 0],
+            theta=[0, 45, 90],
+            mode='lines',
+            line=dict(color=WICKET_THEME['accent'], width=1),
+            fill='toself',
+            opacity=0.3,
+            name='Radar Sweep'
+        ))
+        # Aircraft positions
+        for source in df['source'].unique():
+            source_df = df[df['source'] == source]
+            fig.add_trace(go.Scattergeo(
+                lon=source_df['longitude'],
+                lat=source_df['latitude'],
+                mode='markers',
+                marker=dict(
+                    size=10,
+                    color=WICKET_THEME['accent'] if source == 'ads-b' else WICKET_THEME['error'],
+                    symbol='circle',
+                    line=dict(width=1, color=WICKET_THEME['text'])
+                ),
+                text=source_df['target_id'],
+                hoverinfo='text',
+                name=source.capitalize()
+            ))
+        fig.update_layout(
+            geo=dict(
+                scope='africa',
+                showland=True,
+                landcolor=WICKET_THEME['secondary_bg'],
+                showocean=True,
+                oceancolor=WICKET_THEME['primary_bg'],
+                showcountries=True,
+                countrycolor=WICKET_THEME['border'],
+                projection_type='mercator',
+                center=dict(lat=9, lon=7),
+                lataxis=dict(range=[4, 14]),
+                lonaxis=dict(range=[2, 15])
+            ),
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            margin=dict(l=10, r=10, t=30, b=10),
+            title=dict(text="Real-Time Radar Surveillance", font=dict(color=WICKET_THEME['text_light']))
+        )
+        return fig
+    except Exception as e:
+        logger.error(f"Radar display error: {str(e)}")
+        st.error(f"Radar display error: {str(e)}")
+        return None
+
+def periodic_radar_update(num_targets, region, interval=60):
+    while 'radar_running' in st.session_state and st.session_state.radar_running:
+        radar_data = simulate_radar_data(num_targets, region)
+        adsb_data = st.session_state.atc_results
+        combined_data = merge_radar_adsb(radar_data, adsb_data)
+        st.session_state.radar_data = combined_data
+        time.sleep(interval)
+
 # Real-time NMAP scan
-def run_nmap_scan(target, scan_type, port_range, custom_args, callback=None):
+def run_nmap_scan(target, scan_type, port_range, custom_args):
     try:
         if not NMAP_AVAILABLE:
             raise ImportError("python-nmap library is not installed.")
@@ -495,7 +577,6 @@ def run_nmap_scan(target, scan_type, port_range, custom_args, callback=None):
         scan_args = {'TCP SYN': '-sS', 'TCP Connect': '-sT', 'UDP': '-sU'}
         args = f"{scan_args[scan_type]} {custom_args}"
         
-        # Store results in a list
         scan_results = []
         
         def scan_callback(host, scan_data):
@@ -511,11 +592,12 @@ def run_nmap_scan(target, scan_type, port_range, custom_args, callback=None):
                                 'state': state,
                                 'service': service
                             })
+                st.session_state.scan_results = scan_results
         
         nm.scan(target, port_range, arguments=args, callback=scan_callback)
         with st.spinner("Scanning in progress..."):
             while nm.still_scanning():
-                time.sleep(0.1)  # Avoid blocking the UI
+                time.sleep(0.1)
         
         log_user_activity("system", f"Real-time NMAP scan on {target}")
         return scan_results
@@ -523,6 +605,12 @@ def run_nmap_scan(target, scan_type, port_range, custom_args, callback=None):
         logger.error(f"NMAP scan error: {str(e)}")
         st.warning(f"NMAP scan error: {str(e)}. Using simulated scan.")
         return simulate_nmap_scan(target, scan_type, port_range)
+
+def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=300):
+    while 'nmap_running' in st.session_state and st.session_state.nmap_running:
+        results = run_nmap_scan(target, scan_type, port_range, custom_args)
+        st.session_state.scan_results = results
+        time.sleep(interval)
 
 # Simulated NMAP scan
 def simulate_nmap_scan(target, scan_type, port_range):
@@ -555,25 +643,37 @@ def simulate_nmap_scan(target, scan_type, port_range):
         st.error(f"NMAP simulation error: {str(e)}")
         return []
 
-# Fetch real ADS-B data
-def fetch_adsb_data(num_samples=10):
+# Enhanced ADS-B Data Fetching
+@st.cache_data(ttl=60)
+def fetch_adsb_data(num_samples=10, region=None):
     try:
+        if region is None:
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
         username = st.secrets.get('OPENSKY_USERNAME', os.getenv('OPENSKY_USERNAME'))
         password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('OPENSKY_PASSWORD'))
+        params = {
+            'lamin': region['lat_min'], 'lomin': region['lon_min'],
+            'lamax': region['lat_max'], 'lomax': region['lon_max']
+        }
         url = "https://opensky-network.org/api/states/all"
-        for attempt in range(2):
+        for attempt in range(3):
             if username and password:
-                response = requests.get(url, auth=(username, password))
+                response = requests.get(url, auth=(username, password), params=params, timeout=10)
             else:
-                response = requests.get(url)
+                response = requests.get(url, params=params, timeout=10)
                 logger.info("No credentials provided; using anonymous ADS-B access")
             if response.status_code == 200:
-                data = response.json()['states'][:num_samples]
+                data = response.json()['states']
+                if not data:
+                    logger.warning("No ADS-B data in region. Using simulated data.")
+                    return simulate_aviation_traffic(num_samples, region)
+                data = data[:num_samples]
                 airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
                 adsb_records = []
                 for state in data:
                     adsb_records.append({
                         'timestamp': pd.Timestamp.now(),
+                        'icao24': state[0] if state[0] else 'unknown',
                         'protocol_type': 'ads-b',
                         'service': 'flight_data',
                         'src_bytes': np.random.randint(100, 1000),
@@ -600,30 +700,71 @@ def fetch_adsb_data(num_samples=10):
                         'dst_host_srv_serror_rate': 0.0,
                         'dst_host_rerror_rate': 0.0,
                         'dst_host_srv_rerror_rate': 0.0,
-                        'latitude': state[6] if state[6] is not None else 0.0,
-                        'longitude': state[5] if state[5] is not None else 0.0,
-                        'altitude': state[7] if state[7] is not None else 0.0,
-                        'velocity': state[9] if state[9] is not None else 0.0
+                        'latitude': state[6] if state[6] is not None else np.random.uniform(region['lat_min'], region['lat_max']),
+                        'longitude': state[5] if state[5] is not None else np.random.uniform(region['lon_min'], region['lon_max']),
+                        'altitude': state[7] if state[7] is not None else np.random.uniform(0, 40000),
+                        'velocity': state[9] if state[9] is not None else np.random.uniform(0, 600)
                     })
-                log_user_activity("system", "Fetched real ADS-B data")
+                log_user_activity("system", f"Fetched {len(adsb_records)} ADS-B records")
                 return adsb_records
             elif response.status_code == 429:
                 logger.warning("Rate limit exceeded. Retrying after delay...")
-                time.sleep(5)
+                time.sleep(10 * (attempt + 1))
                 continue
             else:
                 raise Exception(f"Failed to fetch ADS-B data: {response.status_code}")
     except Exception as e:
         logger.error(f"ADS-B fetch error: {str(e)}")
-        st.warning("Unable to fetch real ADS-B data. Using simulated data.")
-        return simulate_aviation_traffic(num_samples)
+        st.warning(f"ADS-B fetch error: {str(e)}. Using simulated data.")
+        return simulate_aviation_traffic(num_samples, region)
+
+def periodic_adsb_fetch(num_samples, region, interval=60):
+    while 'adsb_running' in st.session_state and st.session_state.adsb_running:
+        traffic_data = fetch_adsb_data(num_samples, region)
+        traffic_df = pd.DataFrame(traffic_data)
+        traffic_df, anomalies = detect_air_traffic_anomalies(traffic_df)
+        results = []
+        for _, row in traffic_df.iterrows():
+            prediction, confidence = predict_traffic(
+                pd.DataFrame([row]), st.session_state.model, st.session_state.scaler,
+                st.session_state.label_encoders, st.session_state.le_class
+            )
+            results.append({
+                'timestamp': row['timestamp'],
+                'icao24': row['icao24'],
+                'airport_code': row['airport_code'],
+                'prediction': prediction,
+                'confidence': confidence,
+                'latitude': row['latitude'],
+                'longitude': row['longitude'],
+                'altitude': row['altitude'],
+                'velocity': row['velocity'],
+                'source': 'ads-b'
+            })
+        st.session_state.atc_results = results
+        st.session_state.atc_anomalies = anomalies
+        conflicts = detect_collision_risks(results)
+        st.session_state.flight_conflicts = conflicts
+        routes = optimize_traffic_flow(results)
+        st.session_state.optimized_routes = routes
+        if anomalies.empty and not conflicts:
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'ATC Monitoring',
+                'severity': 'low',
+                'details': f"Fetched {len(traffic_data)} ADS-B records, no anomalies or conflicts"
+            })
+        time.sleep(interval)
 
 # Simulate aviation traffic
-def simulate_aviation_traffic(num_samples=10):
+def simulate_aviation_traffic(num_samples=10, region=None):
     try:
-        airports = ['DNMM', 'DNAA', 'DNHT', 'DNPO']
+        if region is None:
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
+        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
         data = {
             'timestamp': pd.date_range(start='now', periods=num_samples, freq='S'),
+            'icao24': [f"ICAO{i:06d}" for i in range(num_samples)],
             'protocol_type': np.random.choice(['ads-b', 'acars', 'tcp'], num_samples),
             'service': np.random.choice(['atc', 'flight_data', 'other'], num_samples),
             'src_bytes': np.random.randint(100, 1000, num_samples),
@@ -650,8 +791,8 @@ def simulate_aviation_traffic(num_samples=10):
             'dst_host_srv_serror_rate': np.random.uniform(0, 1, num_samples),
             'dst_host_rerror_rate': np.random.uniform(0, 1, num_samples),
             'dst_host_srv_rerror_rate': np.random.uniform(0, 1, num_samples),
-            'latitude': np.random.uniform(4, 14, num_samples),
-            'longitude': np.random.uniform(2, 15, num_samples),
+            'latitude': np.random.uniform(region['lat_min'], region['lat_max'], num_samples),
+            'longitude': np.random.uniform(region['lon_min'], region['lon_max'], num_samples),
             'altitude': np.random.uniform(0, 40000, num_samples),
             'velocity': np.random.uniform(0, 600, num_samples)
         }
@@ -679,73 +820,99 @@ def detect_air_traffic_anomalies(df):
         st.error(f"Air traffic anomaly detection error: {str(e)}")
         return df, pd.DataFrame()
 
-# RF Signal Intrusion Detection (Simulated)
-def detect_rf_signal_intrusion(signal_data):
+# Flight Data Processing: Conflict Prediction
+def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=300):
     try:
-        model = RandomForestClassifier(random_state=42)
-        X = signal_data[['frequency', 'amplitude', 'noise_level']]
-        y = signal_data['label']
-        model.fit(X, y)
-        predictions = model.predict(X)
-        signal_data['intrusion'] = predictions
-        intrusions = signal_data[signal_data['intrusion'] == 1]
-        log_user_activity("system", f"Detected {len(intrusions)} RF signal intrusions")
-        return signal_data, intrusions
+        df = pd.DataFrame(traffic_data)
+        risks = []
+        for i, row1 in df.iterrows():
+            for j, row2 in df.iloc[i+1:].iterrows():
+                if row1['icao24'] == row2['icao24']:
+                    continue
+                pos1 = (row1['latitude'], row1['longitude'])
+                pos2 = (row2['latitude'], row2['longitude'])
+                dist = geodesic(pos1, pos2).km
+                vel1 = row1['velocity'] * np.array([np.cos(np.radians(row1.get('heading', 0))), np.sin(np.radians(row1.get('heading', 0)))])
+                vel2 = row2['velocity'] * np.array([np.cos(np.radians(row2.get('heading', 0))), np.sin(np.radians(row2.get('heading', 0)))])
+                rel_vel = np.linalg.norm(vel1 - vel2)
+                time_to_collision = dist / (rel_vel / 3600) if rel_vel > 0 else float('inf')
+                if dist < distance_threshold and time_to_collision < time_threshold:
+                    risks.append({
+                        'icao24_1': row1['icao24'],
+                        'icao24_2': row2['icao24'],
+                        'distance_km': dist,
+                        'time_to_collision_sec': time_to_collision,
+                        'severity': 'critical' if time_to_collision < 60 else 'high'
+                    })
+        if risks:
+            for risk in risks:
+                st.session_state.alert_log.append({
+                    'timestamp': datetime.now(),
+                    'type': 'Flight Conflict',
+                    'severity': risk['severity'],
+                    'details': f"Potential collision between {risk['icao24_1']} and {risk['icao24_2']}: {risk['distance_km']:.2f}km, {risk['time_to_collision_sec']:.0f}s"
+                })
+        log_user_activity("system", f"Detected {len(risks)} flight conflicts")
+        return risks
     except Exception as e:
-        logger.error(f"RF signal intrusion detection error: {str(e)}")
-        st.error(f"RF signal intrusion detection error: {str(e)}")
-        return signal_data, pd.DataFrame()
+        logger.error(f"Collision risk detection error: {str(e)}")
+        st.error(f"Collision risk detection error: {str(e)}")
+        return []
 
-# Insider Threat Detection
-def detect_insider_threats(username, actions, sequence_length=5):
+# Flight Data Processing: Traffic Flow Optimization
+def optimize_traffic_flow(traffic_data, num_clusters=3):
     try:
-        if username not in st.session_state.user_activity:
-            st.session_state.user_activity[username] = deque(maxlen=sequence_length)
-        st.session_state.user_activity[username].append(actions)
-        
-        if len(st.session_state.user_activity[username]) < sequence_length:
-            return False, 0.0
-        
-        model = Sequential([
-            LSTM(50, input_shape=(sequence_length, 1)),
-            Dense(1, activation='sigmoid')
-        ])
-        model.compile(optimizer='adam', loss='binary_crossentropy')
-        
-        X = np.array(list(st.session_state.user_activity[username])).reshape(1, sequence_length, 1)
-        score = model.predict(X)[0][0]
-        is_threat = score > 0.7
-        log_user_activity(username, f"Insider threat score: {score:.2f}")
-        return is_threat, score
+        df = pd.DataFrame(traffic_data)
+        if len(df) < 2:
+            return []
+        features = ['latitude', 'longitude', 'altitude']
+        X = df[features].fillna(0)
+        kmeans = KMeans(n_clusters=min(num_clusters, len(X)), random_state=42)
+        df['cluster'] = kmeans.fit_predict(X)
+        routes = []
+        for cluster in df['cluster'].unique():
+            cluster_df = df[df['cluster'] == cluster]
+            centroid = {
+                'latitude': cluster_df['latitude'].mean(),
+                'longitude': cluster_df['longitude'].mean(),
+                'altitude': cluster_df['altitude'].mean()
+            }
+            routes.append({
+                'cluster': cluster,
+                'icao24_list': cluster_df['icao24'].tolist(),
+                'suggested_route': centroid,
+                'aircraft_count': len(cluster_df)
+            })
+        log_user_activity("system", f"Optimized traffic flow for {len(routes)} clusters")
+        return routes
     except Exception as e:
-        logger.error(f"Insider threat detection error: {str(e)}")
-        st.error(f"Insider threat detection error: {str(e)}")
-        return False, 0.0
+        logger.error(f"Traffic flow optimization error: {str(e)}")
+        st.error(f"Traffic flow optimization error: {str(e)}")
+        return []
 
-# Predictive Maintenance with Security Alerts
-def predict_maintenance_anomalies(equipment_data):
+# Threat Intelligence (Transformers Bypassed)
+def fetch_threat_feeds(api_key=None):
     try:
-        features = ['temperature', 'vibration', 'uptime']
-        X = equipment_data[features].fillna(0)
-        model = IsolationForest(contamination=0.05, random_state=42)
-        model.fit(X)
-        predictions = model.predict(X)
-        equipment_data['anomaly'] = predictions == -1
-        anomalies = equipment_data[equipment_data['anomaly']]
-        log_user_activity("system", f"Detected {len(anomalies)} equipment anomalies")
-        return equipment_data, anomalies
+        if not api_key:
+            logger.warning("No OTX API key provided. Using sample data.")
+            return ["Suspicious IP 192.168.1.100 detected", "Malware signature found"]
+        url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+        headers = {"X-OTX-API-KEY": api_key}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            pulses = response.json().get('results', [])
+            feeds = [pulse['description'] for pulse in pulses if pulse.get('description')]
+            return feeds[:10]
+        else:
+            raise Exception(f"Failed to fetch OTX feeds: {response.status_code}")
     except Exception as e:
-        logger.error(f"Equipment anomaly detection error: {str(e)}")
-        st.error(f"Equipment anomaly detection error: {str(e)}")
-        return equipment_data, pd.DataFrame()
+        logger.error(f"OTX fetch error: {str(e)}")
+        return []
 
-# Real-time Cyber Threat Intelligence
 def analyze_threat_feeds(text_data):
     try:
-        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-        labels = ["threat", "benign"]
-        results = classifier(text_data, labels, multi_label=False)
-        threats = [text for text, score in zip(text_data, results['scores']) if score > 0.7 and results['labels'][score.index()] == "threat"]
+        st.warning("Transformers disabled due to import error. Using regex.")
+        threats = [text for text in text_data if re.search(r'suspicious|malware|attack|intrusion', text, re.I)]
         log_user_activity("system", f"Detected {len(threats)} cyber threats")
         return threats
     except Exception as e:
@@ -753,555 +920,377 @@ def analyze_threat_feeds(text_data):
         st.error(f"Threat intelligence error: {str(e)}")
         return []
 
-# Autonomous Drone Intrusion Classification
-def classify_drone_intrusion(signal_data):
-    try:
-        model = RandomForestClassifier(random_state=42)
-        X = signal_data[['frequency', 'power_level']]
-        y = signal_data['label']
-        model.fit(X, y)
-        predictions = model.predict(X)
-        signal_data['intrusion'] = predictions
-        intrusions = signal_data[signal_data['intrusion'] == 1]
-        log_user_activity("system", f"Detected {len(intrusions)} drone intrusions")
-        return signal_data, intrusions
-    except Exception as e:
-        logger.error(f"Drone intrusion classification error: {str(e)}")
-        st.error(f"Drone intrusion classification error: {str(e)}")
-        return signal_data, pd.DataFrame()
-
-# ML-based Log File Analyzer for SCADA
-def analyze_scada_logs(logs, sequence_length=10):
-    try:
-        model = Sequential([
-            LSTM(100, input_shape=(sequence_length, 1)),
-            Dense(1, activation='sigmoid')
-        ])
-        model.compile(optimizer='adam', loss='binary_crossentropy')
-        
-        sequences = []
-        for i in range(len(logs) - sequence_length):
-            sequences.append(logs[i:i+sequence_length])
-        X = np.array(sequences).reshape(-1, sequence_length, 1)
-        predictions = model.predict(X)
-        anomalies = [logs[i+sequence_length] for i, p in enumerate(predictions) if p > 0.7]
-        log_user_activity("system", f"Detected {len(anomalies)} SCADA log anomalies")
-        return anomalies
-    except Exception as e:
-        logger.error(f"SCADA log analysis error: {str(e)}")
-        st.error(f"SCADA log analysis error: {str(e)}")
-        return []
-
-# Cyber-Physical System Attack Simulation & Detection
-def simulate_cps_attack(data, attack_type='mitm'):
-    try:
-        if attack_type == 'mitm':
-            data['latency'] = data['latency'] * np.random.uniform(1.5, 3.0, len(data))
-        model = IsolationForest(contamination=0.1, random_state=42)
-        X = data[['latency', 'packet_loss']]
-        model.fit(X)
-        predictions = model.predict(X)
-        data['attack'] = predictions == -1
-        attacks = data[data['attack']]
-        log_user_activity("system", f"Detected {len(attacks)} CPS attacks")
-        return data, attacks
-    except Exception as e:
-        logger.error(f"CPS attack simulation error: {str(e)}")
-        st.error(f"CPS attack simulation error: {str(e)}")
-        return data, pd.DataFrame()
-
-# Retrain model
-def retrain_model(df, label_encoders, le_class):
-    try:
-        df_processed, label_encoders, le_class = preprocess_data(df, label_encoders, le_class, is_train=True)
-        if df_processed is None:
-            return None, None, None, None
-        X = df_processed.drop(columns=['class'], errors='ignore')
-        y = df_processed['class']
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        model = XGBClassifier(random_state=42)
-        model.fit(X_train_scaled, y_train)
-        joblib.dump(model, 'idps_model.pkl')
-        joblib.dump(scaler, 'scaler.pkl')
-        joblib.dump(label_encoders, 'label_encoders.pkl')
-        joblib.dump(le_class, 'le_class.pkl')
-        log_user_activity("system", "Model retrained")
-        return model, scaler, label_encoders, le_class
-    except Exception as e:
-        logger.error(f"Model retraining error: {str(e)}")
-        st.error(f"Model retraining error: {str(e)}")
-        return None, None, None, None
-
-# Intrusion prediction
-def predict_traffic(input_data, model, scaler, label_encoders, le_class, threshold=0.5):
-    try:
-        input_data = input_data.copy()
-        
-        for col in CATEGORICAL_COLS:
-            if col in input_data.columns:
-                input_data[col] = input_data[col].astype(str)
-                unseen_mask = ~input_data[col].isin(label_encoders[col].classes_)
-                input_data.loc[unseen_mask, col] = 'unknown'
-                if 'unknown' not in label_encoders[col].classes_:
-                    label_encoders[col].classes_ = np.append(label_encoders[col].classes_, 'unknown')
-                input_data[col] = label_encoders[col].transform(input_data[col].astype(str))
-        
-        input_data = input_data.drop(columns=LOW_IMPORTANCE_FEATURES, errors='ignore')
-        
-        expected_features = [col for col in NSL_KDD_COLUMNS if col not in LOW_IMPORTANCE_FEATURES + ['class']]
-        for col in expected_features:
-            if col in input_data.columns:
-                input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
-            else:
-                input_data[col] = 0
-        
-        input_data = input_data[expected_features]
-        input_data_scaled = scaler.transform(input_data)
-        pred_prob = model.predict_proba(input_data_scaled)[:, 1]
-        prediction = (pred_prob >= threshold).astype(int)
-        prediction_label = le_class.inverse_transform(prediction)[0]
-        
-        return prediction_label, pred_prob[0]
-    except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        st.error(f"Prediction error: {str(e)}")
-        return None, None
-
-# Calculate compliance metrics
-def calculate_compliance_metrics(detection_rate, open_ports, alerts, anomalies=0, threats=0):
-    scores = {
-        'Detection Rate': min(100, detection_rate * 100),
-        'Open Ports': max(0, 100 - open_ports * 10),
-        'Alert Frequency': max(0, 100 - alerts * 5),
-        'Anomaly Detection': max(0, 100 - anomalies * 10),
-        'Threat Intelligence': max(0, 100 - threats * 5)
-    }
-    overall = sum(scores.values()) / len(scores)
-    return scores, overall
-
-# PDF report generation
-def generate_nama_report(scan_results=None, atc_results=None, compliance_scores=None, anomalies=None, threats=None):
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        styles = getSampleStyleSheet()
-        story = []
-        
-        story.append(Paragraph("NAMA Cybersecurity Report", styles['Title']))
-        story.append(Spacer(1, 12))
-        story.append(Paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-        story.append(Spacer(1, 12))
-        
-        story.append(Paragraph("Executive Summary", styles['Heading2']))
-        summary_text = ("This report details cybersecurity findings for NAMA's network infrastructure, "
-                       "including network scans, air traffic control monitoring, compliance metrics, "
-                       "anomaly detection, and threat intelligence.")
-        story.append(Paragraph(summary_text, styles['Normal']))
-        story.append(Spacer(1, 12))
-        
-        if scan_results:
-            story.append(Paragraph("Network Scan Results", styles['Heading2']))
-            data = [["Port", "Protocol", "State", "Service"]]
-            open_ports = [r for r in scan_results if r['state'] == 'open']
-            for r in open_ports[:10]:
-                data.append([str(r['port']), r['protocol'], r['state'], r['service']])
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(table)
-            story.append(Paragraph(f"Total open ports: {len(open_ports)}", styles['Normal']))
-            story.append(Spacer(1, 12))
-        
-        if atc_results:
-            story.append(Paragraph("ATC Monitoring Results", styles['Heading2']))
-            intrusions = [r for r in atc_results if r.get('prediction') != 'normal']
-            data = [["Timestamp", "Airport Code", "Prediction", "Confidence"]]
-            for r in intrusions[:10]:
-                data.append([str(r['timestamp']), r['airport_code'], r['prediction'], f"{r['confidence']:.2%}"])
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(table)
-            story.append(Paragraph(f"Total intrusions detected: {len(intrusions)}", styles['Normal']))
-            story.append(Spacer(1, 12))
-        
-        if anomalies is not None and not anomalies.empty:
-            story.append(Paragraph("Air Traffic Anomalies", styles['Heading2']))
-            data = [["Timestamp", "Airport Code", "Latitude", "Longitude", "Altitude"]]
-            for _, row in anomalies.head(10).iterrows():
-                data.append([
-                    str(row['timestamp']),
-                    row['airport_code'],
-                    f"{row['latitude']:.2f}",
-                    f"{row['longitude']:.2f}",
-                    f"{row['altitude']:.0f}"
-                ])
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(table)
-            story.append(Paragraph(f"Total anomalies detected: {len(anomalies)}", styles['Normal']))
-            story.append(Spacer(1, 12))
-        
+def periodic_threat_fetch(api_key, interval=300):
+    while 'threat_running' in st.session_state and st.session_state.threat_running:
+        feeds = fetch_threat_feeds(api_key)
+        threats = analyze_threat_feeds(feeds)
+        st.session_state.threats = threats
         if threats:
-            story.append(Paragraph("Cyber Threat Intelligence", styles['Heading2']))
-            data = [["Threat Description"]]
-            for threat in threats[:10]:
-                display_text = threat[:100] + "..." if len(threat) > 100 else threat
-                data.append([display_text])
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(table)
-            story.append(Paragraph(f"Total threats identified: {len(threats)}", styles['Normal']))
-            story.append(Spacer(1, 12))
-        
-        if compliance_scores:
-            story.append(Paragraph("Compliance Status", styles['Heading2']))
-            data = [["Metric", "Score"]]
-            for metric, score in compliance_scores.items():
-                data.append([metric, f"{score:.1f}%"])
-            table = Table(data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(table)
-            overall_score = sum(compliance_scores.values()) / len(compliance_scores)
-            story.append(Paragraph(f"Overall Compliance Score: {overall_score:.1f}%", styles['Normal']))
-        
-        story.append(Spacer(1, 12))
-        story.append(Paragraph("Recommendations", styles['Heading2']))
-        recommendations = (
-            "- Implement stricter firewall rules for open ports.\n"
-            "- Conduct regular security audits and penetration testing.\n"
-            "- Enhance monitoring of air traffic control systems.\n"
-            "- Train staff on recognizing insider threats.\n"
-            "- Update intrusion detection models with new data."
-        )
-        story.append(Paragraph(recommendations, styles['Normal']))
-        
-        doc.build(story)
-        buffer.seek(0)
-        log_user_activity("system", "Generated NAMA cybersecurity report")
-        return buffer
-    except Exception as e:
-        logger.error(f"Report generation error: {str(e)}")
-        st.error(f"Report generation error: {str(e)}")
-        return None
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'Threat Intelligence',
+                'severity': 'high',
+                'details': f"Detected {len(threats)} cyber threats"
+            })
+        time.sleep(interval)
 
-# Main Streamlit app
+# Main application
 def main():
+    apply_wicket_css()
     setup_user_db()
-    apply_wicket_css(st.session_state.theme_mode)
-    
-    # Load models and encoders
-    try:
-        model = joblib.load('idps_model.pkl')
-        scaler = joblib.load('scaler.pkl')
-        label_encoders = joblib.load('label_encoders.pkl')
-        le_class = joblib.load('le_class.pkl')
-    except FileNotFoundError:
-        st.error("Model files not found. Please train the model first.")
-        model, scaler, label_encoders, le_class = None, None, {}, None
-    
-    # Authentication
+
     if not st.session_state.authenticated:
-        st.markdown("""
-            <div class="auth-container">
-                <div class="auth-overlay"></div>
-                <div class="auth-card">
-                    <h1 class="glitch">NAMA IDPS</h1>
-                    <div class="radar"></div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
+        st.markdown('<div class="auth-form"><h2>NAMA IDPS Login</h2>', unsafe_allow_html=True)
+        username = st.text_input("Username", key="login_username", placeholder="Enter username")
+        password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password")
         
-        tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("Login", key="login_btn", help="Click to login"):
+                if authenticate_user(username, password):
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    log_user_activity(username, "Logged in")
+                    st.success("Login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+        with col2:
+            if st.button("Register", key="register_btn", help="Click to register"):
+                if register_user(username, password):
+                    st.success("Registration successful! Please login.")
+                    log_user_activity(username, "Registered")
+                else:
+                    st.error("Username already exists or registration failed")
         
-        with tab1:
-            with st.form("signin_form"):
-                st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-                st.markdown('<h2>SECURE LOGIN</h2>', unsafe_allow_html=True)
-                email = st.text_input("Email", key="signin_email", help="Enter your email", placeholder="user@domain.com")
-                password = st.text_input("Password", type="password", key="signin_password", help="Enter your password", placeholder="••••••••")
-                st.markdown('<a href="#" class="auth-link">Forgot your password?</a>', unsafe_allow_html=True)
-                submit = st.form_submit_button("Sign In", type="primary")
-                st.markdown('</div>', unsafe_allow_html=True)
-                if submit:
-                    if authenticate_user(email, password):
-                        try:
-                            st.session_state.authenticated = True
-                            st.session_state.username = email
-                            log_user_activity(email, "Logged in")
-                            st.success("Login successful!")
-                            st.rerun()
-                        except Exception as e:
-                            logger.error(f"Session state assignment error: {str(e)}")
-                            st.error("An error occurred during login. Please try again.")
-                    else:
-                        st.markdown("""
-                            <script>
-                                var card = document.querySelector('.auth-card');
-                                card.classList.add('shake');
-                                setTimeout(() => card.classList.remove('shake'), 400);
-                            </script>
-                        """, unsafe_allow_html=True)
-                        st.error("Invalid credentials")
-        
-        with tab2:
-            with st.form("signup_form"):
-                st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-                st.markdown('<h2>REGISTER</h2>', unsafe_allow_html=True)
-                username = st.text_input("Username", key="signup_username", help="Enter your username", placeholder="Choose a username")
-                email = st.text_input("Email", key="signup_email", help="Enter your email", placeholder="user@domain.com")
-                password = st.text_input("Password", type="password", key="signup_password", help="Enter your password", placeholder="••••••••")
-                submit = st.form_submit_button("Sign Up", type="primary")
-                st.markdown('</div>', unsafe_allow_html=True)
-                if submit:
-                    if register_user(username, password):
-                        st.success("User registered successfully! Please sign in.")
-                        log_user_activity(username, "Registered")
-                    else:
-                        st.error("Registration failed: Username already exists or bcrypt is missing")
-        
+        st.markdown('<a href="#" class="auth-link">Forgot Password?</a>', unsafe_allow_html=True)
         st.markdown('</div></div>', unsafe_allow_html=True)
         return
-    
-    # Main dashboard
-    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
-    st.sidebar.selectbox("Theme", ["Dark"], index=0)
-    st.title("NAMA Intrusion Detection and Prevention System")
-    st.markdown(f"Welcome, {st.session_state.username} | [Logout](#)", unsafe_allow_html=True)
-    
-    if st.button("Logout"):
-        st.session_state.authenticated = False
-        st.session_state.username = None
-        log_user_activity(st.session_state.username or "unknown", "Logged out")
-        st.rerun()
-    
-    menu = st.sidebar.selectbox(
-        "Menu",
-        ["Dashboard", "Network Scan", "ATC Monitoring", "Threat Intelligence", "Predictive Maintenance", "Reports", "Model Training"]
-    )
-    
+
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/static/images/nama_logo.jpg", use_column_width=True)
+    menu = st.sidebar.selectbox("Select Module", [
+        "Dashboard", "Network Scan", "ATC Monitoring", "Radar Surveillance",
+        "Drone Detection", "Threat Intelligence", "Compliance & Reporting", "Settings"
+    ])
+
+    # Load ML models
+    try:
+        st.session_state.model = joblib.load('nama_idps_model.pkl')
+        st.session_state.scaler = joblib.load('scaler.pkl')
+        st.session_state.label_encoders = joblib.load('label_encoders.pkl')
+        st.session_state.le_class = joblib.load('le_class.pkl')
+    except Exception:
+        st.session_state.model = XGBClassifier(random_state=42)
+        st.session_state.scaler = StandardScaler()
+        st.session_state.label_encoders = {col: LabelEncoder() for col in CATEGORICAL_COLS}
+        st.session_state.le_class = LabelEncoder()
+        logger.warning("ML models not found. Using defaults.")
+
+    def predict_traffic(df, model, scaler, label_encoders, le_class):
+        try:
+            df_processed, _, _ = preprocess_data(df, label_encoders, le_class, is_train=False)
+            if df_processed is None:
+                return "Error", 0.0
+            features = [col for col in NSL_KDD_COLUMNS if col not in ['class'] + LOW_IMPORTANCE_FEATURES]
+            features = [col for col in features if col in df_processed.columns]
+            X = df_processed[features]
+            X_scaled = scaler.transform(X)
+            prediction = model.predict(X_scaled)
+            confidence = model.predict_proba(X_scaled).max(axis=1)[0]
+            prediction_label = le_class.inverse_transform(prediction)[0]
+            return prediction_label, confidence
+        except Exception as e:
+            logger.error(f"Prediction error: {str(e)}")
+            st.error(f"Prediction error: {str(e)}")
+            return "Error", 0.0
+
     if menu == "Dashboard":
-        st.header("System Dashboard")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Compliance Metrics")
-            detection_rate = len([a for a in st.session_state.alert_log if a['severity'] == 'high']) / max(1, len(st.session_state.alert_log))
-            open_ports = st.session_state.compliance_metrics.get('open_ports', 0)
-            alerts = len(st.session_state.alert_log)
-            scores, overall = calculate_compliance_metrics(detection_rate, open_ports, alerts)
-            st.session_state.compliance_metrics = scores
-            fig = px.bar(
-                x=list(scores.keys()),
-                y=list(scores.values()),
-                title="Compliance Scores",
-                labels={'x': 'Metric', 'y': 'Score (%)'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.metric("Overall Compliance", f"{overall:.1f}%")
-        
-        with col2:
-            st.subheader("Recent Alerts")
-            if st.session_state.alert_log:
-                alert_df = pd.DataFrame(st.session_state.alert_log[-5:])
-                st.dataframe(alert_df[['timestamp', 'type', 'severity']])
-            else:
-                st.info("No alerts recorded.")
-        
-        st.subheader("Network Activity")
-        if st.session_state.analysis_history:
-            history_df = pd.DataFrame(st.session_state.analysis_history)
-            fig = px.line(
-                history_df,
-                x='timestamp',
-                y='confidence',
-                color='prediction',
-                title="Intrusion Detection History"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
+        st.header("NAMA IDPS Dashboard")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("System Overview")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Detection Rate", f"{st.session_state.compliance_metrics['detection_rate']}%")
+        col2.metric("Open Ports", st.session_state.compliance_metrics['open_ports'])
+        col3.metric("Active Alerts", st.session_state.compliance_metrics['alerts'])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("Recent Alerts")
+        if st.session_state.alert_log:
+            alert_df = pd.DataFrame(st.session_state.alert_log)
+            st.dataframe(alert_df[['timestamp', 'type', 'severity', 'details']])
+        else:
+            st.write("No alerts yet.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
     elif menu == "Network Scan":
-        st.header("Network Vulnerability Scan")
+        st.header("Real-Time Network Vulnerability Scan")
         scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
         target = st.text_input("Target IP/Hostname", "192.168.1.1")
         port_range = st.text_input("Port Range", "1-1000")
         custom_args = st.text_input("Custom NMAP Arguments", "-Pn")
+        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300)
         
-        if st.button("Run Scan"):
-            scan_results = run_nmap_scan(target, scan_type, port_range, custom_args)
-            
-            if scan_results:
-                st.session_state.compliance_metrics['open_ports'] = len([r for r in scan_results if r['state'] == 'open'])
-                st.dataframe(pd.DataFrame(scan_results))
-                st.session_state.alert_log.append({
-                    'timestamp': datetime.now(),
-                    'type': 'Network Scan',
-                    'severity': 'medium',
-                    'details': f"Scanned {target}, found {st.session_state.compliance_metrics['open_ports']} open ports"
-                })
-    
+        if 'nmap_running' not in st.session_state:
+            st.session_state.nmap_running = False
+            st.session_state.scan_results = []
+        
+        if st.button("Start Real-Time Scan"):
+            st.session_state.nmap_running = True
+            threading.Thread(
+                target=periodic_nmap_scan,
+                args=(target, scan_type, port_range, custom_args, scan_interval),
+                daemon=True
+            ).start()
+            st.success("Real-time scanning started!")
+        
+        if st.button("Stop Scan"):
+            st.session_state.nmap_running = False
+            st.success("Real-time scanning stopped.")
+        
+        if st.session_state.scan_results:
+            st.subheader("Latest Scan Results")
+            st.dataframe(pd.DataFrame(st.session_state.scan_results))
+            open_ports = len([r for r in st.session_state.scan_results if r['state'] == 'open'])
+            st.session_state.compliance_metrics['open_ports'] = open_ports
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'Network Scan',
+                'severity': 'medium',
+                'details': f"Scanned {target}, found {open_ports} open ports"
+            })
+
     elif menu == "ATC Monitoring":
-        st.header("Air Traffic Control Monitoring")
+        st.header("Real-Time Air Traffic Control Monitoring")
         data_source = st.radio("Data Source", ["Simulated", "Real ADS-B"])
         num_samples = st.slider("Number of Samples", 1, 100, 10)
+        fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60)
+        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"])
+        regions = {
+            "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15},
+            "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15},
+            "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8}
+        }
+        region = regions[region_type]
         
-        if st.button("Analyze Traffic"):
-            if data_source == "Real ADS-B":
-                traffic_data = fetch_adsb_data(num_samples)
+        if 'adsb_running' not in st.session_state:
+            st.session_state.adsb_running = False
+            st.session_state.atc_results = []
+            st.session_state.atc_anomalies = pd.DataFrame()
+            st.session_state.flight_conflicts = []
+            st.session_state.optimized_routes = []
+        
+        if st.button("Start Real-Time Monitoring"):
+            st.session_state.adsb_running = True
+            if data_source == "Simulated":
+                st.session_state.atc_results = simulate_aviation_traffic(num_samples, region)
+                st.session_state.atc_anomalies = pd.DataFrame()
+                st.session_state.flight_conflicts = []
+                st.session_state.optimized_routes = []
             else:
-                traffic_data = simulate_aviation_traffic(num_samples)
+                threading.Thread(
+                    target=periodic_adsb_fetch,
+                    args=(num_samples, region, fetch_interval),
+                    daemon=True
+                ).start()
+            st.success("Real-time ATC monitoring started!")
+        
+        if st.button("Stop Monitoring"):
+            st.session_state.adsb_running = False
+            st.success("Real-time ATC monitoring stopped.")
+        
+        if st.session_state.atc_results:
+            st.subheader("Latest ATC Data")
+            results_df = pd.DataFrame(st.session_state.atc_results)
+            st.dataframe(results_df[['timestamp', 'icao24', 'airport_code', 'prediction', 'confidence', 'latitude', 'longitude', 'altitude']])
             
-            if traffic_data:
-                traffic_df = pd.DataFrame(traffic_data)
-                traffic_df, anomalies = detect_air_traffic_anomalies(traffic_df)
-                
-                results = []
-                for _, row in traffic_df.iterrows():
-                    prediction, confidence = predict_traffic(
-                        pd.DataFrame([row]), model, scaler, label_encoders, le_class
-                    )
-                    results.append({
-                        'timestamp': row['timestamp'],
-                        'airport_code': row['airport_code'],
-                        'prediction': prediction,
-                        'confidence': confidence
-                    })
-                
-                st.session_state.analysis_history.extend(results)
-                st.session_state.atc_results = results
-                
-                st.subheader("Traffic Analysis")
-                st.dataframe(pd.DataFrame(results))
-                
-                if not anomalies.empty:
-                    st.subheader("Detected Anomalies")
-                    st.dataframe(anomalies[['timestamp', 'airport_code', 'latitude', 'longitude', 'altitude']])
-                    st.session_state.alert_log.append({
-                        'timestamp': datetime.now(),
-                        'type': 'ATC Anomaly',
-                        'severity': 'high',
-                        'details': f"Detected {len(anomalies)} air traffic anomalies"
-                    })
-                
-                # Visualization
-                fig = px.scatter(
-                    traffic_df,
+            if not st.session_state.atc_anomalies.empty:
+                st.subheader("Detected Anomalies")
+                st.dataframe(st.session_state.atc_anomalies[['timestamp', 'icao24', 'airport_code', 'latitude', 'longitude', 'altitude']])
+            
+            if st.session_state.flight_conflicts:
+                st.subheader("Flight Conflicts")
+                st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
+            
+            if st.session_state.optimized_routes:
+                st.subheader("Optimized Traffic Routes")
+                routes_df = pd.DataFrame([
+                    {'cluster': r['cluster'], 'aircraft_count': r['aircraft_count'],
+                     'suggested_latitude': r['suggested_route']['latitude'],
+                     'suggested_longitude': r['suggested_route']['longitude'],
+                     'suggested_altitude': r['suggested_route']['altitude']}
+                    for r in st.session_state.optimized_routes
+                ])
+                st.dataframe(routes_df)
+                fig_routes = px.scatter(
+                    results_df,
                     x='longitude',
                     y='latitude',
+                    color='airport_code',
                     size='altitude',
-                    color='anomaly',
-                    hover_data=['airport_code', 'velocity'],
-                    title="Air Traffic Visualization"
+                    title="Optimized Traffic Flow",
+                    hover_data=['icao24']
                 )
-                st.plotly_chart(fig, use_container_width=True)
-    
-    elif menu == "Threat Intelligence":
-        st.header("Cyber Threat Intelligence")
-        threat_feed = st.text_area("Enter Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found")
-        if st.button("Analyze Threats"):
-            threats = analyze_threat_feeds(threat_feed.split('\n'))
-            if threats:
-                st.session_state.threats = threats
-                st.write("Detected Threats:")
-                for threat in threats:
-                    st.write(f"- {threat}")
-                st.session_state.alert_log.append({
-                    'timestamp': datetime.now(),
-                    'type': 'Threat Intelligence',
-                    'severity': 'high',
-                    'details': f"Detected {len(threats)} cyber threats"
-                })
-    
-    elif menu == "Predictive Maintenance":
-        st.header("Predictive Maintenance")
-        equipment_data = st.file_uploader("Upload Equipment Data (CSV)", type="csv")
-        if equipment_data and st.button("Analyze Equipment"):
-            equip_df = pd.read_csv(equipment_data)
-            equip_df, anomalies = predict_maintenance_anomalies(equip_df)
-            st.dataframe(anomalies)
-            if not anomalies.empty:
-                st.session_state.alert_log.append({
-                    'timestamp': datetime.now(),
-                    'type': 'Equipment Anomaly',
-                    'severity': 'medium',
-                    'details': f"Detected {len(anomalies)} equipment anomalies"
-                })
-    
-    elif menu == "Reports":
-        st.header("Generate Report")
-        if st.button("Generate Cybersecurity Report"):
-            report_buffer = generate_nama_report(
-                scan_results=st.session_state.get('scan_results', []),
-                atc_results=st.session_state.get('atc_results', []),
-                compliance_scores=st.session_state.compliance_metrics,
-                anomalies=pd.DataFrame(st.session_state.get('atc_results', [])).query("prediction != 'normal'"),
-                threats=st.session_state.get('threats', [])
+                for route in st.session_state.optimized_routes:
+                    fig_routes.add_trace(go.Scatter(
+                        x=[route['suggested_route']['longitude']],
+                        y=[route['suggested_route']['latitude']],
+                        mode='markers',
+                        marker=dict(size=15, symbol='star', color=WICKET_THEME['error']),
+                        name=f"Cluster {route['cluster']} Centroid"
+                    ))
+                st.plotly_chart(fig_routes, use_container_width=True)
+            
+            fig = px.scatter(
+                results_df,
+                x='longitude',
+                y='latitude',
+                size='altitude',
+                color='prediction',
+                hover_data=['icao24', 'velocity'],
+                title="Real-Time Air Traffic Visualization"
             )
-            if report_buffer:
-                st.download_button(
-                    label="Download Report",
-                    data=report_buffer,
-                    file_name="nama_cybersecurity_report.pdf",
-                    mime="application/pdf"
-                )
-    
-    elif menu == "Model Training":
-        st.header("Model Training")
-        training_data = st.file_uploader("Upload Training Data (CSV)", type="csv")
-        if training_data and st.button("Retrain Model"):
-            df = pd.read_csv(training_data, names=NSL_KDD_COLUMNS, low_memory=False)
-            model, scaler, label_encoders, le_class = retrain_model(df, label_encoders, le_class)
-            if model:
-                st.success("Model retrained successfully")
-    
-    # Display alerts
-    if st.session_state.alert_log:
-        st.sidebar.subheader("Recent Alerts")
-        for alert in st.session_state.alert_log[-3:]:
-            st.sidebar.markdown(f"**{alert['timestamp']}**: {alert['type']} ({alert['severity']})")
+            st.plotly_chart(fig, use_container_width=True)
+
+    elif menu == "Radar Surveillance":
+        st.header("Real-Time Radar Surveillance")
+        num_targets = st.slider("Number of Radar Targets", 1, 20, 5)
+        fetch_interval = st.slider("Update Interval (seconds)", 30, 300, 60)
+        region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"])
+        regions = {
+            "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15},
+            "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15},
+            "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8}
+        }
+        region = regions[region_type]
+        
+        if 'radar_running' not in st.session_state:
+            st.session_state.radar_running = False
+            st.session_state.radar_data = []
+        
+        if st.button("Start Radar Surveillance"):
+            st.session_state.radar_running = True
+            threading.Thread(
+                target=periodic_radar_update,
+                args=(num_targets, region, fetch_interval),
+                daemon=True
+            ).start()
+            st.success("Radar surveillance started!")
+        
+ if st.button('Stop Radar Surveillance'):
+            st.session_state.radar_running = False
+            st.success("Radar surveillance stopped!")
+        
+        if st.session_state.radar_data:
+            st.subheader("Radar and ADS-B Tracking")
+            fig = display_radar(st.session_state.radar_data)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']])
+
+    elif menu == "Drone Detection":
+        st.header("Real-Time Drone Intrusion Detection")
+        detection_interval = st.slider("Detection Interval (seconds)", 60, 300, 120)
+        
+        if 'drone_running' not in st.session_state:
+            st.session_state.drone_running = False
+            st.session_state.drone_results = []
+        
+        if st.button("Start Drone Detection"):
+            st.session_state.drone_running = True
+            threading.Thread(
+                target=periodic_drone_detection,
+                args=(detection_interval,),
+                daemon=True
+            ).start()
+            st.success("Real-time drone detection started!")
+        
+        if st.button("Stop Drone Detection"):
+            st.session_state.drone_running = False
+            st.success("Real-time drone detection stopped.")
+        
+        if st.session_state.drone_results:
+            st.subheader("Detected Drone Intrusions")
+            st.dataframe(pd.DataFrame(st.session_state.drone_results))
+
+    elif menu == "Threat Intelligence":
+        st.header("Real-Time Cyber Threat Intelligence")
+        otx_api_key = st.text_input("AlienVault OTX API Key (optional)", type="password")
+        threat_feed = st.text_area("Manual Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found")
+        fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300)
+        
+        if 'threat_running' not in st.session_state:
+            st.session_state.threat_running = False
+            st.session_state.threats = []
+        
+        if st.button("Start Real-Time Threat Analysis"):
+            st.session_state.threat_running = True
+            if threat_feed:
+                threats = analyze_threat_feeds(threat_feed.split('\n'))
+                st.session_state.threats = threats
+            threading.Thread(
+                target=periodic_threat_fetch,
+                args=(otx_api_key, fetch_interval),
+                daemon=True
+            ).start()
+            st.success("Real-time threat analysis started!")
+        
+        if st.button("Stop Threat Analysis"):
+            st.session_state.threat_running = False
+            st.success("Real-time threat analysis stopped.")
+        
+        if st.session_state.threats:
+            st.write("Detected Threats:")
+            for threat in st.session_state.threats:
+                st.write(f"- {threat}")
+
+    elif menu == "Compliance & Reporting":
+        st.header("Compliance & Reporting")
+        st.subheader("Compliance Metrics")
+        st.write(st.session_state.compliance_metrics)
+        
+        if st.button("Generate Report"):
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter)
+            styles = getSampleStyleSheet()
+            elements = []
+            
+            elements.append(Paragraph("NAMA IDPS Report", styles['Title']))
+            elements.append(Spacer(1, 12))
+            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
+            elements.append(Spacer(1, 12))
+            
+            if st.session_state.alert_log:
+                elements.append(Paragraph("Recent Alerts", styles['Heading2']))
+                alert_data = [[a['timestamp'], a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
+                alert_table = Table([['Timestamp', 'Type', 'Severity', 'Details']] + alert_data)
+                alert_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                elements.append(alert_table)
+            
+            doc.build(elements)
+            buffer.seek(0)
+            b64 = base64.b64encode(buffer.getvalue()).decode()
+            href = f'<a href="data:application/pdf;base64,{b64}" download="nama_idps_report.pdf">Download Report</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
+    elif menu == "Settings":
+        st.header("System Settings")
+        st.write("Configure system settings here.")
+        st.session_state.theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
+        if st.button("Logout"):
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.rerun()
 
 if __name__ == "__main__":
     main()
