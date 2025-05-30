@@ -1527,7 +1527,7 @@ def main():
             if st.session_state.alert_log:
                 elements.append(Paragraph("Recent Alerts", styles['Heading2']))
                 alert_data = [[a['timestamp'], a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
-                alert_table = Table([[['Timestamp', 'Type', 'Severity', 'Details']] + alert_data)
+                alert_table = Table([[['Timestamp', 'Type', 'Severity', 'Details']]] + alert_data)
                 alert_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
