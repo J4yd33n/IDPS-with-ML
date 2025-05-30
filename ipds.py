@@ -1521,7 +1521,7 @@ def main():
             
             elements.append(Paragraph("NAMA IDPS Report", styles['Title']))
             elements.append(Spacer(1, 12))
-            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal'])))
+            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
             elements.append(Spacer(1, 12))
             
             if st.session_state.alert_log:
