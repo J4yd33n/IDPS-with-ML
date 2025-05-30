@@ -1178,7 +1178,7 @@ def main():
             ).start()
             st.success("Radar surveillance started!")
         
- if st.button('Stop Radar Surveillance'):
+        if st.button("Stop Radar Surveillance"):
             st.session_state.radar_running = False
             st.success("Radar surveillance stopped!")
         
