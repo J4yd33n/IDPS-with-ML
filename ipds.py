@@ -1149,14 +1149,14 @@ def main():
     
     # Enhanced Sidebar with Icons
     menu_options = {
-        "Dashboard": 
-        "Network Scan": 
-        "ATC Monitoring": 
-        "Radar Surveillance": 
-        "Drone Detection": 
-        "Threat Intelligence": 
-        "Compliance & Reporting": 
-        "Settings": 
+        "Dashboard",
+        "Network Scan",
+        "ATC Monitoring",
+        "Radar Surveillance", 
+        "Drone Detection",
+        "Threat Intelligence",
+        "Compliance & Reporting",
+        "Settings",
     }
     menu = st.sidebar.selectbox(
         "Select Module",
