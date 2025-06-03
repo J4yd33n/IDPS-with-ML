@@ -808,7 +808,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args=None):
                         'state': state,
                         'service': service
                     })
-        log_user_activity("system", "Performed NMAP scan on" {f"{target}"})
+        log_user_activity("system, Performed NMAP scan on" {f"{target}"})
         return results
     except Exception as e:
         logger.error(f"NMAP scan error: {str(e)}")
