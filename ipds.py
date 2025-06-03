@@ -1615,7 +1615,7 @@ def main():
                     elif register_user(username, password):
                         st.success("Registration successful! Please sign in.")
                         st.session_state.form_type = 'sign_in'
-                        st.markdown("<script>document.getElementById('container').classList.remove('right-panel-active');</script>", unsafe_allow_html=True))
+                        st.markdown("<script>document.getElementById('container').classList.remove('right-panel-active');</script>", unsafe_allow_html=True)
                     else:
                         st.error("Username already exists or registration failed")
 
