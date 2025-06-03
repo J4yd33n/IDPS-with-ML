@@ -1654,9 +1654,8 @@ st.markdown('', unsafe_allow_html=True)
 
 elif menu == "Drone Detection":
 st.header("Real-Time Drone Detection")
-st.markdown('', unsafe_allow_html=True)
+st.markdown('', unsafe_allow_html=True) fetch_interval = st.slider("Detection Interval (seconds)", 60, 600, 120, help="Drone detection frequency")
 
-', unsafe_allow_html=True) fetch_interval = st.slider("Detection Interval (seconds)", 60, 600, 120, help="Drone detection frequency")
 if 'drone_running' not in st.session_state:
 st.session_state.drone_running = False
 st.session_state.drone_results = []
