@@ -992,45 +992,6 @@ def simulate_aviation_traffic(num_samples=10, region=None):
         log_user_activity("system", "Simulated ATC traffic")
         return pd.DataFrame(data).to_dict('records')
         
-# Flight Data Processing: Conflict Prediction
-def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=300):
-    try:
-        df = pd.DataFrame(traffic_data)
-        risks = []
-        for i, row1 in df.iterrows():
-            for j, row2 in df.iloc[i+1:].iterrows():
-                if row1['icao24'] == row2['icao24']:
-                    continue
-                pos1 = (row1['latitude'], row1['longitude'])
-                pos2 = (row2['latitude'], row2['longitude'])
-                dist = geodesic(pos1, pos2).km
-                vel1 = row1['velocity'] * np.array([np.cos(np.radians(row1.get('heading', 0))), np.sin(np.radians(row1.get('heading', 0)))])
-                vel2 = row2['velocity'] * np.array([np.cos(np.radians(np.radians(row2.get('heading', 0)))), np.sin(np.radians(np.radians(row2.get('heading', np0))))])
-                rel_vel = np.linalg.norm(vel1 - vel2)
-                time_to_collision = dist / (rel_vel / 3600) if rel_vel > 0 else float('inf')
-                if dist < distance_threshold and time_to_collision < time_threshold:
-                    risks.append({
-                        'icao24_1': row1['icao24'],
-                        'icao24_2': row2['icao24'],
-                        'distance_km': dist,
-                        'time_to_collision': time_to_collision,
-                        'severity': 'critical' if time_to_collision < 60 else 'high'
-                    })
-        if risks:
-            for risk in risks:
-                st.session_state.alert_log.append({
-                    'timestamp': datetime.now(),
-                    'type': 'Flight Conflict',
-                    'severity': risk['severity'],
-                    'details': f'Potential collision between {risk['icao24_1']} and {risk['icao24_2']}: {risk['distance_km']:.2f}km, {risk['time_to_collision']:.0f}s'
-                })
-        log_user_activity("system", f"Detected {len(risks)} flight conflicts")
-        return risks
-    except Exception as e:
-        logger.error(f"Collision risk detection error: {str(e)}")
-        return st.error(f"Collision risk detection error: {str(e)}")
-        return []
-        
 # Drone Detection
 def periodic_drone_detection(interval=120):
     try:
