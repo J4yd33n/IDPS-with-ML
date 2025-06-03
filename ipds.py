@@ -991,6 +991,9 @@ def simulate_aviation_traffic(num_samples=10, region=None):
         }
         log_user_activity("system", "Simulated ATC traffic")
         return pd.DataFrame(data).to_dict('records')
+    except Exception as e:
+        logger.error(f"Simulated aviation traffic error: {str(e)}")
+        return []
         
 # Drone Detection
 def periodic_drone_detection(interval=120):
