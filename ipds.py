@@ -1717,14 +1717,14 @@ if 'threat_running' not in st.session_state:
 
 col1, col2 = st.columns(2)
 with col1:
-if st.button("Start Threat Monitoring", key="start_threat"):
-    st.session_state.threat_running = True
-    threading.Thread(
-    target=periodic_threat_fetch,
-    args=(api_key, fetch_interval),
-    daemon=True
-    ).start()
-    st.success("Threat monitoring started!")
+    if st.button("Start Threat Monitoring", key="start_threat"):
+        st.session_state.threat_running = True
+        threading.Thread(
+        target=periodic_threat_fetch,
+        args=(api_key, fetch_interval),
+        daemon=True
+        ).start()
+        st.success("Threat monitoring started!")
 with col2:
     if st.button("Stop Threat Monitoring", key="stop_threat"):
         st.session_state.threat_running = False
