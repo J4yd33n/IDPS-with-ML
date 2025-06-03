@@ -1638,42 +1638,44 @@ def main():
             fig = display_radar(st.session_state.radar_data)
             if fig:
                 st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(
-                pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']],
-                use_container_width=True,
-                column_config={
-                    "timestamp": st.column_config .DatetimeColumn("Timestamp"),
-"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
-"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
-"altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f"),
-"velocity": st.column_config.NumberColumn("Velocity (kts)", format="%.0f"),
-"heading": st.column_config.NumberColumn("Heading (°)", format="%.0f")
-}
-)
-st.markdown('', unsafe_allow_html=True)
+                  st.dataframe(
+            pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']],
+            use_container_width=True,
+            column_config={
+                "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+                "latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+                "longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+                "altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f"),
+                "velocity": st.column_config.NumberColumn("Velocity (kts)", format="%.0f"),
+                "heading": st.column_config.NumberColumn("Heading (°)", format="%.0f")
+            }
+        )
+        st.markdown('</div>', unsafe_allow_html=True)  # Close the card div
+    # End of Radar Surveillance section
 
-elif menu == "Drone Detection":
-st.header("Real-Time Drone Detection")
-st.markdown('', unsafe_allow_html=True) fetch_interval = st.slider("Detection Interval (seconds)", 60, 600, 120, help="Drone detection frequency")
-
-if 'drone_running' not in st.session_state:
-st.session_state.drone_running = False
-st.session_state.drone_results = []
-
-col1, col2 = st.columns(2)
-with col1:
-if st.button("Start Drone Detection", key="start_drone"):
-st.session_state.drone_running = True
-threading.Thread(
-target=periodic_drone_detection,
-args=(fetch_interval,),
-daemon=True
-).start()
-st.success("Drone detection started!")
-with col2:
-if st.button("Stop Drone Detection", key="stop_drone"):
-st.session_state.drone_running = False
-st.success("Drone detection stopped!")
+    elif menu == "Drone Detection":
+        st.header("Real-Time Drone Detection")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        fetch_interval = st.slider("Detection Interval (seconds)", 60, 600, 120, help="Drone detection frequency")
+        
+        if 'drone_running' not in st.session_state:
+            st.session_state.drone_running = False
+            st.session_state.drone_results = []
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Start Drone Detection", key="start_drone"):
+                st.session_state.drone_running = True
+                threading.Thread(
+                    target=periodic_drone_detection,
+                    args=(fetch_interval,),
+                    daemon=True
+                ).start()
+                st.success("Drone detection started!")
+        with col2:
+            if st.button("Stop Drone Detection", key="stop_drone"):
+                st.session_state.drone_running = False
+                st.success("Drone detection stopped!")
 
 if st.session_state.drone_results:
 st.subheader("Drone Detection Results")
