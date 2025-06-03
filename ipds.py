@@ -1707,7 +1707,8 @@ if st.session_state.drone_results:
 elif menu == "Threat Intelligence":
     st.header("Real-Time Threat Intelligence")
     st.markdown('', unsafe_allow_html=True) 
-    api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
+    api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key")
+    fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
 
 
 if 'threat_running' not in st.session_state:
