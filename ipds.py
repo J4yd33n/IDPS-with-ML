@@ -794,7 +794,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args):
                 'TCP SYN': ['-sS'],
                 'TCP Connect': ['-sT'],
                 'UDP': ['-sU']
-            } }
+            } 
             args = [f"{scan_args[scan_type]} {custom_args}"]
             
             scan_results = []
