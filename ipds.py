@@ -1733,7 +1733,7 @@ with col2:
 if st.session_state.threats:
     st.subheader("Latest Threat Intelligence")
     for threat in st.session_state.threats:
-    st.markdown(f"- {threat}")
+        st.markdown(f"- {threat}")
 else:
     st.write("No threats detected yet.")
     st.markdown('', unsafe_allow_html=True)
