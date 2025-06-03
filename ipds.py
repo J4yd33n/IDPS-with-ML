@@ -1699,14 +1699,14 @@ hover_data=['drone_id', 'severity'],
 template='plotly_dark'
 )
 st.plotly_chart(fig_drones, use_container_width=True)
-st.markdown('
+st.markdown('', unsafe_allow_html=True)
 
-', unsafe_allow_html=True)
+
 elif menu == "Threat Intelligence":
 st.header("Real-Time Threat Intelligence")
-st.markdown('
+st.markdown('', unsafe_allow_html=True) api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
 
-', unsafe_allow_html=True) api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
+
 if 'threat_running' not in st.session_state:
 st.session_state.threat_running = False
 st.session_state.threats = []
@@ -1732,14 +1732,14 @@ for threat in st.session_state.threats:
 st.markdown(f"- {threat}")
 else:
 st.write("No threats detected yet.")
-st.markdown('
+st.markdown('', unsafe_allow_html=True)
 
-', unsafe_allow_html=True)
+
 elif menu == "Satellite Tracking":
 st.header("Real-Time Satellite Tracking")
-st.markdown('
+st.markdown('', unsafe_allow_html=True) num_samples = st.slider("Number of Satellites", 1, 10, 5, help="Number of satellites to track") fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Satellite data refresh rate") region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select tracking region") regions = { "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}, "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15}, "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8} } region = regions[region_type]
 
-', unsafe_allow_html=True) num_samples = st.slider("Number of Satellites", 1, 10, 5, help="Number of satellites to track") fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Satellite data refresh rate") region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select tracking region") regions = { "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}, "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15}, "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8} } region = regions[region_type]
+
 if 'satellite_running' not in st.session_state:
 st.session_state.satellite_running = False
 st.session_state.satellite_results = []
@@ -1775,14 +1775,14 @@ column_config={
 "velocity": st.column_config.NumberColumn("Velocity (km/h)", format="%.0f")
 }
 )
-st.markdown('
+st.markdown('', unsafe_allow_html=True)
 
-', unsafe_allow_html=True)
+
 elif menu == "Compliance & Reporting":
 st.header("Compliance & Reporting")
-st.markdown('
+st.markdown('', unsafe_allow_html=True) st.subheader("Generate Compliance Report") report_type = st.selectbox("Report Type", ["Summary", "Detailed"], help="Select report type") start_date = st.date_input("Start Date", value=datetime.now().date() - pd.Timedelta(days=7)) end_date = st.date_input("End Date", value=datetime.now().date())
 
-', unsafe_allow_html=True) st.subheader("Generate Compliance Report") report_type = st.selectbox("Report Type", ["Summary", "Detailed"], help="Select report type") start_date = st.date_input("Start Date", value=datetime.now().date() - pd.Timedelta(days=7)) end_date = st.date_input("End Date", value=datetime.now().date())
+
 if st.button("Generate Report"):
 try:
 buffer = io.BytesIO()
@@ -1834,14 +1834,14 @@ log_user_activity(st.session_state.username, f"Generated {report_type} complianc
 except Exception as e:
 logger.error(f"Report generation error: {str(e)}")
 st.error(f"Report generation error: {str(e)}")
-st.markdown('
+st.markdown('', unsafe_allow_html=True)
 
-', unsafe_allow_html=True)
+
 elif menu == "Settings":
 st.header("System Settings")
-st.markdown('
+st.markdown('', unsafe_allow_html=True) st.subheader("User Settings") new_password = st.text_input("New Password", type="password", help="Enter new password") if st.button("Change Password"): if new_password and BCRYPT_AVAILABLE: hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) conn = sqlite3.connect('nama_users.db') c = conn.cursor() c.execute("UPDATE users SET password = ? WHERE username = ?", (hashed, st.session_state.username)) conn.commit() conn.close() st.success("Password updated successfully!") log_user_activity(st.session_state.username, "Changed password") else: st.error("Password update failed. Ensure bcrypt is installed and password is provided.")
 
-', unsafe_allow_html=True) st.subheader("User Settings") new_password = st.text_input("New Password", type="password", help="Enter new password") if st.button("Change Password"): if new_password and BCRYPT_AVAILABLE: hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) conn = sqlite3.connect('nama_users.db') c = conn.cursor() c.execute("UPDATE users SET password = ? WHERE username = ?", (hashed, st.session_state.username)) conn.commit() conn.close() st.success("Password updated successfully!") log_user_activity(st.session_state.username, "Changed password") else: st.error("Password update failed. Ensure bcrypt is installed and password is provided.")
+
 st.subheader("Theme Settings")
 theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
 if theme_mode.lower() != st.session_state.theme_mode:
@@ -1855,8 +1855,8 @@ st.session_state.username = None
 log_user_activity("system", "User logged out")
 st.rerun()
 
-st.markdown('
+st.markdown('', unsafe_allow_html=True)
 
-', unsafe_allow_html=True)
+
 if name == "main":
 main()
