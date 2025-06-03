@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -85,7 +86,7 @@ def apply_wicket_css():
     css = f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
-            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
             
             .stApp {{
                 background: linear-gradient(45deg, {WICKET_THEME['primary_bg']} 0%, {WICKET_THEME['secondary_bg']} 100%);
@@ -138,10 +139,6 @@ def apply_wicket_css():
                 background: {WICKET_THEME['hover']};
                 transform: translateX(10px);
                 box-shadow: 0 0 15px {WICKET_THEME['hover']};
-            }}
-            .sidebar-item i {{
-                margin-right: 10px;
-                color: {WICKET_THEME['accent']};
             }}
             
             .main .block-container {{
@@ -300,18 +297,21 @@ def apply_wicket_css():
                 width: 100%;
                 box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
                 z-index: 2;
-                animation: zoomIn 0.8s ease-in-out;
+                animation: slideInAuth 0.8s ease-in-out forwards;
+                position: relative;
+                overflow: hidden;
             }}
             
-            @keyframes zoomIn {{
-                0% {{ transform: scale(0.8); opacity: 0; }}
-                100% {{ transform: scale(1); opacity: 1; }}
+            @keyframes slideInAuth {{
+                0% {{ transform: translateX(100vw); opacity: 0; }}
+                100% {{ transform: translateX(0); opacity: 1; }}
             }}
             
             .auth-form {{
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                text起身
                 text-align: center;
             }}
             
@@ -354,11 +354,31 @@ def apply_wicket_css():
                 margin-top: 1.5rem;
                 transition: all 0.3s ease;
                 box-shadow: 0 0 15px {WICKET_THEME['button_bg']};
+                position: relative;
+                overflow: hidden;
             }}
             .auth-btn:hover {{
                 background: {WICKET_THEME['hover']};
                 box-shadow: 0 0 25px {WICKET_THEME['hover']};
                 transform: scale(1.05);
+            }}
+            .auth-btn::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.3),
+                    transparent
+                );
+                transition: 0.5s;
+            }}
+            .auth-btn:hover::before {{
+                left: 100%;
             }}
             
             .auth-link {{
@@ -422,6 +442,44 @@ def apply_wicket_css():
                 100% {{ transform: rotate(360deg); }}
             }}
             
+            .auth-neon-text {{
+                font-family: 'Orbitron', sans-serif;
+                color: {WICKET_THEME['accent']};
+                text-shadow: 
+                    0 0 5px {WICKET_THEME['accent']},
+                    0 0 10px {WICKET_THEME['accent']},
+                    0 0 20px {WICKET_THEME['accent']},
+                    0 0 40px {WICKET_THEME['hover']};
+                animation: neonFlicker 1.5s infinite alternate;
+            }}
+            
+            @keyframes neonFlicker {{
+                0% {{ text-shadow: 
+                    0 0 5px {WICKET_THEME['accent']},
+                    0 0 10px {WICKET_THEME['accent']},
+                    0 0 20px {WICKET_THEME['accent']},
+                    0 0 40px {WICKET_THEME['hover']}; }}
+                100% {{ text-shadow: 
+                    0 0 10px {WICKET_THEME['accent']},
+                    0 0 20px {WICKET_THEME['accent']},
+                    0 0 30px {WICKET_THEME['accent']},
+                    0 0 50px {WICKET_THEME['hover']}; }}
+            }}
+            
+            .auth-particle {{
+                position: absolute;
+                background: {WICKET_THEME['accent']};
+                border-radius: 50%;
+                pointer-events: none;
+                animation: float 6s infinite linear;
+                z-index: 1;
+            }}
+            
+            @keyframes float {{
+                0% {{ transform: translateY(100vh); opacity: 0.6; }}
+                100% {{ transform: translateY(-100vh); opacity: 0; }}
+            }}
+            
             @media (max-width: 768px) {{
                 .main .block-container {{
                     padding: 15px;
@@ -432,6 +490,10 @@ def apply_wicket_css():
                 .sidebar-item {{
                     font-size: 14px;
                     padding: 10px;
+                }}
+                .auth-card {{
+                    padding: 1.5rem;
+                    max-width: 90%;
                 }}
             }}
         </style>
@@ -471,6 +533,8 @@ if 'flight_conflicts' not in st.session_state:
     st.session_state.flight_conflicts = []
 if 'optimized_routes' not in st.session_state:
     st.session_state.optimized_routes = []
+if 'satellite_results' not in st.session_state:
+    st.session_state.satellite_results = []
 
 # User database setup
 def setup_user_db():
@@ -1032,13 +1096,12 @@ def optimize_traffic_flow(traffic_data, num_clusters=3):
 def periodic_drone_detection(interval=120):
     try:
         while 'drone_running' in st.session_state and st.session_state.drone_running:
-            # Simulate drone detection in the region
-            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}  # Default Nigeria region
-            num_drones = np.random.randint(0, 5)  # Random number of drones
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
+            num_drones = np.random.randint(0, 5)
             drone_results = []
             for i in range(num_drones):
-                altitude = np.random.uniform(0, 1000)  # Drones typically fly low
-                is_unauthorized = altitude < 400 and np.random.random() > 0.7  # Unauthorized if low and random chance
+                altitude = np.random.uniform(0, 1000)
+                is_unauthorized = altitude < 400 and np.random.random() > 0.7
                 drone_results.append({
                     'timestamp': pd.Timestamp.now(),
                     'drone_id': f"DRN{i:03d}",
@@ -1067,7 +1130,7 @@ def periodic_drone_detection(interval=120):
             'details': f"Drone detection failed: {str(e)}"
         })
 
-# Threat Intelligence (Transformers Bypassed)
+# Threat Intelligence
 def fetch_threat_feeds(api_key=None):
     try:
         if not api_key:
@@ -1111,58 +1174,209 @@ def periodic_threat_fetch(api_key, interval=300):
             })
         time.sleep(interval)
 
+# N2YO Satellite Tracking
+@st.cache_data(ttl=60)
+def fetch_satellite_data(num_samples=5, region=None):
+    try:
+        if region is None:
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
+        api_key = "5M5EP6-WMH72D-Q4TNTY-5HTH"
+        url = "https://www.n2yo.com/rest/v1/satellite/positions"
+        norad_ids = [25544, 40075, 43689, 43743, 42983]  # Example NORAD IDs (e.g., ISS, etc.)
+        satellite_data = []
+        
+        observer_lat = (region['lat_min'] + region['lat_max']) / 2
+        observer_lon = (region['lon_min'] + region['lon_max']) / 2
+        observer_alt = 0  # Ground level in kilometers
+        
+        for norad_id in norad_ids[:num_samples]:
+            params = {
+                'id': norad_id,
+                'lat': observer_lat,
+                'lon': observer_lon,
+                'alt': observer_alt,
+                'seconds': 1,
+                'apiKey': api_key
+            }
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                positions = data.get('positions', [])
+                if positions:
+                    pos = positions[0]
+                    satellite_data.append({
+                        'timestamp': pd.Timestamp.now(),
+                        'norad_id': norad_id,
+                        'name': data.get('info', {}).get('satname', 'Unknown'),
+                        'latitude': pos.get('satlatitude'),
+                        'longitude': pos.get('satlongitude'),
+                        'altitude': pos.get('sataltitude'),
+                        'velocity': pos.get('velocity', np.random.uniform(20000, 30000)),
+                        'source': 'n2yo'
+                    })
+            else:
+                logger.warning(f"Failed to fetch data for NORAD ID {norad_id}: {response.status_code}")
+        log_user_activity("system", f"Fetched {len(satellite_data)} satellite records")
+        return satellite_data
+    except Exception as e:
+        logger.error(f"Satellite data fetch error: {str(e)}")
+        st.warning(f"Satellite data fetch error: {str(e)}. Using simulated data.")
+        return simulate_satellite_data(num_samples, region)
+
+def simulate_satellite_data(num_samples=5, region=None):
+    try:
+        if region is None:
+            region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
+        satellite_data = []
+        for i in range(num_samples):
+            satellite_data.append({
+                'timestamp': pd.Timestamp.now(),
+                'norad_id': f"SAT{i:03d}",
+                'name': f"Satellite {i}",
+                'latitude': np.random.uniform(region['lat_min'], region['lat_max']),
+                'longitude': np.random.uniform(region['lon_min'], region['lon_max']),
+                'altitude': np.random.uniform(400, 2000),
+                'velocity': np.random.uniform(20000, 30000),
+                'source': 'simulated'
+            })
+        log_user_activity("system", f"Simulated {len(satellite_data)} satellite records")
+        return satellite_data
+    except Exception as e:
+        logger.error(f"Satellite simulation error: {str(e)}")
+        st.error(f"Satellite simulation error: {str(e)}")
+        return []
+
+def periodic_satellite_fetch(num_samples, region, interval=60):
+    while 'satellite_running' in st.session_state and st.session_state.satellite_running:
+        satellite_data = fetch_satellite_data(num_samples, region)
+        st.session_state.satellite_results = satellite_data
+        if satellite_data:
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'Satellite Tracking',
+                'severity': 'low',
+                'details': f"Fetched {len(satellite_data)} satellite positions"
+            })
+        time.sleep(interval)
+
+def display_satellite_data(data):
+    try:
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.warning("No satellite data available")
+            return None
+        fig = go.Figure()
+        fig.add_trace(go.Scattergeo(
+            lon=df['longitude'],
+            lat=df['latitude'],
+            mode='markers',
+            marker=dict(
+                size=10,
+                color=WICKET_THEME['accent_alt'],
+                symbol='diamond',
+                line=dict(width=1, color=WICKET_THEME['text']),
+                opacity=0.8
+            ),
+            text=df['name'],
+            hoverinfo='text',
+            name='Satellites'
+        ))
+        fig.update_layout(
+            geo=dict(
+                scope='africa',
+                showland=True,
+                landcolor=WICKET_THEME['secondary_bg'],
+                showocean=True,
+                oceancolor=WICKET_THEME['primary_bg'],
+                showcountries=True,
+                countrycolor=WICKET_THEME['border'],
+                projection_type='mercator',
+                center=dict(lat=9, lon=7),
+                lataxis=dict(range=[4, 14]),
+                lonaxis=dict(range=[2, 15])
+            ),
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            margin=dict(l=10, r=10, t=50, b=10),
+            title=dict(
+                text="Real-Time Satellite Tracking",
+                font=dict(color=WICKET_THEME['text_light'], size=20),
+                x=0.5,
+                xanchor='center'
+            )
+        )
+        return fig
+    except Exception as e:
+        logger.error(f"Satellite display error: {str(e)}")
+        st.error(f"Satellite display error: {str(e)}")
+        return None
+
 # Main application
 def main():
     apply_wicket_css()
     setup_user_db()
 
     if not st.session_state.authenticated:
-        st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
-        st.markdown('<div class="auth-form"><h2>NAMA IDPS Login</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="auth-container"><div class="auth-overlay">', unsafe_allow_html=True)
+        # Particle animation background
+        st.markdown("""
+            <div class="auth-particle" style="width:10px;height:10px;top:10%;left:20%;animation-delay:0s;"></div>
+            <div class="auth-particle" style="width:8px;height:8px;top:30%;left:70%;animation-delay:1s;"></div>
+            <div class="auth-particle" style="width:12px;height:12px;top:50%;left:40%;animation-delay:2s;"></div>
+            <div class="auth-particle" style="width:6px;height:6px;top:70%;left:90%;animation-delay:3s;"></div>
+            <div class="auth-particle" style="width:9px;height:9px;top:20%;left:50%;animation-delay:4s;"></div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="auth-card"><div class="auth-form">', unsafe_allow_html=True)
+        st.markdown('<h2 class="auth-neon-text">NAMA IDPS</h2>', unsafe_allow_html=True)
+        
+        form_type = st.radio("Select Action", ["Login", "Register"], horizontal=True, key="form_type")
+        
         username = st.text_input("Username", key="login_username", placeholder="Enter username", help="Enter your username")
         password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password", help="Enter your password")
         
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("Login", key="login_btn", help="Click to login"):
-                if authenticate_user(username, password):
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    log_user_activity(username, "Logged in")
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password")
-        with col2:
-            if st.button("Register", key="register_btn", help="Click to register"):
-                if register_user(username, password):
-                    st.success("Registration successful! Please login.")
-                    log_user_activity(username, "Registered")
-                else:
-                    st.error("Username already exists or registration failed")
+            if st.button(f"{form_type}", key=f"{form_type.lower()}_btn", help=f"Click to {form_type.lower()}"):
+                if form_type == "Login":
+                    if authenticate_user(username, password):
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        log_user_activity(username, "Logged in")
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password")
+                else:  # Register
+                    if register_user(username, password):
+                        st.success("Registration successful! Please login.")
+                        log_user_activity(username, "Registered")
+                    else:
+                        st.error("Username already exists or registration failed")
         
         st.markdown('<a href="#" class="auth-link">Forgot Password?</a>', unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown('</div></div></div>', unsafe_allow_html=True)
         return
 
     st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
     
-   # Enhanced Sidebar without Icons
-menu_options = [
-    "Dashboard",
-    "Network Scan",
-    "ATC Monitoring",
-    "Radar Surveillance",
-    "Drone Detection",
-    "Threat Intelligence",
-    "Compliance & Reporting",
-    "Settings",
-]
-menu = st.sidebar.selectbox(
-    "Select Module",
-    menu_options,
-    help="Navigate through IDPS modules"
-)
+    # Enhanced Sidebar without Icons
+    menu_options = [
+        "Dashboard",
+        "Network Scan",
+        "ATC Monitoring",
+        "Radar Surveillance",
+        "Drone Detection",
+        "Threat Intelligence",
+        "Satellite Tracking",
+        "Compliance & Reporting",
+        "Settings",
+    ]
+    menu = st.sidebar.selectbox(
+        "Select Module",
+        menu_options,
+        help="Navigate through IDPS modules"
+    )
 
     # Load ML models
     try:
@@ -1428,135 +1642,222 @@ menu = st.sidebar.selectbox(
                 pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']],
                 use_container_width=True,
                 column_config={
-                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
-                    "latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
-                    "longitude": st.column_config.NumberColumn("Longitude", format="%.4f")
-                }
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
+                    "timestamp": st.column_config .DatetimeColumn("Timestamp"),
+"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+"altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f"),
+"velocity": st.column_config.NumberColumn("Velocity (kts)", format="%.0f"),
+"heading": st.column_config.NumberColumn("Heading (°)", format="%.0f")
+}
+)
+st.markdown('', unsafe_allow_html=True)
 
-    elif menu == "Drone Detection":
-        st.header("Real-Time Drone Intrusion Detection")
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        detection_interval = st.slider("Detection Interval (seconds)", 60, 300, 120, help="Drone scan frequency")
-        
-        if 'drone_running' not in st.session_state:
-            st.session_state.drone_running = False
-            st.session_state.drone_results = []
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Start Drone Detection", key="start_drone"):
-                st.session_state.drone_running = True
-                threading.Thread(
-                    target=periodic_drone_detection,
-                    args=(detection_interval,),
-                    daemon=True
-                ).start()
-                st.success("Real-time drone detection started!")
-        with col2:
-            if st.button("Stop Drone Detection", key="stop_drone"):
-                st.session_state.drone_running = False
-                st.success("Drone detection completed successfully.")
-            
-        if st.session_state.drone_results:
-            st.subheader("Detected Drone Intrusions")
-            st.dataframe(
-                pd.DataFrame(st.session_state.drone_results),
-                use_container_width=True,
-                column_config={
-                    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
-                    "altitude": st.column_config["altitude"]("Altitude", format="%.0f"),
-                    "status": st.column_config.TextColumn("Status", help="Drone authorization status")
-                })
-        st.markdown('</div>', unsafe_allow_html=True)
+elif menu == "Drone Detection":
+st.header("Real-Time Drone Detection")
+st.markdown('
 
-    elif menu == "Threat Intelligence":
-        st.header("Real-Time Cyber Threat Intelligence")
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        otx_api_key = st.text_input("AlienVault OTX API Key (optional)", type="password", help="Enter your OTX API key (leave blank for sample data)")
-        threat_feed = st.text_area("Manual Threat Feed (one per line)", "Suspicious IP detected\nMalware signature found", help="Enter manual threat feeds")
-        fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
-        
-        if 'threat_running' not in st.session_state:
-            st.session_state.threat_running = False
-            st.session_state.threats = []
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Start Real-Time Threat Analysis", key="start_threat"):
-                st.session_state.threat_running = True
-                if threat_feed:
-                    threats = analyze_threat_feeds(threat_feed.split('\n'))
-                    st.session_state.threats = threats
-                threading.Thread(
-                    target=periodic_threat_fetch,
-                    args=(otx_api_key, fetch_interval),
-                    daemon=True
-                ).start()
-                st.success("Real-time threat analysis started!")
-        with col2:
-            if st.button("Stop Threat Analysis", key="stop_threat"):
-                st.session_state.threat_running = False
-                st.success("Real-time threat analysis stopped.")
-        
-        if st.session_state.threats:
-            st.subheader("Detected Threats")
-            for threat in st.session_state.threats:
-                st.write(f"- {threat}")
-        st.markdown('</div>', unsafe_allow_html=True)
+', unsafe_allow_html=True) fetch_interval = st.slider("Detection Interval (seconds)", 60, 600, 120, help="Drone detection frequency")
+if 'drone_running' not in st.session_state:
+st.session_state.drone_running = False
+st.session_state.drone_results = []
 
-    elif menu == "Compliance & Reporting":
-        st.header("Compliance & Reporting")
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Compliance Metrics")
-        st.write(st.session_state.compliance_metrics)
-        
-        if st.button("Generate Report", key="generate_report", help="Download compliance report"):
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=letter)
-            styles = doc.getSampleStyleSheet()
-            elements = []
-            
-            elements.append(Paragraph("NAMA IDPS Report", styles['Title']))
-            elements.append(Spacer(1, 12))
-            elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
-            elements.append(Spacer(1, 12))
-            
-            if st.session_state.alert_log:
-                elements.append(Paragraph("Recent Alerts", styles['Heading2']))
-                alert_data = [[a['timestamp'], a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
-                alert_table = Table([[['Timestamp', 'Type', 'Severity', 'Details']]] + alert_data)
-                alert_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 14),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                elements.append(alert_table)
-            
-            doc.build(elements)
-            buffer.seek(0)
-            b64 = base64.b64encode(buffer.getvalue()).decode()
-            href = f'<a href="data:application/pdf;base64, {b64}" download="nama_idps_report.pdf">Download Report</a>'
-            st.markdown(href, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+col1, col2 = st.columns(2)
+with col1:
+if st.button("Start Drone Detection", key="start_drone"):
+st.session_state.drone_running = True
+threading.Thread(
+target=periodic_drone_detection,
+args=(fetch_interval,),
+daemon=True
+).start()
+st.success("Drone detection started!")
+with col2:
+if st.button("Stop Drone Detection", key="stop_drone"):
+st.session_state.drone_running = False
+st.success("Drone detection stopped!")
 
-    elif menu == "Settings":
-        st.header("System Settings")
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.write("Configure system settings here.")
-        st.session_state.theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1, help="Select theme")
-        if st.button("Logout", key="logout"):
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+if st.session_state.drone_results:
+st.subheader("Drone Detection Results")
+drone_df = pd.DataFrame(st.session_state.drone_results)
+st.dataframe(
+drone_df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']],
+use_container_width=True,
+column_config={
+"timestamp": st.column_config.DatetimeColumn("Timestamp"),
+"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+"altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f")
+}
+)
+fig_drones = px.scatter(
+drone_df,
+x='longitude',
+y='latitude',
+color='status',
+size='altitude',
+title="Drone Detection Map",
+hover_data=['drone_id', 'severity'],
+template='plotly_dark'
+)
+st.plotly_chart(fig_drones, use_container_width=True)
+st.markdown('
 
-if __name__ == "__main__":
-    main()
+', unsafe_allow_html=True)
+elif menu == "Threat Intelligence":
+st.header("Real-Time Threat Intelligence")
+st.markdown('
 
+', unsafe_allow_html=True) api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
+if 'threat_running' not in st.session_state:
+st.session_state.threat_running = False
+st.session_state.threats = []
+
+col1, col2 = st.columns(2)
+with col1:
+if st.button("Start Threat Monitoring", key="start_threat"):
+st.session_state.threat_running = True
+threading.Thread(
+target=periodic_threat_fetch,
+args=(api_key, fetch_interval),
+daemon=True
+).start()
+st.success("Threat monitoring started!")
+with col2:
+if st.button("Stop Threat Monitoring", key="stop_threat"):
+st.session_state.threat_running = False
+st.success("Threat monitoring stopped!")
+
+if st.session_state.threats:
+st.subheader("Latest Threat Intelligence")
+for threat in st.session_state.threats:
+st.markdown(f"- {threat}")
+else:
+st.write("No threats detected yet.")
+st.markdown('
+
+', unsafe_allow_html=True)
+elif menu == "Satellite Tracking":
+st.header("Real-Time Satellite Tracking")
+st.markdown('
+
+', unsafe_allow_html=True) num_samples = st.slider("Number of Satellites", 1, 10, 5, help="Number of satellites to track") fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Satellite data refresh rate") region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select tracking region") regions = { "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}, "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15}, "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8} } region = regions[region_type]
+if 'satellite_running' not in st.session_state:
+st.session_state.satellite_running = False
+st.session_state.satellite_results = []
+
+col1, col2 = st.columns(2)
+with col1:
+if st.button("Start Satellite Tracking", key="start_satellite"):
+st.session_state.satellite_running = True
+threading.Thread(
+target=periodic_satellite_fetch,
+args=(num_samples, region, fetch_interval),
+daemon=True
+).start()
+st.success("Satellite tracking started!")
+with col2:
+if st.button("Stop Satellite Tracking", key="stop_satellite"):
+st.session_state.satellite_running = False
+st.success("Satellite tracking stopped!")
+
+if st.session_state.satellite_results:
+st.subheader("Satellite Tracking Results")
+fig = display_satellite_data(st.session_state.satellite_results)
+if fig:
+st.plotly_chart(fig, use_container_width=True)
+st.dataframe(
+pd.DataFrame(st.session_state.satellite_results)[['timestamp', 'norad_id', 'name', 'latitude', 'longitude', 'altitude', 'velocity']],
+use_container_width=True,
+column_config={
+"timestamp": st.column_config.DatetimeColumn("Timestamp"),
+"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+"altitude": st.column_config.NumberColumn("Altitude (km)", format="%.0f"),
+"velocity": st.column_config.NumberColumn("Velocity (km/h)", format="%.0f")
+}
+)
+st.markdown('
+
+', unsafe_allow_html=True)
+elif menu == "Compliance & Reporting":
+st.header("Compliance & Reporting")
+st.markdown('
+
+', unsafe_allow_html=True) st.subheader("Generate Compliance Report") report_type = st.selectbox("Report Type", ["Summary", "Detailed"], help="Select report type") start_date = st.date_input("Start Date", value=datetime.now().date() - pd.Timedelta(days=7)) end_date = st.date_input("End Date", value=datetime.now().date())
+if st.button("Generate Report"):
+try:
+buffer = io.BytesIO()
+doc = SimpleDocTemplate(buffer, pagesize=letter)
+styles = getSampleStyleSheet()
+elements = []
+
+elements.append(Paragraph("NAMA IDPS Compliance Report", styles['Title']))
+elements.append(Spacer(1, 12))
+elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
+elements.append(Spacer(1, 12))
+
+alert_df = pd.DataFrame(st.session_state.alert_log)
+if not alert_df.empty:
+alert_df = alert_df[
+(alert_df['timestamp'].dt.date >= start_date) &
+(alert_df['timestamp'].dt.date <= end_date)
+]
+if report_type == "Summary":
+summary = alert_df.groupby('type').size().reset_index(name='count')
+data = [['Alert Type', 'Count']] + [[row['type'], row['count']] for _, row in summary.iterrows()]
+else:
+data = [['Timestamp', 'Type', 'Severity', 'Details']] + [
+[row['timestamp'], row['type'], row['severity'], row['details']] for _, row in alert_df.iterrows()
+]
+
+table = Table(data)
+table.setStyle(TableStyle([
+('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+('FONTSIZE', (0, 0), (-1, 0), 12),
+('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+('GRID', (0, 0), (-1, -1), 1, colors.black)
+]))
+elements.append(table)
+
+doc.build(elements)
+buffer.seek(0)
+st.download_button(
+label="Download Report",
+data=buffer,
+file_name=f"nama_compliance_report_{start_date}to{end_date}.pdf",
+mime="application/pdf"
+)
+log_user_activity(st.session_state.username, f"Generated {report_type} compliance report")
+except Exception as e:
+logger.error(f"Report generation error: {str(e)}")
+st.error(f"Report generation error: {str(e)}")
+st.markdown('
+
+', unsafe_allow_html=True)
+elif menu == "Settings":
+st.header("System Settings")
+st.markdown('
+
+', unsafe_allow_html=True) st.subheader("User Settings") new_password = st.text_input("New Password", type="password", help="Enter new password") if st.button("Change Password"): if new_password and BCRYPT_AVAILABLE: hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) conn = sqlite3.connect('nama_users.db') c = conn.cursor() c.execute("UPDATE users SET password = ? WHERE username = ?", (hashed, st.session_state.username)) conn.commit() conn.close() st.success("Password updated successfully!") log_user_activity(st.session_state.username, "Changed password") else: st.error("Password update failed. Ensure bcrypt is installed and password is provided.")
+st.subheader("Theme Settings")
+theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
+if theme_mode.lower() != st.session_state.theme_mode:
+st.session_state.theme_mode = theme_mode.lower()
+st.success(f"Theme changed to {theme_mode}")
+
+st.subheader("Logout")
+if st.button("Logout"):
+st.session_state.authenticated = False
+st.session_state.username = None
+log_user_activity("system", "User logged out")
+st.rerun()
+
+st.markdown('
+
+', unsafe_allow_html=True)
+if name == "main":
+main()
