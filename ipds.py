@@ -829,7 +829,7 @@ def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=360:
 # Simulated NMAP scan
 def simulate_nmap_scan(target, scan_type, port_range):
     try:
-        common_ports = {
+        common_ports = ({
             '21': ('ftp', ['tcp']), 
             '22': ('ssh', ['t_tcp']), 
             '23': ('telnet', ['tcp']), 
@@ -837,7 +837,7 @@ def simulate_nmap_scan(target, scan_type, port_range):
             '443': ('https', ['tcp']), 
             '3306': ('mysql', ['tcp']), 
             '3389': ('rdp', ['tcp'])
-        } })
+         })
         start_port, end_port = map(int, port_range.split('-'))
         ports_to_scan = ['port' for p in common_ports if start_port <= p <= end_port]
         np.random.seed(42)
