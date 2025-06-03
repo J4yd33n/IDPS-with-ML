@@ -1068,7 +1068,6 @@ def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=30
         logger.error(f"Collision risk detection error: {str(e)}")
         st.error(f"Collision risk detection error: {str(e)}")
         return []
-
 # Anomaly Detection in Air Traffic Data
 def detect_air_traffic_anomalies(df):
     try:
