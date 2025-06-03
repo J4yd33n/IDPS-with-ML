@@ -1677,19 +1677,19 @@ def main():
                 st.session_state.drone_running = False
                 st.success("Drone detection stopped!")
 
-if st.session_state.drone_results:
-st.subheader("Drone Detection Results")
-drone_df = pd.DataFrame(st.session_state.drone_results)
-st.dataframe(
-drone_df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']],
-use_container_width=True,
-column_config={
-"timestamp": st.column_config.DatetimeColumn("Timestamp"),
-"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
-"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
-"altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f")
-}
-)
+if st.session_state.drone_results:  
+    st.subheader("Drone Detection Results")
+    drone_df = pd.DataFrame(st.session_state.drone_results)
+    st.dataframe(
+    drone_df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']],
+    use_container_width=True,
+    column_config={
+    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+    "latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+    "longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+    "altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f")
+    }
+    )
 fig_drones = px.scatter(
 drone_df,
 x='longitude',
