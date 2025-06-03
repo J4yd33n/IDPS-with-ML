@@ -1318,7 +1318,7 @@ def main():
                         st.session_state.authenticated = True
                         st.session_state.username = username
                         log_user_activity(username, "Logged in")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Invalid username or password")
             with col2:
