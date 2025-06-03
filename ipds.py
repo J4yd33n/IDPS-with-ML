@@ -1705,111 +1705,112 @@ st.markdown('', unsafe_allow_html=True)
 
 
 elif menu == "Threat Intelligence":
-st.header("Real-Time Threat Intelligence")
-st.markdown('', unsafe_allow_html=True) api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
+    st.header("Real-Time Threat Intelligence")
+    st.markdown('', unsafe_allow_html=True) api_key = st.text_input("OTX API Key", type="password", help="Enter your AlienVault OTX API key") fetch_interval = st.slider("Fetch Interval (seconds)", 60, 600, 300, help="Threat feed refresh rate")
 
 
 if 'threat_running' not in st.session_state:
-st.session_state.threat_running = False
-st.session_state.threats = []
+    st.session_state.threat_running = False
+    st.session_state.threats = []
 
 col1, col2 = st.columns(2)
 with col1:
 if st.button("Start Threat Monitoring", key="start_threat"):
-st.session_state.threat_running = True
-threading.Thread(
-target=periodic_threat_fetch,
-args=(api_key, fetch_interval),
-daemon=True
-).start()
-st.success("Threat monitoring started!")
+    st.session_state.threat_running = True
+    threading.Thread(
+    target=periodic_threat_fetch,
+    args=(api_key, fetch_interval),
+    daemon=True
+    ).start()
+    st.success("Threat monitoring started!")
 with col2:
-if st.button("Stop Threat Monitoring", key="stop_threat"):
-st.session_state.threat_running = False
-st.success("Threat monitoring stopped!")
+    if st.button("Stop Threat Monitoring", key="stop_threat"):
+        st.session_state.threat_running = False
+        st.success("Threat monitoring stopped!")
 
 if st.session_state.threats:
-st.subheader("Latest Threat Intelligence")
-for threat in st.session_state.threats:
-st.markdown(f"- {threat}")
+    st.subheader("Latest Threat Intelligence")
+    for threat in st.session_state.threats:
+    st.markdown(f"- {threat}")
 else:
-st.write("No threats detected yet.")
-st.markdown('', unsafe_allow_html=True)
+    st.write("No threats detected yet.")
+    st.markdown('', unsafe_allow_html=True)
 
 
 elif menu == "Satellite Tracking":
-st.header("Real-Time Satellite Tracking")
-st.markdown('', unsafe_allow_html=True) num_samples = st.slider("Number of Satellites", 1, 10, 5, help="Number of satellites to track") fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Satellite data refresh rate") region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select tracking region") regions = { "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}, "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15}, "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8} } region = regions[region_type]
+    st.header("Real-Time Satellite Tracking")
+    st.markdown('', unsafe_allow_html=True) num_samples = st.slider("Number of Satellites", 1, 10, 5, help="Number of satellites to track") fetch_interval = st.slider("Fetch Interval (seconds)", 30, 300, 60, help="Satellite data refresh rate") region_type = st.selectbox("Region Type", ["All Nigeria", "Remote Areas", "Urban Areas"], help="Select tracking region") regions = { "All Nigeria": {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}, "Remote Areas": {'lat_min': 10, 'lat_max': 14, 'lon_min': 10, 'lon_max': 15}, "Urban Areas": {'lat_min': 6, 'lat_max': 9, 'lon_min': 3, 'lon_max': 8} } region = regions[region_type]
 
 
 if 'satellite_running' not in st.session_state:
-st.session_state.satellite_running = False
-st.session_state.satellite_results = []
+    st.session_state.satellite_running = False
+    st.session_state.satellite_results = []
 
 col1, col2 = st.columns(2)
 with col1:
-if st.button("Start Satellite Tracking", key="start_satellite"):
-st.session_state.satellite_running = True
-threading.Thread(
-target=periodic_satellite_fetch,
-args=(num_samples, region, fetch_interval),
-daemon=True
-).start()
-st.success("Satellite tracking started!")
+    if st.button("Start Satellite Tracking", key="start_satellite"):
+        st.session_state.satellite_running = True
+        threading.Thread(
+        target=periodic_satellite_fetch,
+        args=(num_samples, region, fetch_interval),
+        daemon=True
+        ).start()
+        st.success("Satellite tracking started!")
 with col2:
-if st.button("Stop Satellite Tracking", key="stop_satellite"):
-st.session_state.satellite_running = False
-st.success("Satellite tracking stopped!")
+    if st.button("Stop Satellite Tracking", key="stop_satellite"):
+        st.session_state.satellite_running = False
+        st.success("Satellite tracking stopped!")
 
 if st.session_state.satellite_results:
-st.subheader("Satellite Tracking Results")
-fig = display_satellite_data(st.session_state.satellite_results)
+    st.subheader("Satellite Tracking Results")
+    fig = display_satellite_data(st.session_state.satellite_results)
+    
 if fig:
-st.plotly_chart(fig, use_container_width=True)
-st.dataframe(
-pd.DataFrame(st.session_state.satellite_results)[['timestamp', 'norad_id', 'name', 'latitude', 'longitude', 'altitude', 'velocity']],
-use_container_width=True,
-column_config={
-"timestamp": st.column_config.DatetimeColumn("Timestamp"),
-"latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
-"longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
-"altitude": st.column_config.NumberColumn("Altitude (km)", format="%.0f"),
-"velocity": st.column_config.NumberColumn("Velocity (km/h)", format="%.0f")
-}
-)
-st.markdown('', unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(
+    pd.DataFrame(st.session_state.satellite_results)[['timestamp', 'norad_id', 'name', 'latitude', 'longitude', 'altitude', 'velocity']],
+    use_container_width=True,
+    column_config={
+    "timestamp": st.column_config.DatetimeColumn("Timestamp"),
+    "latitude": st.column_config.NumberColumn("Latitude", format="%.4f"),
+    "longitude": st.column_config.NumberColumn("Longitude", format="%.4f"),
+    "altitude": st.column_config.NumberColumn("Altitude (km)", format="%.0f"),
+    "velocity": st.column_config.NumberColumn("Velocity (km/h)", format="%.0f")
+    }
+    )
+    st.markdown('', unsafe_allow_html=True)
 
 
 elif menu == "Compliance & Reporting":
-st.header("Compliance & Reporting")
-st.markdown('', unsafe_allow_html=True) st.subheader("Generate Compliance Report") report_type = st.selectbox("Report Type", ["Summary", "Detailed"], help="Select report type") start_date = st.date_input("Start Date", value=datetime.now().date() - pd.Timedelta(days=7)) end_date = st.date_input("End Date", value=datetime.now().date())
+    st.header("Compliance & Reporting")
+    st.markdown('', unsafe_allow_html=True) st.subheader("Generate Compliance Report") report_type = st.selectbox("Report Type", ["Summary", "Detailed"], help="Select report type") start_date = st.date_input("Start Date", value=datetime.now().date() - pd.Timedelta(days=7)) end_date = st.date_input("End Date", value=datetime.now().date())
 
 
 if st.button("Generate Report"):
-try:
-buffer = io.BytesIO()
-doc = SimpleDocTemplate(buffer, pagesize=letter)
-styles = getSampleStyleSheet()
-elements = []
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
 
-elements.append(Paragraph("NAMA IDPS Compliance Report", styles['Title']))
-elements.append(Spacer(1, 12))
-elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
-elements.append(Spacer(1, 12))
+        elements.append(Paragraph("NAMA IDPS Compliance Report", styles['Title']))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph(f"Period: {start_date} to {end_date}", styles['Normal']))
+        elements.append(Spacer(1, 12))
 
 alert_df = pd.DataFrame(st.session_state.alert_log)
 if not alert_df.empty:
-alert_df = alert_df[
-(alert_df['timestamp'].dt.date >= start_date) &
-(alert_df['timestamp'].dt.date <= end_date)
-]
+    alert_df = alert_df[
+    (alert_df['timestamp'].dt.date >= start_date) &
+    (alert_df['timestamp'].dt.date <= end_date)
+    ]
 if report_type == "Summary":
-summary = alert_df.groupby('type').size().reset_index(name='count')
-data = [['Alert Type', 'Count']] + [[row['type'], row['count']] for _, row in summary.iterrows()]
+    summary = alert_df.groupby('type').size().reset_index(name='count')
+    data = [['Alert Type', 'Count']] + [[row['type'], row['count']] for _, row in summary.iterrows()]
 else:
-data = [['Timestamp', 'Type', 'Severity', 'Details']] + [
-[row['timestamp'], row['type'], row['severity'], row['details']] for _, row in alert_df.iterrows()
-]
+    data = [['Timestamp', 'Type', 'Severity', 'Details']] + [
+    [row['timestamp'], row['type'], row['severity'], row['details']] for _, row in alert_df.iterrows()
+    ]
 
 table = Table(data)
 table.setStyle(TableStyle([
@@ -1840,25 +1841,26 @@ st.markdown('', unsafe_allow_html=True)
 
 
 elif menu == "Settings":
-st.header("System Settings")
-st.markdown('', unsafe_allow_html=True) st.subheader("User Settings") new_password = st.text_input("New Password", type="password", help="Enter new password") if st.button("Change Password"): if new_password and BCRYPT_AVAILABLE: hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) conn = sqlite3.connect('nama_users.db') c = conn.cursor() c.execute("UPDATE users SET password = ? WHERE username = ?", (hashed, st.session_state.username)) conn.commit() conn.close() st.success("Password updated successfully!") log_user_activity(st.session_state.username, "Changed password") else: st.error("Password update failed. Ensure bcrypt is installed and password is provided.")
+    st.header("System Settings")
+    st.markdown('', unsafe_allow_html=True) st.subheader("User Settings") new_password = st.text_input("New Password", type="password", help="Enter new password") if st.button("Change Password"): if new_password and BCRYPT_AVAILABLE: hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()) conn = sqlite3.connect('nama_users.db') c = conn.cursor() c.execute("UPDATE users SET password = ? WHERE username = ?", (hashed, st.session_state.username)) conn.commit() conn.close() st.success("Password updated successfully!") log_user_activity(st.session_state.username, "Changed password") else: st.error("Password update failed. Ensure bcrypt is installed and password is provided.")
 
 
-st.subheader("Theme Settings")
-theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
+    st.subheader("Theme Settings")
+    theme_mode = st.selectbox("Theme Mode", ["Dark", "Light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
+
 if theme_mode.lower() != st.session_state.theme_mode:
-st.session_state.theme_mode = theme_mode.lower()
-st.success(f"Theme changed to {theme_mode}")
-
-st.subheader("Logout")
+    st.session_state.theme_mode = theme_mode.lower()
+    st.success(f"Theme changed to {theme_mode}")
+    
+ st.subheader("Logout")
 if st.button("Logout"):
-st.session_state.authenticated = False
-st.session_state.username = None
-log_user_activity("system", "User logged out")
-st.rerun()
+    st.session_state.authenticated = False
+    st.session_state.username = None
+    log_user_activity("system", "User logged out")
+    st.rerun()
 
 st.markdown('', unsafe_allow_html=True)
 
 
 if name == "main":
-main()
+    main()
