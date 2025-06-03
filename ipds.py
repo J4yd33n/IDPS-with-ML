@@ -1037,7 +1037,7 @@ def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=30
                     'timestamp': datetime.now(),
                     'type': 'Flight Conflict',
                     'severity': risk['severity'],
-                    'details']: f'Potential collision between {risk['icao24_1']} and {risk['icao24_2']}: {risk['distance_km']:.2f}km, {risk['time_to_collision']:.0f}s'
+                    'details': f'Potential collision between {risk['icao24_1']} and {risk['icao24_2']}: {risk['distance_km']:.2f}km, {risk['time_to_collision']:.0f}s'
                 })
         log_user_activity("system", f"Detected {len(risks)} flight conflicts")
         return risks
