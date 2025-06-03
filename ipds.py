@@ -1637,8 +1637,8 @@ def main():
             st.subheader("Radar and ADS-B Tracking")
             fig = display_radar(st.session_state.radar_data)
             if fig:
-                st.plotly_chart(fig, use_container_width=True)
-                  st.dataframe(
+                st.plotly_chart(fig, use_container_width=True)    
+                st.dataframe(
             pd.DataFrame(st.session_state.radar_data)[['timestamp', 'target_id', 'source', 'latitude', 'longitude', 'altitude', 'velocity', 'heading']],
             use_container_width=True,
             column_config={
