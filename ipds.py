@@ -830,7 +830,7 @@ def simulate_nmap_scan(target, scan_type, port_range):
             3306: ('mysql', ['tcp']), 
             3389: ('rdp', ['tcp'])
         })
-        start_port, end_port = map(int, port_range.split('-')))
+        start_port, end_port = map(int, port_range.split('-'))
         ports_to_scan = [p for p in common_ports.keys() if start_port <= p <= end_port]
         np.random.seed(42)
         scan_results = []
@@ -861,7 +861,7 @@ def simulate_nmap_scan(target, scan_type, port_range):
             if region is None:
                 region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
             username = st.secrets.get('OPENSKY_USERNAME', os.getenv('OPENSKY'))
-            password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('PASSWORD_OPENSKY')))
+            password = st.secrets.get('OPENSKY_PASSWORD', os.getenv('PASSWORD_OPENSKY'))
             params = {
                 'lamin': region['lat_min'], 'lomin': region['lon_min'],
                 'lamax': region['lat_max'], 'lomax': region['lon_max']
