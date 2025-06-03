@@ -831,10 +831,10 @@ def simulate_nmap_scan(target, scan_type, port_range):
     try:
         common_ports = {
             '21': ('ftp', ['tcp']), 
-            '22': ['ssh', ('t_tcp']), 
-            '23': ['telnet', ('tcp']), 
-            '80': ['http', ['tcp']),
-            '443': ['https', ('tcp']), 
+            '22': ('ssh', ['t_tcp']), 
+            '23': ('telnet', ['tcp']), 
+            '80': ('http', ['tcp']),
+            '443': ('https', ['tcp']), 
             '3306': ('mysql', ['tcp']), 
             '3389': ('rdp', ['tcp'])
         } })
