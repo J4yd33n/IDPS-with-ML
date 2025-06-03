@@ -1020,7 +1020,7 @@ def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=30
                 pos2 = (row2['latitude'], row2['longitude'])
                 dist = geodesic(pos1, pos2).km
                 vel1 = row1['velocity'] * np.array([np.cos(np.radians(row1.get('heading', 0))), np.sin(np.radians(row1.get('heading', 0)))])
-                vel2 = row2['velocity'] * np.array([np.cos(np.radians(np.radians(row2.get('heading', 0))), np.sin(np.radians(np.radians(row2.get('heading', np0))))]))
+                vel2 = row2['velocity'] * np.array([np.cos(np.radians(np.radians(row2.get('heading', 0)))), np.sin(np.radians(np.radians(row2.get('heading', np0))))])
                 rel_vel = np.linalg.norm(vel1 - vel2)
                 time_to_collision = dist / (rel_vel / 3600) if rel_vel > 0 else float('inf')
                 if dist < distance_threshold and time_to_collision < time_threshold:
