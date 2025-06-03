@@ -813,7 +813,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args=None):
     except Exception as e:
         logger.error(f"NMAP scan error: {str(e)}")
         st.warning(f"NMAP scan error: {str(e)}. Using simulated data.")
-        return simulate_nmap_scan(target, scan_type, port_range))
+        return simulate_nmap_scan(target, scan_type, port_range)
 
 # Periodic NMAP scan
 def periodic_nmap_scan(target, scan_type, port_range, custom_args=None, interval=3600):
