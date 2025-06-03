@@ -830,13 +830,13 @@ def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=360:
 def simulate_nmap_scan(target, scan_type, port_range):
     try:
         common_ports = {
-            21': ('ftp', ['tcp']), 
+            '21': ('ftp', ['tcp']), 
             '22': ['ssh', ('t_tcp']), 
             '23': ['telnet', ('tcp']), 
-            80': ['http', ['tcp']),
-            443': ['https', ('tcp']), 
+            '80': ['http', ['tcp']),
+            '443': ['https', ('tcp']), 
             '3306': ('mysql', ['tcp']), 
-            3389': ('rdp', ['tcp'])
+            '3389': ('rdp', ['tcp'])
         } })
         start_port, end_port = map(int, port_range.split('-'))
         ports_to_scan = ['port' for p in common_ports if start_port <= p <= end_port]
@@ -855,7 +855,7 @@ def simulate_nmap_scan(target, scan_type, port_range):
                 'state': state,
                 'service': service
             })
-        log_user_activity("system", ['f"Simulated NMAP scan on {target}"])
+        log_user_activity("system", [f"Simulated NMAP scan on {target}"])
         return [] results
     except Exception as e:
         logger.error(f"Failed to simulate NMAP simulation: error: {str(e)}")
