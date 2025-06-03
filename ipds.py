@@ -1045,38 +1045,7 @@ def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=30
         logger.error(f"Collision risk detection error: {str(e)}")
         return st.error(f"Collision risk detection error: {str(e)}")
         return []
-
-# Flight Data Processing: Traffic Flow Optimization
-def optimize_traffic_flow(traffic_data, num_clusters=3):
-    try:
-        df = pd.DataFrame(traffic_data)
-        if len(df) < 2:
-            return []
-        features = ['latitude', 'longitude', 'altitude']
-        X = df[features].fillna(0).values
-        kmeans = KMeans(n_clusters=min(num_clusters, len(X)), random_state=42)
-        df['cluster'] = kmeans.fit_predict(X)
-        routes = []
-        for cluster in df['cluster'].unique():
-            cluster_df = df[df['cluster'] == cluster]
-            centroid = {
-                'latitude': cluster_df['latitude'].mean(),
-                'longitude': cluster_df['longitude'].mean(),
-                'altitude': cluster_df['altitude'].mean()
-            }
-            routes.append({
-                'cluster': cluster,
-                'icao24_list': cluster_df['icao24'].to_list(),
-                'suggested_route': centroid,
-                'aircraft_count': len(cluster_df)
-            })
-        log_user_activity("system", f"Optimized routes for {len(routes)} clusters")
-        return routes
-    except Exception as e:
-        logger.error(f"Traffic optimization error: {str(e)}")
-        st.error(f"Traffic optimization error: {str(e)}")
-        return []
-
+        
 # Drone Detection
 def periodic_drone_detection(interval=120):
     try:
@@ -1115,6 +1084,52 @@ def periodic_drone_detection(interval=120):
             'details': f"Drone detection failed: {str(e)}"
         })
 
+# Flight Data Processing: Traffic Flow Optimization
+def optimize_traffic_flow(traffic_data, num_clusters=3):
+    try:
+        df = pd.DataFrame(traffic_data)
+        if len(df) < 2:
+            return []
+        features = ['latitude', 'longitude', 'altitude']
+        X = df[features].fillna(0).values
+        kmeans = KMeans(n_clusters=min(num_clusters, len(X)), random_state=42)
+        df['cluster'] = kmeans.fit_predict(X)
+        routes = []
+        for cluster in df['cluster'].unique():
+            cluster_df = df[df['cluster'] == cluster]
+            centroid = {
+                'latitude': cluster_df['latitude'].mean(),
+                'longitude': cluster_df['longitude'].mean(),
+                'altitude': cluster_df['altitude'].mean()
+            }
+            routes.append({
+                'cluster': cluster,
+                'icao24_list': cluster_df['icao24'].to_list(),
+                'suggested_route': centroid,
+                'aircraft_count': len(cluster_df)
+            })
+        log_user_activity("system", f"Optimized routes for {len(routes)} clusters")
+        return routes
+    except Exception as e:
+        logger.error(f"Traffic optimization error: {str(e)}")
+        st.error(f"Traffic optimization error: {str(e)}")
+        return []
+
+# Anomaly Detection in Air Traffic Data
+def detect_air_traffic_anomalies(df):
+    try:
+        features = ['latitude', 'longitude', 'altitude', 'velocity']
+        X = df[features].fillna(0)
+        model = IsolationForest(contamination=0.1, random_state=42)
+        model.fit(X)
+        predictions = model.predict(X)
+        df['anomaly'] = predictions == -1
+        anomalies = df[df['anomaly'] == True]
+        return df, anomalies
+    except Exception as e:
+        logger.error(f"Flight data processing error: {str(e)}")
+        return df, pd.DataFrame()
+
 # Threat Intelligence Integration
 @st.cache_data(ttl=3600)
 def fetch_threat_feed(api_key=None, source="alienvault"):
@@ -1139,6 +1154,7 @@ def fetch_threat_feed(api_key=None, source="alienvault"):
                 return threats
             else:
                 logger.warning(f"AlienVault API error: {response.status_code}")
+                st.warning("Failed to fetch AlienVault threat feed. Using simulated data.")
         return simulate_threat_feed()
     except Exception as e:
         logger.error(f"Threat feed fetch error: {str(e)}")
@@ -1259,36 +1275,16 @@ def predict_traffic(df, model, scaler, label_encoders, le_class):
         logger.error(f"Prediction error: {str(e)}")
         return "error", 0.0
 
-# Anomaly Detection in Air Traffic Data
-def detect_air_traffic_anomalies(df):
-    try:
-        features = ['latitude', 'longitude', 'altitude', 'velocity']
-        X = df[features].fillna(0)
-        model = IsolationForest(contamination=0.1, random_state=42)
-        model.fit(X)
-        predictions = model.predict(X)
-        df['anomaly'] = predictions == -1
-        anomalies = df[df['anomaly'] == True]
-        return df, anomalies
-    except Exception as e:
-        logger.error(f"Flight data processing error: {str(e)}")
-        return df, pd.DataFrame()
-
 # Report Generation
 def generate_pdf_report(data, filename="nama_idps_report.pdf"):
-    """
-    Generate a PDF report summarizing IDPS activities.
-    """
     try:
         doc = SimpleDocTemplate(filename, pagesize=letter)
         styles = getSampleStyleSheet()
         elements = []
 
-        # Title
         elements.append(Paragraph("NAMA IDPS Report", styles['Title']))
         elements.append(Spacer(1, 12))
 
-        # Summary
         elements.append(Paragraph("Summary", styles['Heading2']))
         summary_data = [
             ["Date", datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
@@ -1310,10 +1306,9 @@ def generate_pdf_report(data, filename="nama_idps_report.pdf"):
         elements.append(table)
         elements.append(Spacer(1, 12))
 
-        # Alerts
         elements.append(Paragraph("Recent Alerts", styles['Heading2']))
         alert_data = [["Timestamp", "Type", "Severity", "Details"]]
-        for alert in st.session_state.alert_log[-5:]:  # Last 5 alerts
+        for alert in st.session_state.alert_log[-5:]:
             alert_data.append([
                 alert['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                 alert['type'],
@@ -1341,9 +1336,6 @@ def generate_pdf_report(data, filename="nama_idps_report.pdf"):
 
 # Main Streamlit App
 def main():
-    """
-    Main Streamlit application for NAMA IDPS.
-    """
     apply_wicket_css()
     setup_user_db()
 
