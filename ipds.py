@@ -804,8 +804,8 @@ def run_nmap_scan(target, scan_type, port_range, custom_args):
                 for proto in nm[host].all_protocols():
                     ports = nm[host][proto].keys()
                     for port in ports:
-                        state = nm[host][proto][port']['state']
-                        service = nm[host][proto][port'].get('service', 'unknown')
+                        state = nm['host']['proto']['port']['state']
+                        service = nm['host'][proto]['port'].get('service', 'unknown')
                         scan_results.append({
                             'port': state,
                             'protocol': proto,
@@ -813,11 +813,11 @@ def run_nmap_scan(target, scan_type, port_range, custom_args):
                             'service': service
                         })
             
-            log_user_activity("system", ['f"Performed real-time NMAP scan on {target}"])
+            log_user_activity("system", [f"Performed real-time NMAP scan on {target}" ])
             return scan_results
         except Exception as e:
             logger.error(f"NMAP Failed to scan: error: {str(e)}")
-            st.warning(f"NMAP scan error: {str(e)}". Using simulated scan.")
+            st.warning(f"NMAP scan error: {str(e)}. Using simulated scan.")
             return simulate_nmap_scan_results(target, scan_type, port_range)
 
 def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=360:
