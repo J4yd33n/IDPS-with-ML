@@ -821,7 +821,7 @@ def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=300)
 # Simulated NMAP scan
 def simulate_nmap_scan(target, scan_type, port_range):
     try:
-        common_ports = {
+        common_ports = ({
             21: ('ftp', ['tcp']), 
             22: ('ssh', 'tcp'), 
             23: ('telnet', ['tcp']), 
