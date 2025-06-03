@@ -1595,11 +1595,11 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Show Sign In"):
-                st.session_state.form_type'] = 'sign_in'
+                st.session_state.form_type'] = sign_in'
                 st.markdown("<script>document.getElementById('container').classList.remove('right-panel-active');</script>", unsafe_allow_html=True)
         with col2:
             if st.button("Show Sign Up"):
-                st.session_state.form_type'] = 'sign_up'
+                st.session_state.form_type'] = sign_up'
                 st.markdown("<script>document.getElementById('container').classList.add('right-panel-active');</script>", unsafe_allow_html=True)
 
         # Sign-up form
