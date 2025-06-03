@@ -813,7 +813,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args):
         return simulate_nmap_scan(target, scan_type, port_range)
 
 def periodic_nmap_scan(target, scan_type, port_range, custom_args, interval=300):
-    while 'nmap_running' in st.session_state and not st.session_state.nmap_running]:
+    while 'nmap_running' in st.session_state and not st.session_state.nmap_running:
         results = run_nmap_scan(target, scan_type, port_range, custom_args)
         st.session_state['nmap_results'] = results
         time.sleep(interval)
