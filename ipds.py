@@ -1690,18 +1690,18 @@ if st.session_state.drone_results:
     "altitude": st.column_config.NumberColumn("Altitude (ft)", format="%.0f")
     }
     )
-fig_drones = px.scatter(
-drone_df,
-x='longitude',
-y='latitude',
-color='status',
-size='altitude',
-title="Drone Detection Map",
-hover_data=['drone_id', 'severity'],
-template='plotly_dark'
-)
-st.plotly_chart(fig_drones, use_container_width=True)
-st.markdown('', unsafe_allow_html=True)
+    fig_drones = px.scatter(
+    drone_df,
+    x='longitude',
+    y='latitude',
+    color='status',
+    size='altitude',
+    title="Drone Detection Map",
+    hover_data=['drone_id', 'severity'],
+    template='plotly_dark'
+    )
+    st.plotly_chart(fig_drones, use_container_width=True)
+    st.markdown('', unsafe_allow_html=True)
 
 
 elif menu == "Threat Intelligence":
