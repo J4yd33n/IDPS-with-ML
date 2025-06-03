@@ -991,22 +991,7 @@ def simulate_aviation_traffic(num_samples=10, region=None):
         }
         log_user_activity("system", "Simulated ATC traffic")
         return pd.DataFrame(data).to_dict('records')
-
-# Anomaly Detection in Air Traffic Data
-def detect_air_traffic_anomalies(df):
-    try:
-        features = ['latitude', 'longitude', 'altitude', 'velocity']
-        X = df[features].fillna(0)
-        model = IsolationForest(contamination=0.1, random_state=42)
-        model.fit(X)
-        predictions = model.predict(X)
-        df['anomaly'] = predictions == -1
-        anomalies = df[df['anomaly'] == True]
-        return df, anomalies
-    except Exception as e:
-        logger.error(f"Flight data processing error: {str(e)}")
-        return df, pd.DataFrame()
-
+        
 # Flight Data Processing: Conflict Prediction
 def detect_collision_risks(traffic_data, distance_threshold=5, time_threshold=300):
     try:
