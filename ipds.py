@@ -800,7 +800,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args=None):
             for proto in nm[host].all_protocols():
                 ports = nm[host][proto].keys()
                 for port in ports:
-                    state = nm[host][proto][port']['state']
+                    state = nm[host][proto][port]['state']
                     service = nm[host][proto][port].get('name', 'unknown')
                     results.append({
                         'port': port,
@@ -879,16 +879,16 @@ def fetch_adsb_data(num_samples=10, region=None):
         url = "https://opensky-network.org/api/states/all"
         for attempt in range(3):
             try:
-                response = requests.get(url, auth=(username, params['password']) if username and password else None, params=params, timeout=10)
+                response = requests.get(url, auth=(username, password) if username and password else None, params=params, timeout=10)
                 if response.status_code == 200:
                     data = response.json().get('states', [])
                     if not data:
                         logger.warning("No ADS-B data found. Using simulated data.")
                         return simulate_radar_data(num_samples, region)
-                    data = data[:num_samples[:10]]
-                    airports = ['DNMM', 'DNAA', 'DNKN', 'N']
+                    data = data[:num_samples]
+                    airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
                     adsb_records = []
-                    for state in data for:
+                    for state in data:
                         adsb_records.append({
                             'timestamp': pd.Timestamp.now(),
                             'icao24': state[0] if state[0] else 'unknown',
@@ -905,18 +905,17 @@ def fetch_adsb_data(num_samples=10, region=None):
                             'srv_serror_rate': 0.0,
                             'rerror_rate': np.random.uniform(0, 0.1),
                             'same_srv_rate': np.random.uniform(0.8, 1.0),
-                            'diff_srt_rate': np.random.uniform(0, 0.2),
+                            'diff_srv_rate': np.random.uniform(0, 0.2),
                             'srv_diff_host_rate': np.random.uniform(0, 0.1),
                             'dst_host_count': np.random.randint(1, 255),
-                            'dst_host_srt_count': np.random.randint(1, 255),
-                            'dst_host_same_srt_rate': np.random.uniform(0, 1.0),
-                            'dst_host_diff_srt_rate': np.random.uniform(0, 0.2),
+                            'dst_host_srv_count': np.random.randint(1, 255),
+                            'dst_host_same_srv_rate': np.random.uniform(0, 1.0),
+                            'dst_host_diff_srv_rate': np.random.uniform(0, 0.2),
                             'dst_host_same_src_port_rate': np.random.uniform(0, 0.5),
-                            'dst_host_srt_diff_host_rate': np.random.uniform(0, 0.1),
-                            'dst_host_srt_rate': np.random.uniform(0, 0.1),
-                            'dst_host_srt_rate': np.random.uniform(0, 0.1),
+                            'dst_host_srv_diff_host_rate': np.random.uniform(0, 0.1),
+                            'dst_host_serror_rate': np.random.uniform(0, 0.1),
                             'dst_host_rerror_rate': np.random.uniform(0, 0.1),
-                            'dst_host_srt_rerror_rate': np.random.uniform(0, 0.1),
+                            'dst_host_srv_rerror_rate': np.random.uniform(0, 0.1),
                             'latitude': state[6] if state[6] is not None else np.random.uniform(region['lat_min'], region['lat_max']),
                             'longitude': state[5] if state[5] is not None else np.random.uniform(region['lon_min'], region['lon_max']),
                             'altitude': state[7] if state[7] is not None else np.random.uniform(0, 40000),
@@ -924,29 +923,26 @@ def fetch_adsb_data(num_samples=10, region=None):
                         })
                     log_user_activity("system", f"Fetched {len(adsb_records)} ADS-B data records")
                     return adsb_records
-                elif response.status == 429:
+                elif response.status_code == 429:
                     logger.warning("OpenSky API rate limit exceeded. Retrying...")
                     time.sleep(30 * (attempt + 1))
                     continue
                 else:
                     raise Exception(f"Failed to fetch ADS-B: {response.status_code}")
-                except Exception as e:
-                    logger.error(f"Error: {str(e)}")
-                    return f"Error: {e.error}"
             except Exception as e:
-                logger.error(f"Error: {str(e)}")
+                logger.error(f"Error fetching ADS-B data: {str(e)}")
                 if attempt == 2:
                     logger.warning("Max retries reached. Using simulated data.")
                     return simulate_radar_data(num_samples, region)
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error in fetch_adsb_data: {str(e)}")
         return simulate_radar_data(num_samples, region)
 
 def simulate_aviation_traffic(num_samples=10, region=None):
     try:
         if region is None:
             region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
-        airports = ['DNMM', 'DNAA', 'N', 'DNPO']
+        airports = ['DNMM', 'DNAA', 'DNKN', 'DNPO']
         data = []
         for i in range(num_samples):
             data.append({
@@ -960,23 +956,22 @@ def simulate_aviation_traffic(num_samples=10, region=None):
                 'duration': np.random.randint(0, 100),
                 'flag': np.random.choice(['SF', 'S0', 'REJ']),
                 'count': np.random.randint(1, 10),
-                'count': np.random.randint(1, 10),
+                'srv_count': np.random.randint(1, 10),
                 'serror_rate': np.random.uniform(0, 0.1),
                 'srv_serror_rate': np.random.uniform(0, 0.1),
                 'rerror_rate': np.random.uniform(0, 0.1),
-                'same_srt_rate': np.random.uniform(0.8, 1.0),
-                'diff_srt_rate': np.random.uniform(0, 0.2),
-                'srv_diff_host_rate': np.random.uniform('0, 0.1),
+                'same_srv_rate': np.random.uniform(0.8, 1.0),
+                'diff_srv_rate': np.random.uniform(0, 0.2),
+                'srv_diff_host_rate': np.random.uniform(0, 0.1),
                 'dst_host_count': np.random.randint(1, 255),
-                'dst_host_srt_count': np.random.randint(1, 255),
-                'dst_host_same_srt_rate': np.random.uniform(0, 1.0),
-                'dst_host_diff_srt_rate': np.random.uniform(0, 0.2),
+                'dst_host_srv_count': np.random.randint(1, 255),
+                'dst_host_same_srv_rate': np.random.uniform(0, 1.0),
+                'dst_host_diff_srv_rate': np.random.uniform(0, 0.2),
                 'dst_host_same_src_port_rate': np.random.uniform(0, 0.5),
-                'dst_host_srt_diff_host_rate': np.random.uniform(0, 0.1),
-                'dst_host_srt_rate': np.random.uniform(0, 0.1),
-                'dst_host_srt_rate': np.serror_rate': np.random.uniform(0, 0.1),
+                'dst_host_srv_diff_host_rate': np.random.uniform(0, 0.1),
+                'dst_host_serror_rate': np.random.uniform(0, 0.1),
                 'dst_host_rerror_rate': np.random.uniform(0, 0.1),
-                'dst_host_srt_rerror_rate': np.random.uniform(0, 0.1),
+                'dst_host_srv_rerror_rate': np.random.uniform(0, 0.1),
                 'latitude': np.random.uniform(region['lat_min'], region['lat_max']),
                 'longitude': np.random.uniform(region['lon_min'], region['lon_max']),
                 'altitude': np.random.uniform(0, 40000),
@@ -990,7 +985,7 @@ def simulate_aviation_traffic(num_samples=10, region=None):
 
 def periodic_adsb_fetch(num_samples, region=None, interval=10):
     try:
-        while 'adsb_running' in in st.session_state and st.session_state.get('adsb_running', False):
+        while 'adsb_running' in st.session_state and st.session_state.get('adsb_running', False):
             try:
                 traffic_data = fetch_adsb_data(num_samples, region)
                 traffic_df = pd.DataFrame(traffic_data)
@@ -1002,7 +997,7 @@ def periodic_adsb_fetch(num_samples, region=None, interval=10):
                             pd.DataFrame([row]),
                             st.session_state.model,
                             st.session_state.scaler,
-                            st.session_state.label_encoders
+                            st.session_state.label_encoders,
                             st.session_state.le_class
                         )
                         results.append({
@@ -1024,26 +1019,31 @@ def periodic_adsb_fetch(num_samples, region=None, interval=10):
                 st.session_state.atc_anomalies = anomalies
                 conflicts = detect_collision_risks(results)
                 st.session_state.flight_conflicts = conflicts
-                st.session_state.optimized_routes = optimize_routes_routes(results)
+                st.session_state.optimized_routes = optimize_routes(results)
                 if not anomalies.empty or conflicts:
                     st.session_state.alert_log.append({
                         'timestamp': datetime.now(),
                         'type': 'ATC Monitoring',
                         'severity': 'high',
-                        'details': f"Detected {len({len(anomalies)} anomalies and {len(conflicts)} conflicts detected" detected"})
+                        'details': f"Detected {len(anomalies)} anomalies and {len(conflicts)} conflicts"
+                    })
                 time.sleep(interval)
             except Exception as e:
-                logger.error(f"Periodic error: {str(e)}")
-                st.error(f"Periodic error: {str(e)}")
+                logger.error(f"Periodic ADS-B fetch error: {str(e)}")
+                st.error(f"Periodic ADS-B fetch error: {str(e)}")
+                continue
+    except Exception as e:
+        logger.error(f"Error in periodic_adsb_fetch: {str(e)}")
+        st.error(f"Error in periodic_adsb_fetch: {str(e)}")
 
 def detect_drones():
     try:
         region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
-        num_drones = np.random.randint(0, 5),
+        num_drones = np.random.randint(0, 5)
         drone_results = []
         for i in range(num_drones):
-            altitude = np.random.uniform(0, 1000),
-            is_unauthorized = altitude < 400,
+            altitude = np.random.uniform(0, 1000)
+            is_unauthorized = altitude < 400
             drone_results.append({
                 'timestamp': pd.Timestamp.now(),
                 'drone_id': f"DRN{i:03d}",
@@ -1054,29 +1054,28 @@ def detect_drones():
                 'severity': 'high' if is_unauthorized else 'low'
             })
         st.session_state.drone_results = drone_results
-        try:
-            if any(d['status'] == 'unidentified' for d in drone_results):
-                st.session_state.alert_log.append({
-                    'timestamp': datetime.now(),
-                    'type': 'Drone Intrusion detected',
-                    'severity': 'high',
-                    'details': f"Detected {sum(d['status'] == 'unidentified' for d in drone_results)} unauthorized drones detected"
-                })
-            log_user_activity("system", f"Detected {len(drone_results)} drones detected, {sum(d['status'] == 'unidentified' for d in drone_results)} unauthorized")
-        except Exception as e:
-            logger.error(f"Drone detection error: {str(e)}")
+        if any(d['status'] == 'unidentified' for d in drone_results):
             st.session_state.alert_log.append({
                 'timestamp': datetime.now(),
-                'type': 'Drone Detection Error',
+                'type': 'Drone Intrusion',
                 'severity': 'high',
-                'details': f"Drone detection failed: {str(e)}"
+                'details': f"Detected {sum(d['status'] == 'unidentified' for d in drone_results)} unauthorized drones"
             })
+        log_user_activity("system", f"Detected {len(drone_results)} drones, {sum(d['status'] == 'unidentified' for d in drone_results)} unauthorized")
+    except Exception as e:
+        logger.error(f"Drone detection error: {str(e)}")
+        st.session_state.alert_log.append({
+            'timestamp': datetime.now(),
+            'type': 'Drone Detection Error',
+            'severity': 'high',
+            'details': f"Drone detection failed: {str(e)}"
+        })
 
-def periodic_drone_detection(detection(interval=3600):
+def periodic_drone_detection(interval=3600):
     while 'drone_running' in st.session_state and st.session_state.drone_running:
         detect_drones()
         time.sleep(interval)
-
+        
 def detect_collision_risks(data):
     try:
         df = pd.DataFrame(data)
