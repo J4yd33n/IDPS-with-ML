@@ -1051,7 +1051,7 @@ def optimize_traffic_flow(traffic_data, num_clusters=3):
     try:
         df = pd.DataFrame(traffic_data)
         if len(df) < 2:
-            return []        )
+            return []        
         features = ['latitude', 'longitude', 'altitude']
         X = df[features].values().fillna(0)
         kmeans = KMeans(n_clusters=min(num_clusters, len(X)), random_state=42)
