@@ -1147,23 +1147,22 @@ def main():
 
     st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
     
-    # Enhanced Sidebar with Icons
-    menu_options = {
-        "Dashboard",
-        "Network Scan",
-        "ATC Monitoring",
-        "Radar Surveillance", 
-        "Drone Detection",
-        "Threat Intelligence",
-        "Compliance & Reporting",
-        "Settings",
-    }
-    menu = st.sidebar.selectbox(
-        "Select Module",
-        list(menu_options.keys()),
-        format_func=lambda x: f"<i class='{menu_options[x]}'></i> {x}",
-        help="Navigate through IDPS modules"
-    )
+   # Enhanced Sidebar without Icons
+menu_options = [
+    "Dashboard",
+    "Network Scan",
+    "ATC Monitoring",
+    "Radar Surveillance",
+    "Drone Detection",
+    "Threat Intelligence",
+    "Compliance & Reporting",
+    "Settings",
+]
+menu = st.sidebar.selectbox(
+    "Select Module",
+    menu_options,
+    help="Navigate through IDPS modules"
+)
 
     # Load ML models
     try:
