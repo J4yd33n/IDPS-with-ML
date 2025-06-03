@@ -1051,9 +1051,9 @@ def optimize_traffic_flow(traffic_data, num_clusters=3):
     try:
         df = pd.DataFrame(traffic_data)
         if len(df) < 2:
-            return []        
+            return []
         features = ['latitude', 'longitude', 'altitude']
-        X = df[features].values().fillna(0)
+        X = df[features].fillna(0).values
         kmeans = KMeans(n_clusters=min(num_clusters, len(X)), random_state=42)
         df['cluster'] = kmeans.fit_predict(X)
         routes = []
@@ -1074,7 +1074,8 @@ def optimize_traffic_flow(traffic_data, num_clusters=3):
         return routes
     except Exception as e:
         logger.error(f"Traffic optimization error: {str(e)}")
-        return str(e.error(f"Traffic optimization error: {str(e)}"))
+        st.error(f"Traffic optimization error: {str(e)}")
+        return []
 
 # Drone Detection
 def periodic_drone_detection(interval=120):
@@ -1092,18 +1093,18 @@ def periodic_drone_detection(interval=120):
                     'latitude': np.random.uniform(region['lat_min'], region['lat_max']),
                     'longitude': np.random.uniform(region['lon_min'], region['lon_max']),
                     'altitude': altitude,
-                    'status': 'ununauthorized' if is_unauthorized else 'authorized',
+                    'status': 'unauthorized' if is_unauthorized else 'authorized',
                     'severity': 'high' if is_unauthorized else 'low'
                 })
             st.session_state.drone_results = drone_results
-            if any(d['status'] == 'ununauthorized' for d in drone_results):
+            if any(d['status'] == 'unauthorized' for d in drone_results):
                 st.session_state.alert_log.append({
                     'timestamp': datetime.now(),
                     'type': 'Drone Intrusion',
                     'severity': 'high',
-                    'details': f"Detected {sum(d['status'] == 'ununauthorized' for d in drone_results)} unauthorized drones"
+                    'details': f"Detected {sum(d['status'] == 'unauthorized' for d in drone_results)} unauthorized drones"
                 })
-            log_user_activity("system", f"Drone detection: {len(drone_results)} drones, {sum(d['status'] == 'unapproved' for d in drone_results)} unauthorized")
+            log_user_activity("system", f"Drone detection: {len(drone_results)} drones, {sum(d['status'] == 'unauthorized' for d in drone_results)} unauthorized")
             time.sleep(interval)
     except Exception as e:
         logger.error(f"Drone detection error: {str(e)}")
@@ -1117,9 +1118,6 @@ def periodic_drone_detection(interval=120):
 # Threat Intelligence Integration
 @st.cache_data(ttl=3600)
 def fetch_threat_feed(api_key=None, source="alienvault"):
-    """
-    Fetch threat intelligence from external sources like AlienVault OTX or a simulated feed.
-    """
     try:
         if source == "alienvault" and api_key:
             url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
@@ -1128,7 +1126,7 @@ def fetch_threat_feed(api_key=None, source="alienvault"):
             if response.status_code == 200:
                 data = response.json().get("results", [])
                 threats = []
-                for pulse in data[:10]:  # Limit to 10 for performance
+                for pulse in data[:10]:
                     threats.append({
                         'timestamp': pd.Timestamp.now(),
                         'threat_id': pulse.get('id', 'unknown'),
@@ -1141,7 +1139,6 @@ def fetch_threat_feed(api_key=None, source="alienvault"):
                 return threats
             else:
                 logger.warning(f"AlienVault API error: {response.status_code}")
-                st.warning("Failed to fetch AlienVault threat feed. Using simulated data.")
         return simulate_threat_feed()
     except Exception as e:
         logger.error(f"Threat feed fetch error: {str(e)}")
@@ -1149,9 +1146,6 @@ def fetch_threat_feed(api_key=None, source="alienvault"):
         return simulate_threat_feed()
 
 def simulate_threat_feed(num_threats=5):
-    """
-    Simulate a threat intelligence feed for testing or fallback.
-    """
     try:
         threats = []
         for i in range(num_threats):
@@ -1170,9 +1164,6 @@ def simulate_threat_feed(num_threats=5):
         return []
 
 def periodic_threat_fetch(api_key, interval=3600):
-    """
-    Periodically fetch threat intelligence and update session state.
-    """
     try:
         while 'threat_running' in st.session_state and st.session_state.threat_running:
             threats = fetch_threat_feed(api_key)
@@ -1196,9 +1187,6 @@ def periodic_threat_fetch(api_key, interval=3600):
 
 # Model Training and Prediction
 def train_model(df, model_type="xgboost"):
-    """
-    Train a machine learning model for traffic classification.
-    """
     try:
         label_encoders = {}
         le_class = LabelEncoder()
@@ -1241,9 +1229,6 @@ def train_model(df, model_type="xgboost"):
         return None, None, None, None
 
 def predict_traffic(df, model, scaler, label_encoders, le_class):
-    """
-    Predict traffic classification using the trained model.
-    """
     try:
         df_processed, _, _ = preprocess_data(df, label_encoders, le_class, is_train=False)
         if df_processed is None:
@@ -1252,12 +1237,12 @@ def predict_traffic(df, model, scaler, label_encoders, le_class):
         X = df_processed.drop(['class'], axis=1, errors='ignore')
         X_scaled = scaler.transform(X)
 
-        if isinstance(model, Sequential):  # LSTM model
+        if isinstance(model, Sequential):
             X_reshaped = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
             probabilities = model.predict(X_reshaped, verbose=0)
             prediction = le_class.inverse_transform([np.argmax(probabilities[0])])[0]
             confidence = np.max(probabilities[0])
-        else:  # XGBoost or RandomForest
+        else:
             probabilities = model.predict_proba(X_scaled)
             prediction = le_class.inverse_transform([np.argmax(probabilities[0])])[0]
             confidence = np.max(probabilities[0])
@@ -1273,6 +1258,21 @@ def predict_traffic(df, model, scaler, label_encoders, le_class):
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
         return "error", 0.0
+
+# Anomaly Detection in Air Traffic Data
+def detect_air_traffic_anomalies(df):
+    try:
+        features = ['latitude', 'longitude', 'altitude', 'velocity']
+        X = df[features].fillna(0)
+        model = IsolationForest(contamination=0.1, random_state=42)
+        model.fit(X)
+        predictions = model.predict(X)
+        df['anomaly'] = predictions == -1
+        anomalies = df[df['anomaly'] == True]
+        return df, anomalies
+    except Exception as e:
+        logger.error(f"Flight data processing error: {str(e)}")
+        return df, pd.DataFrame()
 
 # Report Generation
 def generate_pdf_report(data, filename="nama_idps_report.pdf"):
