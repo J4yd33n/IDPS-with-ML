@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -808,7 +809,7 @@ def run_nmap_scan(target, scan_type, port_range, custom_args=None):
                         'state': state,
                         'service': service
                     })
-        log_user_activity("system, Performed NMAP scan on" {f"{target}"})
+        log_user_activity("system", f"Performed NMAP scan on {target}")
         return results
     except Exception as e:
         logger.error(f"NMAP scan error: {str(e)}")
@@ -830,36 +831,37 @@ def periodic_nmap_scan(target, scan_type, port_range, custom_args=None, interval
 def simulate_nmap_scan(target, scan_type, port_range):
     try:
         common_ports = {
-            '21': {'service': 'ftp', 'protocols': ['tcp']},
+            '21': {'service': 'ftp', 'protocol': 'tcp'},
             '22': {'service': 'ssh', 'protocol': 'tcp'},
             '23': {'service': 'telnet', 'protocol': 'tcp'},
-            '80': {'service': 'http', 'protocol': ['tcp']},
-            '443': {'service': 'https', 'protocol': ['tcp']},
-            '3306': {'service': 'mysql', 'protocol': ['tcp']},
-            '3389': {'service': 'rdp', 'protocol': ['tcp']}
+            '80': {'service': 'http', 'protocol': 'tcp'},
+            '443': {'service': 'https', 'protocol': 'tcp'},
+            '3306': {'service': 'mysql', 'protocol': 'tcp'},
+            '3389': {'service': 'rdp', 'protocol': 'tcp'}
         }
         start_port, end_port = map(int, port_range.split('-'))
         ports_to_scan = [p for p in common_ports.keys() if start_port <= int(p) <= end_port]
         np.random.seed(42)
         results = []
-        for port in ports_to_scan:            port_data = common_ports[port]
+        for port in ports_to_scan:
+            port_data = common_ports[port]
             protocol = port_data['protocol']
             service = port_data['service']
-            if scan_type in ['TCP SYN', 'TCP Connect'] and 'tcp' not in protocol:
+            if scan_type in ['TCP SYN', 'TCP Connect'] and protocol != 'tcp':
                 continue
-            if scan_type == 'UDP' and 'udp' not in protocol:
+            if scan_type == 'UDP' and protocol != 'udp':
                 continue
             state = 'open' if np.random.random() < 0.5 else 'closed'
             results.append({
                 'port': port,
-                'protocol': 'tcp' if 'udp' in service else protocol,
+                'protocol': protocol,
                 'state': state,
                 'service': service
             })
-        log_user_activity("system", f"Simulated {f"Simulated NMAP scan on {len(results)} for {port_range} on {target}"})
+        log_user_activity("system", f"Simulated NMAP scan on {target} for {port_range} with {len(results)} results")
         return results
     except Exception as e:
-        logger.error(f"Failed to simulate NMAP simulation: {str(e)}")
+        logger.error(f"Failed to simulate NMAP scan: {str(e)}")
         st.error(f"Error: {str(e)}")
         return []
 
@@ -1075,13 +1077,13 @@ def periodic_drone_detection(interval=3600):
     while 'drone_running' in st.session_state and st.session_state.drone_running:
         detect_drones()
         time.sleep(interval)
-        
+
 def detect_collision_risks(data):
     try:
         df = pd.DataFrame(data)
         risks = []
-        for i, row1 in enumerate(df.iterrows()):
-            for j, row2 in enumerate(df.iloc[i+1:].iterrows()):
+        for i, row1 in df.iterrows():
+            for j, row2 in df.iloc[i+1:].iterrows():
                 if row1['icao24'] == row2['icao24']:
                     continue
                 pos1 = (row1['latitude'], row1['longitude'])
@@ -1120,7 +1122,7 @@ def detect_aircraft_anomalies(df):
         logger.error(f"Anomaly detection error: {str(e)}")
         return df, pd.DataFrame()
 
-def optimize_routes_routes(data):
+def optimize_routes(data):
     try:
         df = pd.DataFrame(data)
         if df.empty:
@@ -1305,6 +1307,211 @@ def generate_pdf_report(data, filename="nama_idps_report.pdf"):
     except Exception as e:
         logger.error(f"PDF report generation error: {str(e)}")
         return None
+
+# Compliance Monitoring
+def monitor_compliance():
+    try:
+        compliance_metrics = st.session_state.compliance_metrics
+        open_ports = len([r for r in st.session_state.scan_results if r['state'] == 'open']) if st.session_state.scan_results else 0
+        alerts_count = len(st.session_state.alert_log)
+        detection_rate = (len(st.session_state.atc_anomalies) / len(st.session_state.atc_results) * 100) if st.session_state.atc_results else 0
+        
+        compliance_metrics.update({
+            'detection_rate': detection_rate,
+            'open_ports': open_ports,
+            'alerts': alerts_count
+        })
+        
+        if open_ports > 10 or alerts_count > 5:
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'Compliance Alert',
+                'severity': 'high',
+                'details': f"High open ports ({open_ports}) or alerts ({alerts_count}) detected"
+            })
+        
+        log_user_activity("system", "Compliance metrics updated")
+        return compliance_metrics
+    except Exception as e:
+        logger.error(f"Compliance monitoring error: {str(e)}")
+        st.error(f"Compliance monitoring error: {str(e)}")
+        return st.session_state.compliance_metrics
+
+def periodic_compliance_check(interval=3600):
+    while 'compliance_running' in st.session_state and st.session_state.compliance_running:
+        try:
+            metrics = monitor_compliance()
+            st.session_state.compliance_metrics = metrics
+            time.sleep(interval)
+        except Exception as e:
+            logger.error(f"Periodic compliance check error: {str(e)}")
+            continue
+
+# Display Compliance Metrics
+def display_compliance_metrics():
+    try:
+        metrics = st.session_state.compliance_metrics
+        st.markdown("### Compliance Dashboard")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Detection Rate", f"{metrics['detection_rate']:.1f}%")
+        with col2:
+            st.metric("Open Ports", metrics['open_ports'])
+        with col3:
+            st.metric("Active Alerts", metrics['alerts'])
+        
+        # Compliance Status Visualization
+        fig = go.Figure()
+        fig.add_trace(go.Indicator(
+            mode="gauge+number",
+            value=metrics['detection_rate'],
+            title={'text': "Intrusion Detection Rate"},
+            gauge={
+                'axis': {'range': [0, 100]},
+                'bar': {'color': WICKET_THEME['accent']},
+                'threshold': {
+                    'line': {'color': WICKET_THEME['error'], 'width': 4},
+                    'thickness': 0.75,
+                    'value': 80
+                }
+            }
+        ))
+        fig.update_layout(
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            font={'color': WICKET_THEME['text_light']},
+            margin=dict(l=20, r=20, t=50, b=20)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Recent Compliance Alerts
+        st.markdown("#### Recent Compliance Alerts")
+        compliance_alerts = [a for a in st.session_state.alert_log if a['type'] == 'Compliance Alert']
+        if compliance_alerts:
+            st.dataframe(pd.DataFrame(compliance_alerts[-5:]))
+        else:
+            st.info("No compliance alerts to display.")
+    except Exception as e:
+        logger.error(f"Compliance display error: {str(e)}")
+        st.error(f"Compliance display error: {str(e)}")
+
+# Download Report
+def download_report():
+    try:
+        report_file = generate_pdf_report(st.session_state.alert_log, filename="nama_idps_report.pdf")
+        if report_file and os.path.exists(report_file):
+            with open(report_file, "rb") as file:
+                st.download_button(
+                    label="Download Report",
+                    data=file,
+                    file_name=report_file,
+                    mime="application/pdf"
+                )
+            os.remove(report_file)
+        else:
+            st.error("Failed to generate PDF report")
+    except Exception as e:
+        logger.error(f"Report download error: {str(e)}")
+        st.error(f"Report download error: {str(e)}")
+
+# Enhanced Drone Visualization
+def display_drone_data():
+    try:
+        if not st.session_state.drone_results:
+            st.warning("No drone data available")
+            return
+        
+        df = pd.DataFrame(st.session_state.drone_results)
+        fig = go.Figure()
+        
+        # Drone positions
+        for status in df['status'].unique():
+            status_df = df[df['status'] == status]
+            fig.add_trace(go.Scattergeo(
+                lon=status_df['longitude'],
+                lat=status_df['latitude'],
+                mode='markers',
+                marker=dict(
+                    size=10,
+                    color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
+                    symbol='triangle-up',
+                    line=dict(width=2, color=WICKET_THEME['text'])
+                ),
+                text=status_df['drone_id'],
+                hoverinfo='text',
+                name=status.capitalize()
+            ))
+        
+        fig.update_layout(
+            geo=dict(
+                scope='africa',
+                showland=True,
+                landcolor=WICKET_THEME['secondary_bg'],
+                showocean=True,
+                oceancolor=WICKET_THEME['primary_bg'],
+                showcountries=True,
+                countrycolor=WICKET_THEME['border'],
+                projection_type='mercator',
+                center=dict(lat=9, lon=7),
+                lataxis=dict(range=[4, 14]),
+                lonaxis=dict(range=[2, 15])
+            ),
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            margin=dict(l=10, r=10, t=50, b=10),
+            title=dict(
+                text="Drone Surveillance",
+                font=dict(color=WICKET_THEME['text_light'], size=20),
+                x=0.5,
+                xanchor='center'
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
+    except Exception as e:
+        logger.error(f"Drone display error: {str(e)}")
+        st.error(f"Drone display error: {str(e)}")
+
+# Threat Intelligence Visualization
+def display_threat_intelligence():
+    try:
+        if not st.session_state.threats:
+            st.warning("No threat intelligence data available")
+            return
+        
+        df = pd.DataFrame(st.session_state.threats)
+        st.markdown("### Threat Intelligence Feed")
+        
+        # Severity Distribution
+        severity_counts = df['severity'].value_counts()
+        fig = go.Figure(data=[
+            go.Bar(
+                x=severity_counts.index,
+                y=severity_counts.values,
+                marker_color=[WICKET_THEME['error'], WICKET_THEME['accent'], WICKET_THEME['success']],
+                text=severity_counts.values,
+                textposition='auto'
+            )
+        ])
+        fig.update_layout(
+            title="Threat Severity Distribution",
+            xaxis_title="Severity",
+            yaxis_title="Count",
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            font={'color': WICKET_THEME['text_light']},
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Recent Threats
+        st.markdown("#### Recent Threats")
+        st.dataframe(df[['timestamp', 'threat_id', 'description', 'severity', 'source']])
+    except Exception as e:
+        logger.error(f"Threat intelligence display error: {str(e)}")
+        st.error(f"Threat intelligence error: {str(e)}")
 
 def main():
     apply_wicket_css()
@@ -1554,397 +1761,205 @@ def main():
                     </div>
                 </div>
             </div>
-            <script>
-                const signInBtn = document.getElementById("signInBtn");
-                const signUpBtn = document.getElementById("signUpBtn");
-                const container = document.getElementById("container");
+           <script>
+                    const signInBtn = document.getElementById("signInBtn");
+                    const signUpBtn = document.getElementById("signUpBtn");
+                    const container = document.getElementById("container");
+                    const signInForm = document.getElementById("form2");
+                    const signUpForm = document.getElementById("form1");
 
-                if (signInBtn) {
-                    signInBtn.addEventListener("click", () => {
-                        container.classList.remove("right-panel-active");
-                        if (window.parent && window.parent.postMessage) {
-                            window.parent.postMessage({type: 'setFormType', value: 'signin'}, '*');
-                        }
-                    });
-                }
-                if (signUpBtn) {
                     signUpBtn.addEventListener("click", () => {
                         container.classList.add("right-panel-active");
-                        if (window.parent && window.parent.postMessage) {
-                            window.parent.postMessage({type: 'setFormType', value: 'signup'}, '*');
-                        }
                     });
-                }
-            </script>
-        </body>
+
+                    signInBtn.addEventListener("click", () => {
+                        container.classList.remove("right-panel-active");
+                    });
+
+                    signUpForm.addEventListener("submit", (e) => {
+                        e.preventDefault();
+                        const username = document.getElementById("signupUsername").value;
+                        const email = document.getElementById("signupEmail").value;
+                        const password = document.getElementById("signupPassword").value;
+                        // Use Streamlit's script run context to send data to Python
+                        fetch("/_stcore/streamlit_script_run", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                "signup": {
+                                    "username": username,
+                                    "email": email,
+                                    "password": password
+                                }
+                            })
+                        }).then(response => {
+                            if (response.ok) {
+                                alert("Sign-up successful! Please sign in.");
+                                container.classList.remove("right-panel-active");
+                            } else {
+                                alert("Sign-up failed. Username may already exist.");
+                            }
+                        });
+                    });
+
+                    signInForm.addEventListener("submit", (e) => {
+                        e.preventDefault();
+                        const email = document.getElementById("signinEmail").value;
+                        const password = document.getElementById("signinPassword").value;
+                        fetch("/_stcore/streamlit_script_run", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                "signin": {
+                                    "email": email,
+                                    "password": password
+                                }
+                            })
+                        }).then(response => {
+                            if (response.ok) {
+                                window.location.reload(); // Refresh to update session state
+                            } else {
+                                alert("Sign-in failed. Please check your credentials.");
+                            }
+                        });
+                    });
+                </script>
+            </body>
         </html>
         """
-        st.markdown(html_content, unsafe_allow_html=True)
+        components.html(html_content, height=500)
 
-        components.html("""
-        <script>
-            window.addEventListener('message', function(e) {
-                if (e.data.type === 'setFormType') {
-                    // Handled by Streamlit session state
-                }
-            });
-        </script>
-        """, height=0)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Show Sign In"):
-                st.session_state.form_type = 'signin'
-                st.markdown("<script>document.getElementById('container').classList.remove('right-panel-active');</script>", unsafe_allow_html=True)
-        with col2:
-            if st.button("Show Sign Up"):
-                st.session_state.form_type = 'signup'
-                st.markdown("<script>document.getElementById('container').classList.add('right-panel-active');</script>", unsafe_allow_html=True)
-
-        if st.session_state.form_type == 'signup':
-            with st.form("signup_form"):
-                username = st.text_input("Username", key="signup_username")
-                email = st.text_input("Email", key="signup_email")
-                password = st.text_input("Password", type="password", key="signup_password")
-                submit = st.form_submit_button("Sign Up")
-                if submit:
-                    if not username or not email or not password:
-                        st.error("Please fill in all fields")
-                    elif register_user(username, password):
-                        st.success("Registration successful! Please sign in.")
-                        st.session_state.form_type = 'signin'
-                        st.markdown("<script>document.getElementById('container').classList.remove('right-panel-active');</script>", unsafe_allow_html=True)
-                    else:
-                        st.error("Username already exists or registration failed")
-        else:
-            with st.form("signin_form"):
-                email = st.text_input("Email", key="signin_email")
-                password = st.text_input("Password", type="password", key="signin_password")
-                submit = st.form_submit_button("Sign In")
-                if submit:
-                    if not email or not password:
-                        st.error("Please fill in all fields")
-                    elif authenticate_user(email, password):
-                        st.session_state.authenticated = True
-                        st.session_state.username = email
-                        log_user_activity(email, "Login")
-                        st.success("Login successful!")
-                        st.rerun()
-                    else:
-                        st.error("Invalid email or password")
-
+        # Handle form submissions
+        if st._is_running_with_streamlit:
+            import streamlit.components.v1 as components
+            if "signup" in st.session_state.get("_streamlit_script_run_data", {}):
+                signup_data = st.session_state["_streamlit_script_run_data"]["signup"]
+                username = signup_data["username"]
+                password = signup_data["password"]
+                if register_user(username, password):
+                    st.success("Registration successful! Please sign in.")
+                    log_user_activity(username, "Registered")
+                else:
+                    st.error("Registration failed. Username may already exist.")
+            elif "signin" in st.session_state.get("_streamlit_script_run_data", {}):
+                signin_data = st.session_state["_streamlit_script_run_data"]["signin"]
+                username = signin_data["email"]
+                password = signin_data["password"]
+                if authenticate_user(username, password):
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    log_user_activity(username, "Signed in")
+                    st.experimental_rerun()
+                else:
+                    st.error("Invalid username or password")
     else:
-        st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/logo.png", use_column_width=True)
-        st.sidebar.write(f"Welcome, {st.session_state.username}")
-        page = st.sidebar.selectbox(
-            "Navigation",
-            ["Dashboard", "ATC Monitoring", "Network Analysis", "Drone Detection", "Threat Intelligence", "Compliance"],
-            format_func=lambda x: x
-        )
+        # Main application logic after authentication
+        st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/images/logo.png", use_column_width=True, caption="NAMA IDPS")
+        st.sidebar.markdown("<h2 style='text-align: center; color: #E6E6FA;'>Navigation</h2>", unsafe_allow_html=True)
+        
+        # Sidebar navigation
+        page = st.sidebar.radio("", [
+            "🏠 Dashboard",
+            "✈️ ATC Monitoring",
+            "🛸 Drone Surveillance",
+            "🛡️ Threat Intelligence",
+            "🔍 Compliance Monitoring",
+            "📊 Reports",
+            "⚙️ Settings"
+        ])
 
-        if page == "Dashboard":
-            st.title("NAMA IDPS Dashboard")
-            st.markdown("### Real-Time Aviation Security Monitoring")
+        # Start background threads if not already running
+        if 'adsb_running' not in st.session_state:
+            st.session_state.adsb_running = True
+            threading.Thread(target=periodic_adsb_fetch, args=(10,), daemon=True).start()
+        if 'radar_running' not in st.session_state:
+            st.session_state.radar_running = True
+            threading.Thread(target=periodic_radar_update, args=(5,), daemon=True).start()
+        if 'nmap_running' not in st.session_state:
+            st.session_state.nmap_running = True
+            threading.Thread(target=periodic_nmap_scan, args=("192.168.1.0/24", "TCP SYN", "1-1000"), daemon=True).start()
+        if 'drone_running' not in st.session_state:
+            st.session_state.drone_running = True
+            threading.Thread(target=periodic_drone_detection, daemon=True).start()
+        if 'threat_running' not in st.session_state:
+            st.session_state.threat_running = True
+            threading.Thread(target=periodic_threat_fetch, args=(None,), daemon=True).start()
+        if 'compliance_running' not in st.session_state:
+            st.session_state.compliance_running = True
+            threading.Thread(target=periodic_compliance_check, daemon=True).start()
+
+        # Page routing
+        if page == "🏠 Dashboard":
+            st.markdown("<h1 style='text-align: center;'>NAMA Intrusion Detection & Prevention System</h1>", unsafe_allow_html=True)
+            st.markdown("<div class='card'><h3>System Overview</h3></div>", unsafe_allow_html=True)
+            
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown("#### Alerts")
+                st.markdown("#### Recent Alerts")
                 if st.session_state.alert_log:
-                    for alert in st.session_state.alert_log[-5:]:
-                        st.write(f"**{alert['timestamp']}** | {alert['type']} | Severity: {alert['severity']} | {alert['details']}")
+                    st.dataframe(pd.DataFrame(st.session_state.alert_log[-5:]))
                 else:
-                    st.write("No alerts to display.")
+                    st.info("No alerts to display.")
             with col2:
-                st.markdown("#### Metrics")
-                st.metric("Detection Rate", f"{st.session_state.compliance_metrics['detection_rate']:.1f}%")
-                st.metric("Open Ports", st.session_state.compliance_metrics['open_ports'])
-                st.metric("Active Alerts", st.session_state.compliance_metrics['alerts'])
+                st.markdown("#### System Status")
+                st.metric("Active Threats", len(st.session_state.threats))
+                st.metric("Flight Conflicts", len(st.session_state.flight_conflicts))
+                st.metric("Unauthorized Drones", sum(d['status'] == 'unidentified' for d in st.session_state.drone_results))
 
-        elif page == "ATC Monitoring":
-            st.markdown("### ATC Monitoring")
-            if st.button("Start ATC Scan"):
-                st.session_state.adsb_running = True
-                threading.Thread(target=periodic_adsb_fetch, args=(10,), daemon=True).start()
-            if st.session_state.atc_results:
-                fig = display_radar(st.session_state.atc_results)
+        elif page == "✈️ ATC Monitoring":
+            st.markdown("<h1>ATC Monitoring</h1>", unsafe_allow_html=True)
+            if st.session_state.radar_data:
+                fig = display_radar(st.session_state.radar_data)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
-                st.dataframe(pd.DataFrame(st.session_state.atc_results)[['timestamp', 'icao24', 'airport_code', 'latitude', 'longitude', 'altitude']])
+            if st.session_state.atc_results:
+                st.markdown("#### Recent ATC Data")
+                st.dataframe(pd.DataFrame(st.session_state.atc_results))
             if not st.session_state.atc_anomalies.empty:
-                st.markdown("#### Anomalies Detected")
+                st.markdown("#### Detected Anomalies")
                 st.dataframe(st.session_state.atc_anomalies)
 
-        elif page == "Network Analysis":
-            st.markdown("### Network Analysis")
-            target = st.text_input("Target IP/Subnet", "192.168.1.0/24")
-            scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
-            port_range = st.text_input("Port Range", "80-443")
-            custom_args = st.text_input("Custom Nmap Args", "-sS")
-            if st.button("Start Network Scan"):
-                st.session_state.scan_results = run_nmap_scan(target, scan_type, port_range, custom_args)
-            if st.session_state.scan_results:
-                st.dataframe(pd.DataFrame(st.session_state.scan_results))
+        elif page == "🛸 Drone Surveillance":
+            st.markdown("<h1>Drone Surveillance</h1>", unsafe_allow_html=True)
+            display_drone_data()
 
-        elif page == "Drone Detection":
-            st.markdown("### Drone Detection")
-            if st.button("Start Drone Scan"):
-                st.session_state.drone_running = True
-                threading.Thread(target=periodic_drone_detection, args=(120,), daemon=True).start()
-            if st.session_state.drone_results:
-                st.dataframe(pd.DataFrame(st.session_state.drone_results))
-
-# Logging configuration
-logger = logging.getLogger(__name__)
-
-# Compliance Monitoring
-def monitor_compliance():
-    try:
-        compliance_metrics = st.session_state.compliance_metrics
-        open_ports = len([r for r in st.session_state.scan_results if r['state'] == 'open']) if st.session_state.scan_results else 0
-        alerts_count = len(st.session_state.alert_log)
-        detection_rate = (len(st.session_state.atc_anomalies) / len(st.session_state.atc_results) * 100) if st.session_state.atc_results else 0
-        
-        compliance_metrics.update({
-            'detection_rate': detection_rate,
-            'open_ports': open_ports,
-            'alerts': alerts_count
-        })
-        
-        if open_ports > 10 or alerts_count > 5:
-            st.session_state.alert_log.append({
-                'timestamp': datetime.now(),
-                'type': 'Compliance Alert',
-                'severity': 'high',
-                'details': f"High open ports ({open_ports}) or alerts ({alerts_count}) detected"
-            })
-        
-        log_user_activity("system", "Compliance metrics updated")
-        return compliance_metrics
-    except Exception as e:
-        logger.error(f"Compliance monitoring error: {str(e)}")
-        st.error(f"Compliance monitoring error: {str(e)}")
-        return st.session_state.compliance_metrics
-
-def periodic_compliance_check(interval=3600):
-    while 'compliance_running' in st.session_state and st.session_state.compliance_running:
-        try:
-            metrics = monitor_compliance()
-            st.session_state.compliance_metrics = metrics
-            time.sleep(interval)
-        except Exception as e:
-            logger.error(f"Periodic compliance check error: {str(e)}")
-            continue
-
-# Display Compliance Metrics
-def display_compliance_metrics():
-    try:
-        metrics = st.session_state.compliance_metrics
-        st.markdown("### Compliance Dashboard")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Detection Rate", f"{metrics['detection_rate']:.1f}%")
-        with col2:
-            st.metric("Open Ports", metrics['open_ports'])
-        with col3:
-            st.metric("Active Alerts", metrics['alerts'])
-        
-        # Compliance Status Visualization
-        fig = go.Figure()
-        fig.add_trace(go.Indicator(
-            mode="gauge+number",
-            value=metrics['detection_rate'],
-            title={'text': "Intrusion Detection Rate"},
-            gauge={
-                'axis': {'range': [0, 100]},
-                'bar': {'color': WICKET_THEME['accent']},
-                'threshold': {
-                    'line': {'color': WICKET_THEME['error'], 'width': 4},
-                    'thickness': 0.75,
-                    'value': 80
-                }
-            }
-        ))
-        fig.update_layout(
-            paper_bgcolor=WICKET_THEME['card_bg'],
-            plot_bgcolor=WICKET_THEME['card_bg'],
-            font={'color': WICKET_THEME['text_light']},
-            margin=dict(l=20, r=20, t=50, b=20)
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Recent Compliance Alerts
-        st.markdown("#### Recent Compliance Alerts")
-        compliance_alerts = [a for a in st.session_state.alert_log if a['type'] == 'Compliance Alert']
-        if compliance_alerts:
-            st.dataframe(pd.DataFrame(compliance_alerts[-5:]))
-        else:
-            st.info("No compliance alerts to display.")
-    except Exception as e:
-        logger.error(f"Compliance display error: {str(e)}")
-        st.error(f"Compliance display error: {str(e)}")
-
-# Download Report
-def download_report():
-    try:
-        report_file = generate_pdf_report(st.session_state.alert_log, filename="nama_idps_report.pdf")
-        if report_file and os.path.exists(report_file):
-            with open(report_file, "rb") as file:
-                st.download_button(
-                    label="Download Report",
-                    data=file,
-                    file_name=report_file,
-                    mime="application/pdf"
-                )
-            os.remove(report_file)
-        else:
-            st.error("Failed to generate PDF report")
-    except Exception as e:
-        logger.error(f"Report download error: {str(e)}")
-        st.error(f"Report download error: {str(e)}")
-
-# Enhanced Drone Visualization
-def display_drone_data():
-    try:
-        if not st.session_state.drone_results:
-            st.warning("No drone data available")
-            return
-        
-        df = pd.DataFrame(st.session_state.drone_results)
-        fig = go.Figure()
-        
-        # Drone positions
-        for status in df['status'].unique():
-            status_df = df[df['status'] == status]
-            fig.add_trace(go.Scattergeo(
-                lon=status_df['longitude'],
-                lat=status_df['latitude'],
-                mode='markers',
-                marker=dict(
-                    size=10,
-                    color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
-                    symbol='triangle-up',
-                    line=dict(width=2, color=WICKET_THEME['text'])
-                ),
-                text=status_df['drone_id'],
-                hoverinfo='text',
-                name=status.capitalize()
-            ))
-        
-        fig.update_layout(
-            geo=dict(
-                scope='africa',
-                showland=True,
-                landcolor=WICKET_THEME['secondary_bg'],
-                showocean=True,
-                oceancolor=WICKET_THEME['primary_bg'],
-                showcountries=True,
-                countrycolor=WICKET_THEME['border'],
-                projection_type='mercator',
-                center=dict(lat=9, lon=7),
-                lataxis=dict(range=[4, 14]),
-                lonaxis=dict(range=[2, 15])
-            ),
-            showlegend=True,
-            paper_bgcolor=WICKET_THEME['card_bg'],
-            plot_bgcolor=WICKET_THEME['card_bg'],
-            margin=dict(l=10, r=10, t=50, b=10),
-            title=dict(
-                text="Drone Surveillance",
-                font=dict(color=WICKET_THEME['text_light'], size=20),
-                x=0.5,
-                xanchor='center'
-            )
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
-    except Exception as e:
-        logger.error(f"Drone display error: {str(e)}")
-        st.error(f"Drone display error: {str(e)}")
-
-# Threat Intelligence Visualization
-def display_threat_intelligence():
-    try:
-        if not st.session_state.threats:
-            st.warning("No threat intelligence data available")
-            return
-        
-        df = pd.DataFrame(st.session_state.threats)
-        st.markdown("### Threat Intelligence Feed")
-        
-        # Severity Distribution
-        severity_counts = df['severity'].value_counts()
-        fig = go.Figure(data=[
-            go.Bar(
-                x=severity_counts.index,
-                y=severity_counts.values,
-                marker_color=[WICKET_THEME['error'], WICKET_THEME['accent'], WICKET_THEME['success']],
-                text=severity_counts.values,
-                textposition='auto'
-            )
-        ])
-        fig.update_layout(
-            title="Threat Severity Distribution",
-            xaxis_title="Severity",
-            yaxis_title="Count",
-            paper_bgcolor=WICKET_THEME['card_bg'],
-            plot_bgcolor=WICKET_THEME['card_bg'],
-            font={'color': WICKET_THEME['text_light']},
-            showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Recent Threats
-        st.markdown("#### Recent Threats")
-        st.dataframe(df[['timestamp', 'threat_id', 'description', 'severity', 'source']])
-    except Exception as e:
-        logger.error(f"Threat intelligence display error: {str(e)}")
-        st.error(f"Threat intelligence error: {str(e)}")
-
-# Main continuation
-def main_continuation():
-    if st.session_state.authenticated:
-        global page
-        page = st.sidebar.selectbox(
-            "Navigation",
-            ["Dashboard", "ATC Monitoring", "Network Analysis", "Drone Detection", "Threat Intelligence", "Compliance"],
-            format_func=lambda x: x
-        )
-        
-        if page == "Threat Intelligence":
-            st.markdown("### Threat Intelligence")
-            api_key = st.text_input("AlienVault OTX API Key", type="password")
-            if st.button("Fetch Threat Intelligence"):
-                st.session_state.threat_running = True
-                threading.Thread(target=periodic_threat_fetch, args=(api_key, 120), daemon=True).start()
+        elif page == "🛡️ Threat Intelligence":
+            st.markdown("<h1>Threat Intelligence</h1>", unsafe_allow_html=True)
             display_threat_intelligence()
-        
-        elif page == "Compliance":
-            st.markdown("### Compliance Monitoring")
-            if st.button("Start Compliance Check"):
-                st.session_state.compliance_running = True
-                threading.Thread(target=periodic_compliance_check, args=(120,), daemon=True).start()
+
+        elif page == "🔍 Compliance Monitoring":
+            st.markdown("<h1>Compliance Monitoring</h1>", unsafe_allow_html=True)
             display_compliance_metrics()
-            download_report()
-        
-        # Stop all scans
-        if st.button("Stop All Scans"):
-            st.session_state.adsb_running = False
-            st.session_state.nmap_running = False
-            st.session_state.drone_running = False
-            st.session_state.threat_running = False
-            st.session_state.compliance_running = False
-            st.session_state.radar_running = False
-            st.success("All scans stopped")
-        
-        # Logout
-        if st.sidebar.button("Logout"):
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            log_user_activity(st.session_state.username or "unknown", "Logout")
-            st.rerun()
+
+        elif page == "📊 Reports":
+            st.markdown("<h1>Reports</h1>", unsafe_allow_html=True)
+            st.markdown("<div class='card'>")
+            st.markdown("### Generate Report")
+            if st.button("Generate PDF Report", key="generate_report"):
+                download_report()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        elif page == "⚙️ Settings":
+            st.markdown("<h1>Settings</h1>", unsafe_allow_html=True)
+            st.markdown("<div class='card'>")
+            st.markdown("### System Configuration")
+            target = st.text_input("NMAP Scan Target", "192.168.1.0/24")
+            scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
+            port_range = st.text_input("Port Range", "1-1000")
+            custom_args = st.text_input("Custom NMAP Arguments", "")
+            if st.button("Run NMAP Scan"):
+                results = run_nmap_scan(target, scan_type, port_range, custom_args)
+                st.session_state.scan_results = results
+                st.dataframe(pd.DataFrame(results))
+            if st.button("Logout"):
+                st.session_state.authenticated = False
+                st.session_state.username = None
+                st.experimental_rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-    main_continuation()
-
-      
