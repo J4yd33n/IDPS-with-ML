@@ -271,7 +271,7 @@ def apply_wicket_css():
             }}
             
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/aeroplane.jpg') no-repeat center center fixed;
+                background: url('https://github.com/J4yd33n/IDPS-with-ML/blob/main/airplane.jpg') no-repeat center center fixed;
                 background-size: cover;
                 position: relative;
                 min-height: 100vh;
