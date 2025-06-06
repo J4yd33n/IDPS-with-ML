@@ -1891,7 +1891,7 @@ def main():
                         st.error("Registration failed. Username may already exist.")
                 elif "signin" in script_run_data:
                     signin_data = script_run_data["signin"]
-                    username = signin_data["email"]
+                    username = signin_data["username"]
                     password = signin_data["password"]
                     if authenticate_user(username, password):
                         st.session_state.authenticated = True
