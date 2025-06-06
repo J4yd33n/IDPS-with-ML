@@ -1578,20 +1578,14 @@ def display_threat_intelligence():
                 textposition='auto'
             )
         ])
-        fig.update_layout(
+       fig.update_layout(
             title="Threat Severity Distribution",
             xaxis_title="Severity",
             yaxis_title="Count",
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
             font={'color': WICKET_THEME['text_light']},
-            margin=dict(l=20, r=20, t=50, b=20),
-            title=dict(
-                text="Threat Severity Distribution",
-                font=dict(color=WICKET_THEME['text_light'], size=20),
-                x=0.5,
-                xanchor='center'
-            )
+            margin=dict(l=20, r=20, t=50, b=20)
         )
         st.plotly_chart(fig, use_container_width=True)
         
