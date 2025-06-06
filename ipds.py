@@ -89,12 +89,25 @@ def apply_wicket_css():
             @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
             
             .stApp {{
-                background: linear-gradient(45deg, {WICKET_THEME['primary_bg']} 0%, {WICKET_THEME['secondary_bg']} 100%);
-                background-size: 200% 200%;
-                animation: gradientShift 15s ease-in-out infinite;
+                background: url('https://github.com/J4yd33n/IDPS-with-ML/blob/main/airplane.jpg?raw=true') no-repeat center center fixed;
+                background-size: cover;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
-                overflow-x: hidden;
+                position: relative;
+                overflow: hidden;
+            }}
+            
+            /* Dynamic Background Animation */
+            .stApp::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, rgba(0,212,255,0.1), rgba(255,0,255,0.1));
+                animation: gradientShift 20s ease-in-out infinite;
+                z-index: -1;
             }}
             
             @keyframes gradientShift {{
@@ -170,7 +183,7 @@ def apply_wicket_css():
             }}
             
             .stTextInput>div>input, .stSelectbox>div>select {{
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.05);
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
                 padding: 12px;
@@ -270,8 +283,6 @@ def apply_wicket_css():
             }}
             
             .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/images/aeroplane.jpg') no-repeat center center fixed;
-                background-size: cover;
                 position: relative;
                 min-height: 100vh;
                 display: flex;
@@ -283,28 +294,28 @@ def apply_wicket_css():
             .auth-overlay {{
                 position: absolute;
                 inset: 0;
-                background: linear-gradient(135deg, rgba(10, 15, 45, 0.85), rgba(30, 42, 68, 0.75));
+                background: rgba(10, 15, 45, 0.7);
                 z-index: 1;
             }}
             
             .auth-card {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border: 2px solid {WICKET_THEME['border']};
-                border-radius: 15px;
-                padding: 2.5rem;
-                max-width: 450px;
-                width: 100%;
-                box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+                background: rgba(30, 42, 68, 0.3);
+                backdrop-filter: blur(20px);
+                border: 2px solid rgba(0, 212, 255, 0.5);
+                border-radius: 20px;
+                padding: 3rem;
+                max-width: 500px;
+                width: 90%;
+                box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
                 z-index: 2;
-                animation: slideInAuth 0.8s ease-in-out forwards;
+                animation: slideInAuth 1s cubic-bezier(0.68, -0.55, 0.265, 1.55);
                 position: relative;
                 overflow: hidden;
             }}
             
             @keyframes slideInAuth {{
-                0% {{ transform: translateX(100vw); opacity: 0; }}
-                100% {{ transform: translateX(0); opacity: 1; }}
+                0% {{ transform: translateX(100vw) rotate(10deg); opacity: 0; }}
+                100% {{ transform: translateX(0) rotate(0deg); opacity: 1; }}
             }}
             
             .auth-form {{
@@ -317,48 +328,50 @@ def apply_wicket_css():
             .auth-form h2 {{
                 font-family: 'Orbitron', sans-serif;
                 color: {WICKET_THEME['text_light']};
-                margin-bottom: 1.5rem;
-                text-shadow: 0 0 8px {WICKET_THEME['accent']};
+                margin-bottom: 2rem;
+                text-shadow: 0 0 10px {WICKET_THEME['accent']}, 0 0 20px {WICKET_THEME['hover']};
+                animation: neonFlicker 2s infinite alternate;
             }}
             
             .auth-input {{
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.05);
                 border: 1px solid {WICKET_THEME['border']};
-                border-radius: 8px;
-                padding: 12px;
-                margin: 0.5rem 0;
+                border-radius: 10px;
+                padding: 15px;
+                margin: 0.75rem 0;
                 width: 100%;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
                 transition: all 0.3s ease;
+                box-shadow: inset 0 0 5px rgba(0, 212, 255, 0.2);
             }}
             .auth-input:focus {{
                 border-color: {WICKET_THEME['accent']};
-                box-shadow: 0 0 12px {WICKET_THEME['accent']};
+                box-shadow: 0 0 15px {WICKET_THEME['accent']}, inset 0 0 10px {WICKET_THEME['accent']};
                 outline: none;
             }}
             
             .auth-btn {{
                 background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
                 color: {WICKET_THEME['button_text']};
-                border-radius: 25px;
-                padding: 12px 0;
+                border-radius: 30px;
+                padding: 15px 0;
                 width: 100%;
                 border: none;
                 font-family: 'Orbitron', sans-serif;
-                font-size: 0.9rem;
+                font-size: 1rem;
                 font-weight: 700;
-                letter-spacing: 1px;
+                letter-spacing: 2px;
                 cursor: pointer;
-                margin-top: 1.5rem;
+                margin-top: 2rem;
                 transition: all 0.3s ease;
-                box-shadow: 0 0 15px {WICKET_THEME['button_bg']};
+                box-shadow: 0 0 20px {WICKET_THEME['button_bg']};
                 position: relative;
                 overflow: hidden;
             }}
             .auth-btn:hover {{
                 background: {WICKET_THEME['hover']};
-                box-shadow: 0 0 25px {WICKET_THEME['hover']};
+                box-shadow: 0 0 30px {WICKET_THEME['hover']};
                 transform: scale(1.05);
             }}
             .auth-btn::before {{
@@ -383,26 +396,26 @@ def apply_wicket_css():
             .auth-link {{
                 color: {WICKET_THEME['accent']};
                 font-size: 0.9rem;
-                margin-top: 1rem;
+                margin-top: 1.5rem;
                 text-decoration: none;
                 font-family: 'Roboto Mono', monospace;
                 transition: color 0.3s ease;
             }}
             .auth-link:hover {{
                 color: {WICKET_THEME['hover']};
-                text-shadow: 0 0 8px {WICKET_THEME['hover']};
+                text-shadow: 0 0 10px {WICKET_THEME['hover']};
             }}
             
             .radar {{
                 position: absolute;
-                bottom: 20px;
-                right: 20px;
-                width: 100px;
-                height: 100px;
+                bottom: 30px;
+                right: 30px;
+                width: 120px;
+                height: 120px;
                 border-radius: 50%;
-                background: radial-gradient(circle, rgba(0, 212, 255, 0.3) 0%, transparent 70%);
+                background: radial-gradient(circle, rgba(0, 212, 255, 0.4) 0%, transparent 70%);
                 z-index: 2;
-                animation: radarPulse 2s infinite;
+                animation: radarPulse 3s infinite;
             }}
             .radar::before {{
                 content: '';
@@ -413,13 +426,13 @@ def apply_wicket_css():
                 height: 50%;
                 background: {WICKET_THEME['accent']};
                 transform-origin: bottom;
-                animation: radarSweep 4s linear infinite;
+                animation: radarSweep 5s linear infinite;
             }}
             
             @keyframes radarPulse {{
-                0% {{ transform: scale(1); opacity: 0.8; }}
-                50% {{ transform: scale(1.2); opacity: 0.5; }}
-                100% {{ transform: scale(1); opacity: 0.8; }}
+                0% {{ transform: scale(1); opacity: 0.7; }}
+                50% {{ transform: scale(1.15); opacity: 0.4; }}
+                100% {{ transform: scale(1); opacity: 0.7; }}
             }}
             @keyframes radarSweep {{
                 0% {{ transform: rotate(0deg); }}
@@ -470,12 +483,12 @@ def apply_wicket_css():
                 background: {WICKET_THEME['accent']};
                 border-radius: 50%;
                 pointer-events: none;
-                animation: float 6s infinite linear;
+                animation: floatParticle 8s infinite linear;
                 z-index: 1;
             }}
             
-            @keyframes float {{
-                0% {{ transform: translateY(100vh); opacity: 0.6; }}
+            @keyframes floatParticle {{
+                0% {{ transform: translateY(100vh); opacity: 0.8; }}
                 100% {{ transform: translateY(-100vh); opacity: 0; }}
             }}
             
@@ -491,11 +504,48 @@ def apply_wicket_css():
                     padding: 10px;
                 }}
                 .auth-card {{
-                    padding: 1.5rem;
-                    max-width: 90%;
+                    padding: 2rem;
+                    max-width: 95%;
+                }}
+                .radar {{
+                    width: 80px;
+                    height: 80px;
+                    bottom: 20px;
+                    right: 20px;
                 }}
             }}
+            
+            /* Particle Generator */
+            #particle-container {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 0;
+            }}
         </style>
+        <script>
+            // Particle Animation
+            function createParticles() {{
+                const container = document.createElement('div');
+                container.id = 'particle-container';
+                document.body.appendChild(container);
+                
+                for (let i = 0; i < 50; i++) {{
+                    const particle = document.createElement('div');
+                    particle.className = 'auth-particle';
+                    const size = Math.random() * 5 + 2;
+                    particle.style.width = `${{size}}px`;
+                    particle.style.height = `${{size}}px`;
+                    particle.style.left = `${{Math.random() * 100}}vw`;
+                    particle.style.animationDuration = `${{Math.random() * 4 + 4}}s`;
+                    particle.style.animationDelay = `${{Math.random() * 2}}s`;
+                    container.appendChild(particle);
+                }}
+            }}
+            document.addEventListener('DOMContentLoaded', createParticles);
+        </script>
     """
     st.markdown(css, unsafe_allow_html=True)
 
@@ -545,77 +595,106 @@ if 'le_class' not in st.session_state:
 
 # User database setup
 def setup_user_db():
-    conn = sqlite3.connect('nama_users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS user_activity (
-        username TEXT,
-        timestamp TEXT,
-        action TEXT
-    )''')
-    c.execute("SELECT username FROM users WHERE username = ?", ('nama',))
-    if not c.fetchone() and BCRYPT_AVAILABLE:
-        default_password = 'admin'
-        hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
-        try:
+    try:
+        conn = sqlite3.connect('nama_users.db')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_activity (
+            username TEXT,
+            timestamp TEXT,
+            action TEXT
+        )''')
+        c.execute("SELECT username FROM users WHERE username = ?", ('nama',))
+        if not c.fetchone() and BCRYPT_AVAILABLE:
+            default_password = 'admin'
+            hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
             c.execute("INSERT INTO users (username, password) VALUES (?, ?)", ('nama', hashed))
             conn.commit()
             logger.info("Default user 'nama' created successfully")
-        except sqlite3.IntegrityError:
-            logger.error("Failed to create default user: username already exists")
-    conn.commit()
-    conn.close()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Database setup error: {str(e)}")
+        st.error(f"Database setup error: {str(e)}")
 
 def register_user(username, password):
     if not BCRYPT_AVAILABLE:
         logger.error("Cannot register user: bcrypt module is missing")
+        st.error("Cannot register user: bcrypt module is missing")
         return False
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    conn = sqlite3.connect('nama_users.db')
-    c = conn.cursor()
     try:
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        conn = sqlite3.connect('nama_users.db')
+        c = conn.cursor()
         c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
         conn.commit()
+        conn.close()
+        logger.info(f"User {username} registered successfully")
+        return True
     except sqlite3.IntegrityError:
+        logger.warning(f"Registration failed: Username {username} already exists")
         return False
-    conn.close()
-    return True
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        st.error(f"Registration error: {str(e)}")
+        return False
 
 def authenticate_user(username, password):
     if not BCRYPT_AVAILABLE:
         logger.error("Authentication disabled: bcrypt module is missing")
         st.error("Authentication disabled: bcrypt module is missing")
         return False
-    conn = sqlite3.connect('nama_users.db')
-    c = conn.cursor()
-    c.execute("SELECT password FROM users WHERE username = ?", (username,))
-    result = c.fetchone()
-    conn.close()
-    if result:
-        stored_password = result[0]
-        try:
-            return bcrypt.checkpw(password.encode('utf-8'), stored_password)
-        except Exception as e:
-            logger.error(f"Password verification error: {str(e)}")
+    try:
+        conn = sqlite3.connect('nama_users.db')
+        c = conn.cursor()
+        c.execute("SELECT password FROM users WHERE username = ?", (username,))
+        result = c.fetchone()
+        conn.close()
+        if result:
+            stored_password = result[0]
+            if isinstance(stored_password, str):
+                stored_password = stored_password.encode('utf-8')
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+                logger.info(f"User {username} authenticated successfully")
+                return True
+            else:
+                logger.warning(f"Authentication failed for {username}: Incorrect password")
+                return False
+        else:
+            logger.warning(f"Authentication failed: Username {username} not found")
             return False
-    return False
+    except Exception as e:
+        logger.error(f"Authentication error: {str(e)}")
+        st.error(f"Authentication error: {str(e)}")
+        return False
 
 def log_user_activity(username, action):
-    conn = sqlite3.connect('nama_users.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO user_activity (username, timestamp, action) VALUES (?, ?, ?)",
-              (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), action))
-    conn.commit()
-    conn.close()
-    logger.info(f"User: {username}, Action: {action}")
+    try:
+        conn = sqlite3.connect('nama_users.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO user_activity (username, timestamp, action) VALUES (?, ?, ?)",
+                  (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), action))
+        conn.commit()
+        conn.close()
+        logger.info(f"User: {username}, Action: {action}")
+    except Exception as e:
+        logger.error(f"Error logging user activity: {str(e)}")
 
 # Preprocessing
-def preprocess_data(df, label_encoders, le_class, is_train=True):
+def preprocess_data(df, label_encoders=None, le_class=None, is_train=True):
     try:
         df = df.copy()
+        if label_encoders is None:
+            label_encoders = {}
+        if le_class is None and is_train:
+            le_class = LabelEncoder()
+        for col in NSL_KDD_COLUMNS:
+            if col not in df.columns and col != 'class':
+                df[col] = 0
+            elif col in CATEGORICAL_COLS and col not in df.columns:
+                df[col] = 'missing'
         df.fillna({'protocol_type': 'missing', 'service': 'missing', 'flag': 'missing'}, inplace=True)
         df.fillna(0, inplace=True)
         
@@ -630,6 +709,9 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
                 label_encoders[col] = LabelEncoder()
                 df[col] = label_encoders[col].fit_transform(df[col])
             else:
+                if col not in label_encoders:
+                    logger.error(f"Label encoder for {col} not found during inference")
+                    return None, label_encoders, le_class
                 unseen_mask = ~df[col].isin(label_encoders[col].classes_)
                 df.loc[unseen_mask, col] = 'unknown'
                 if 'unknown' not in label_encoders[col].classes_:
@@ -639,9 +721,11 @@ def preprocess_data(df, label_encoders, le_class, is_train=True):
         if 'class' in df.columns:
             df['class'] = df['class'].astype(str)
             if is_train:
-                le_class = LabelEncoder()
                 df['class'] = le_class.fit_transform(df['class'])
             else:
+                if le_class is None:
+                    logger.error("Class label encoder not provided for inference")
+                    return None, label_encoders, le_class
                 valid_classes = np.append(le_class.classes_, 'unknown')
                 df['class'] = df['class'].apply(lambda x: x if x in valid_classes else 'unknown')
                 if 'unknown' not in le_class.classes_:
@@ -1501,289 +1585,297 @@ def display_threat_intelligence():
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
             font={'color': WICKET_THEME['text_light']},
-            showlegend=False
+            margin=dict(l=20, r=20, t=50, b=20),
+            title=dict(
+                text="Threat Severity Distribution",
+                font=dict(color=WICKET_THEME['text_light'], size=20),
+                x=0.5,
+                xanchor='center'
+            )
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # Recent Threats
+        # Threat Details Table
         st.markdown("#### Recent Threats")
-        st.dataframe(df[['timestamp', 'threat_id', 'description', 'severity', 'source']])
+        threat_data = df[['timestamp', 'threat_id', 'description', 'severity', 'source']].tail(5)
+        st.dataframe(threat_data)
+        
+        # Display indicators for high-severity threats
+        high_severity_threats = df[df['severity'] == 'high']
+        if not high_severity_threats.empty:
+            st.markdown("#### High Severity Threat Indicators")
+            for _, threat in high_severity_threats.iterrows():
+                st.write(f"**{threat['threat_id']}**: {threat['description']}")
+                st.write(f"Indicators: {', '.join(threat['indicators'])}")
     except Exception as e:
         logger.error(f"Threat intelligence display error: {str(e)}")
-        st.error(f"Threat intelligence error: {str(e)}")
+        st.error(f"Threat intelligence display error: {str(e)}")
 
-# Modified main function (relevant portion)
-def main():
-    apply_wicket_css()
-    setup_user_db()
-
-    if 'form_type' not in st.session_state:
-        st.session_state.form_type = 'signin'
-
-    if not st.session_state.model:
-        # Create a complete sample DataFrame with all NSL-KDD columns
-        sample_data = pd.DataFrame({
-            'duration': [0, 100, 200],
-            'protocol_type': ['tcp', 'udp', 'icmp'],
-            'service': ['http', 'ftp', 'ssh'],
-            'flag': ['SF', 'S0', 'REJ'],
-            'src_bytes': [100, 500, 1500],
-            'dst_bytes': [0, 100, 1000],
-            'land': [0, 0, 0],
-            'wrong_fragment': [0, 0, 0],
-            'urgent': [0, 0, 0],
-            'hot': [0, 0, 0],
-            'num_failed_logins': [0, 0, 0],
-            'logged_in': [0, 0, 0],
-            'num_compromised': [0, 0, 0],
-            'root_shell': [0, 0, 0],
-            'su_attempted': [0, 0, 0],
-            'num_root': [0, 0, 0],
-            'num_file_creations': [0, 0, 0],
-            'num_shells': [0, 0, 0],
-            'num_access_files': [0, 0, 0],
-            'num_outbound_cmds': [0, 0, 0],
-            'is_host_login': [0, 0, 0],
-            'is_guest_login': [0, 0, 0],
-            'count': [1, 2, 3],
-            'srv_count': [1, 2, 3],
-            'serror_rate': [0.0, 0.0, 0.0],
-            'srv_serror_rate': [0.0, 0.0, 0.0],
-            'rerror_rate': [0.0, 0.0, 0.0],
-            'srv_rerror_rate': [0.0, 0.0, 0.0],
-            'same_srv_rate': [1.0, 1.0, 1.0],
-            'diff_srv_rate': [0.0, 0.0, 0.0],
-            'srv_diff_host_rate': [0.0, 0.0, 0.0],
-            'dst_host_count': [100, 100, 100],
-            'dst_host_srv_count': [100, 100, 100],
-            'dst_host_same_srv_rate': [1.0, 1.0, 1.0],
-            'dst_host_diff_srv_rate': [0.0, 0.0, 0.0],
-            'dst_host_same_src_port_rate': [0.0, 0.0, 0.0],
-            'dst_host_srv_diff_host_rate': [0.0, 0.0, 0.0],
-            'dst_host_serror_rate': [0.0, 0.0, 0.0],
-            'dst_host_srv_serror_rate': [0.0, 0.0, 0.0],
-            'dst_host_rerror_rate': [0.0, 0.0, 0.0],
-            'dst_host_srv_rerror_rate': [0.0, 0.0, 0.0],
-            'class': ['normal', 'anomaly', 'normal']
-        })
-        try:
-            st.session_state.model, st.session_state.scaler, st.session_state.label_encoders, st.session_state.le_class = train_model(sample_data)
-            if st.session_state.model is None:
-                st.error("Failed to initialize model. Using fallback mode.")
-                logger.warning("Model initialization failed, proceeding without model")
-            else:
-                logger.info("Initialized model for ATC monitoring")
-        except Exception as e:
-            logger.error(f"Model initialization error: {str(e)}")
-            st.error(f"Model initialization error: {str(e)}")
-
-    # Rest of the main function remains unchanged
-    if not st.session_state.authenticated:
-        html_content = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>NAMA IDPS Login</title>
-            <!-- CSS remains the same as provided -->
-        </head>
-        <body>
-            <!-- HTML content remains the same as provided -->
-            <script>
-                const signInBtn = document.getElementById("signInBtn");
-                const signUpBtn = document.getElementById("signUpBtn");
-                const container = document.getElementById("container");
-                const signInForm = document.getElementById("form2");
-                const signUpForm = document.getElementById("form1");
-
-                signUpBtn.addEventListener("click", () => {
-                    container.classList.add("right-panel-active");
-                });
-
-                signInBtn.addEventListener("click", () => {
-                    container.classList.remove("right-panel-active");
-                });
-
-                signUpForm.addEventListener("submit", (e) => {
-                    e.preventDefault();
-                    const username = document.getElementById("signupUsername").value;
-                    const email = document.getElementById("signupEmail").value;
-                    const password = document.getElementById("signupPassword").value;
-                    fetch("/_stcore/streamlit_script_run", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            "signup": {
-                                "username": username,
-                                "email": email,
-                                "password": password
-                            }
-                        })
-                    }).then(response => {
-                        if (response.ok) {
-                            alert("Sign-up successful! Please sign in.");
-                            container.classList.remove("right-panel-active");
-                        } else {
-                            alert("Sign-up failed. Username may already exist.");
-                        }
-                    });
-                });
-
-                signInForm.addEventListener("submit", (e) => {
-                    e.preventDefault();
-                    const email = document.getElementById("signinEmail").value;
-                    const password = document.getElementById("signinPassword").value;
-                    fetch("/_stcore/streamlit_script_run", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            "signin": {
-                                "email": email,
-                                "password": password
-                            }
-                        })
-                    }).then(response => {
-                        if (response.ok) {
-                            window.location.reload();
-                        } else {
-                            alert("Sign-in failed. Please check your credentials.");
-                        }
-                    });
-                });
-            </script>
-        </body>
-        </html>
-        """
-        components.html(html_content, height=500)
-
-        if st._is_running_with_streamlit:
-            if "_streamlit_script_run_data" in st.session_state:
-                if "signup" in st.session_state["_streamlit_script_run_data"]:
-                    signup_data = st.session_state["_streamlit_script_run_data"]["signup"]
-                    username = signup_data["username"]
-                    password = signup_data["password"]
-                    if register_user(username, password):
-                        st.success("Registration successful! Please sign in.")
-                        log_user_activity(username, "Registered")
-                    else:
-                        st.error("Registration failed. Username may already exist.")
-                elif "signin" in st.session_state["_streamlit_script_run_data"]:
-                    signin_data = st.session_state["_streamlit_script_run_data"]["signin"]
-                    username = signin_data["email"]
-                    password = signin_data["password"]
-                    if authenticate_user(username, password):
-                        st.session_state.authenticated = True
-                        st.session_state.username = username
-                        log_user_activity(username, "Signed in")
-                        st.experimental_rerun()
-                    else:
-                        st.error("Invalid username or password")
-    else:
-        # Rest of the main function (sidebar, navigation, etc.) remains unchanged
-        st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/images/logo.png", use_column_width=True, caption="NAMA IDPS")
-        st.sidebar.markdown("<h2 style='text-align: center; color: #E6E6FA;'>Navigation</h2>", unsafe_allow_html=True)
+# Display Alerts
+def display_alerts():
+    try:
+        st.markdown("### Alert Log")
+        if not st.session_state.alert_log:
+            st.info("No alerts to display.")
+            return
+        alert_df = pd.DataFrame(st.session_state.alert_log)
+        alert_df = alert_df.sort_values(by='timestamp', ascending=False)
+        st.dataframe(alert_df[['timestamp', 'type', 'severity', 'details']].head(10))
         
-        page = st.sidebar.radio("", [
-            "🏠 Dashboard",
-            "✈️ ATC Monitoring",
-            "🛸 Drone Surveillance",
-            "🛡️ Threat Intelligence",
-            "🔍 Compliance Monitoring",
-            "📊 Reports",
-            "⚙️ Settings"
+        # Alert Severity Distribution
+        severity_counts = alert_df['severity'].value_counts()
+        fig = go.Figure(data=[
+            go.Pie(
+                labels=severity_counts.index,
+                values=severity_counts.values,
+                marker=dict(colors=[WICKET_THEME['error'], WICKET_THEME['accent'], WICKET_THEME['success']]),
+                textinfo='label+percent',
+                hoverinfo='label+value'
+            )
         ])
+        fig.update_layout(
+            title="Alert Severity Distribution",
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            font={'color': WICKET_THEME['text_light']},
+            margin=dict(l=20, r=20, t=50, b=20)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        logger.error(f"Alert display error: {str(e)}")
+        st.error(f"Alert display error: {str(e)}")
 
-        if 'adsb_running' not in st.session_state:
-            st.session_state.adsb_running = True
-            threading.Thread(target=periodic_adsb_fetch, args=(10,), daemon=True).start()
-        if 'radar_running' not in st.session_state:
-            st.session_state.radar_running = True
-            threading.Thread(target=periodic_radar_update, args=(5,), daemon=True).start()
-        if 'nmap_running' not in st.session_state:
-            st.session_state.nmap_running = True
-            threading.Thread(target=periodic_nmap_scan, args=("192.168.1.0/24", "TCP SYN", "1-1000"), daemon=True).start()
-        if 'drone_running' not in st.session_state:
-            st.session_state.drone_running = True
-            threading.Thread(target=periodic_drone_detection, daemon=True).start()
-        if 'threat_running' not in st.session_state:
-            st.session_state.threat_running = True
-            threading.Thread(target=periodic_threat_fetch, args=(None,), daemon=True).start()
-        if 'compliance_running' not in st.session_state:
-            st.session_state.compliance_running = True
-            threading.Thread(target=periodic_compliance_check, daemon=True).start()
-
-        if page == "🏠 Dashboard":
-            st.markdown("<h1 style='text-align: center;'>NAMA Intrusion Detection & Prevention System</h1>", unsafe_allow_html=True)
-            st.markdown("<div class='card'><h3>System Overview</h3></div>", unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("#### Recent Alerts")
-                if st.session_state.alert_log:
-                    st.dataframe(pd.DataFrame(st.session_state.alert_log[-5:]))
-                else:
-                    st.info("No alerts to display.")
-            with col2:
-                st.markdown("#### System Status")
-                st.metric("Active Threats", len(st.session_state.threats))
-                st.metric("Flight Conflicts", len(st.session_state.flight_conflicts))
-                st.metric("Unauthorized Drones", sum(d['status'] == 'unidentified' for d in st.session_state.drone_results))
-
-        elif page == "✈️ ATC Monitoring":
-            st.markdown("<h1>ATC Monitoring</h1>", unsafe_allow_html=True)
-            if st.session_state.radar_data:
-                fig = display_radar(st.session_state.radar_data)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True)
-            if st.session_state.atc_results:
-                st.markdown("#### Recent ATC Data")
-                st.dataframe(pd.DataFrame(st.session_state.atc_results))
-            if not st.session_state.atc_anomalies.empty:
-                st.markdown("#### Detected Anomalies")
-                st.dataframe(st.session_state.atc_anomalies)
-
-        elif page == "🛸 Drone Surveillance":
-            st.markdown("<h1>Drone Surveillance</h1>", unsafe_allow_html=True)
-            display_drone_data()
-
-        elif page == "🛡️ Threat Intelligence":
-            st.markdown("<h1>Threat Intelligence</h1>", unsafe_allow_html=True)
-            display_threat_intelligence()
-
-        elif page == "🔍 Compliance Monitoring":
-            st.markdown("<h1>Compliance Monitoring</h1>", unsafe_allow_html=True)
-            display_compliance_metrics()
-
-        elif page == "📊 Reports":
-            st.markdown("<h1>Reports</h1>", unsafe_allow_html=True)
-            st.markdown("<div class='card'>")
-            st.markdown("### Generate Report")
-            if st.button("Generate PDF Report", key="generate_report"):
-                download_report()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        elif page == "⚙️ Settings":
-            st.markdown("<h1>Settings</h1>", unsafe_allow_html=True)
-            st.markdown("<div class='card'>")
-            st.markdown("### System Configuration")
-            target = st.text_input("NMAP Scan Target", "192.168.1.0/24")
-            scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
-            port_range = st.text_input("Port Range", "1-1000")
-            custom_args = st.text_input("Custom NMAP Arguments", "")
-            if st.button("Run NMAP Scan"):
-                results = run_nmap_scan(target, scan_type, port_range, custom_args)
-                st.session_state.scan_results = results
-                st.dataframe(pd.DataFrame(results))
-            if st.button("Logout"):
-                st.session_state.authenticated = False
-                st.session_state.username = None
+# Main App Pages
+def login_page():
+    apply_wicket_css()
+    st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
+    st.markdown('<h2 class="auth-neon-text">NAMA IDPS Login</h2>', unsafe_allow_html=True)
+    
+    with st.form(key='login_form', clear_on_submit=True):
+        st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+        username = st.text_input("Username", placeholder="Enter username", key='login_username')
+        password = st.text_input("Password", type="password", placeholder="Enter password", key='login_password')
+        login_button = st.form_submit_button("Login", type='primary')
+        
+        if login_button:
+            if authenticate_user(username, password):
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                log_user_activity(username, "Logged in")
+                st.success("Login successful!")
                 st.experimental_rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.error("Invalid username or password")
+        st.markdown('<a href="#" onclick="showRegister()" class="auth-link">Register new user</a>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def register_page():
+    apply_wicket_css()
+    st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
+    st.markdown('<h2 class="auth-neon-text">Register New User</h2>', unsafe_allow_html=True)
+    
+    with st.form(key='register_form', clear_on_submit=True):
+        st.markdown('<div class="auth-form">', unsafe_allow_html=True)
+        username = st.text_input("Username", placeholder="Choose a username", key='register_username')
+        password = st.text_input("Password", type="password", placeholder="Choose a password", key='register_password')
+        confirm_password = st.text_input("Confirm Password", type="password", placeholder="Confirm password", key='confirm_password')
+        register_button = st.form_submit_button("Register", type='primary')
+        
+        if register_button:
+            if password != confirm_password:
+                st.error("Passwords do not match")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters long")
+            elif register_user(username, password):
+                st.success("Registration successful! Please log in.")
+                log_user_activity(username, "Registered")
+                st.experimental_rerun()
+            else:
+                st.error("Registration failed. Username may already exist.")
+        st.markdown('<a href="#" onclick="showLogin()" class="auth-link">Back to Login</a>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def dashboard_page():
+    apply_wicket_css()
+    st.markdown('<h1 class="auth-neon-text">NAMA IDPS Dashboard</h1>', unsafe_allow_html=True)
+    
+    # Display Radar
+    st.markdown("### Radar Surveillance")
+    radar_fig = display_radar(st.session_state.radar_data)
+    if radar_fig:
+        st.plotly_chart(radar_fig, use_container_width=True)
+    
+    # Display Drone Data
+    display_drone_data()
+    
+    # Display ATC Anomalies
+    st.markdown("### ATC Anomalies")
+    if not st.session_state.atc_anomalies.empty:
+        st.dataframe(st.session_state.atc_anomalies[['icao24', 'latitude', 'longitude', 'altitude', 'velocity', 'anomaly']])
+    else:
+        st.info("No ATC anomalies detected.")
+    
+    # Display Flight Conflicts
+    st.markdown("### Flight Conflicts")
+    if st.session_state.flight_conflicts:
+        st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
+    else:
+        st.info("No flight conflicts detected.")
+    
+    # Display Compliance Metrics
+    display_compliance_metrics()
+    
+    # Display Threat Intelligence
+    display_threat_intelligence()
+    
+    # Display Alerts
+    display_alerts()
+    
+    # Download Report Button
+    st.button("Generate and Download Report", on_click=download_report)
+
+def nmap_scan_page():
+    apply_wicket_css()
+    st.markdown('<h1 class="auth-neon-text">NMAP Network Scanner</h1>', unsafe_allow_html=True)
+    
+    target = st.text_input("Target IP/Hostname", value="192.168.1.1")
+    scan_type = st.selectbox("Scan Type", ["TCP SYN", "TCP Connect", "UDP"])
+    port_range = st.text_input("Port Range", value="1-1000")
+    custom_args = st.text_input("Custom NMAP Arguments (optional)", value="")
+    
+    if st.button("Run NMAP Scan"):
+        with st.spinner("Running NMAP scan..."):
+            results = run_nmap_scan(target, scan_type, port_range, custom_args)
+            st.session_state.scan_results = results
+            log_user_activity(st.session_state.username, f"Ran NMAP scan on {target}")
+        
+        if results:
+            st.markdown("### Scan Results")
+            st.dataframe(pd.DataFrame(results))
+        else:
+            st.error("No results from NMAP scan")
+    
+    if st.session_state.scan_results:
+        st.markdown("### Previous Scan Results")
+        st.dataframe(pd.DataFrame(st.session_state.scan_results))
+
+def settings_page():
+    apply_wicket_css()
+    st.markdown('<h1 class="auth-neon-text">Settings</h1>', unsafe_allow_html=True)
+    
+    st.markdown("### Background Processes")
+    st.session_state.radar_running = st.checkbox("Run Radar Surveillance", value=st.session_state.get('radar_running', False))
+    st.session_state.adsb_running = st.checkbox("Run ADS-B Monitoring", value=st.session_state.get('adsb_running', False))
+    st.session_state.drone_running = st.checkbox("Run Drone Detection", value=st.session_state.get('drone_running', False))
+    st.session_state.threat_running = st.checkbox("Run Threat Intelligence Fetch", value=st.session_state.get('threat_running', False))
+    st.session_state.compliance_running = st.checkbox("Run Compliance Monitoring", value=st.session_state.get('compliance_running', False))
+    st.session_state.nmap_running = st.checkbox("Run Periodic NMAP Scan", value=st.session_state.get('nmap_running', False))
+    
+    st.markdown("### API Configuration")
+    api_key = st.text_input("Threat Intelligence API Key (e.g., AlienVault OTX)", type="password")
+    if st.button("Save API Key"):
+        st.session_state.api_key = api_key
+        st.success("API Key saved")
+        log_user_activity(st.session_state.username, "Updated API key")
+    
+    st.markdown("### Theme Settings")
+    theme_mode = st.selectbox("Theme Mode", ["dark", "light"], index=0 if st.session_state.theme_mode == 'dark' else 1)
+    if theme_mode != st.session_state.theme_mode:
+        st.session_state.theme_mode = theme_mode
+        st.success(f"Theme changed to {theme_mode}")
+        log_user_activity(st.session_state.username, f"Changed theme to {theme_mode}")
+
+# Main App Logic
+def main():
+    setup_user_db()
+    apply_wicket_css()
+    
+    # Initialize background threads
+    if 'radar_running' not in st.session_state:
+        st.session_state.radar_running = False
+    if 'adsb_running' not in st.session_state:
+        st.session_state.adsb_running = False
+    if 'drone_running' not in st.session_state:
+        st.session_state.drone_running = False
+    if 'threat_running' not in st.session_state:
+        st.session_state.threat_running = False
+    if 'compliance_running' not in st.session_state:
+        st.session_state.compliance_running = False
+    if 'nmap_running' not in st.session_state:
+        st.session_state.nmap_running = False
+    
+    # Start background threads if enabled
+    if st.session_state.radar_running and not hasattr(st.session_state, 'radar_thread'):
+        st.session_state.radar_thread = threading.Thread(target=periodic_radar_update, args=(5,), daemon=True)
+        st.session_state.radar_thread.start()
+    
+    if st.session_state.adsb_running and not hasattr(st.session_state, 'adsb_thread'):
+        st.session_state.adsb_thread = threading.Thread(target=periodic_adsb_fetch, args=(10,), daemon=True)
+        st.session_state.adsb_thread.start()
+    
+    if st.session_state.drone_running and not hasattr(st.session_state, 'drone_thread'):
+        st.session_state.drone_thread = threading.Thread(target=periodic_drone_detection, daemon=True)
+        st.session_state.drone_thread.start()
+    
+    if st.session_state.threat_running and not hasattr(st.session_state, 'threat_thread'):
+        api_key = st.session_state.get('api_key', None)
+        st.session_state.threat_thread = threading.Thread(target=periodic_threat_fetch, args=(api_key,), daemon=True)
+        st.session_state.threat_thread.start()
+    
+    if st.session_state.compliance_running and not hasattr(st.session_state, 'compliance_thread'):
+        st.session_state.compliance_thread = threading.Thread(target=periodic_compliance_check, daemon=True)
+        st.session_state.compliance_thread.start()
+    
+    if st.session_state.nmap_running and not hasattr(st.session_state, 'nmap_thread'):
+        st.session_state.nmap_thread = threading.Thread(
+            target=periodic_nmap_scan,
+            args=("192.168.1.1", "TCP SYN", "1-1000"),
+            daemon=True
+        )
+        st.session_state.nmap_thread.start()
+    
+    # Sidebar Navigation
+    st.sidebar.image("https://github.com/J4yd33n/IDPS-with-ML/raw/main/logo.png", use_column_width=True)
+    st.sidebar.markdown('<h2 class="auth-neon-text">NAMA IDPS</h2>', unsafe_allow_html=True)
+    
+    if st.session_state.authenticated:
+        page = st.sidebar.selectbox(
+            "Navigation",
+            ["Dashboard", "NMAP Scanner", "Settings"],
+            format_func=lambda x: f'<span class="sidebar-item">{x}</span>',
+            key='nav_select'
+        )
+        st.sidebar.markdown(f"**User**: {st.session_state.username}")
+        if st.sidebar.button("Logout"):
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            log_user_activity(st.session_state.username, "Logged out")
+            st.experimental_rerun()
+    else:
+        page = st.sidebar.selectbox(
+            "Navigation",
+            ["Login", "Register"],
+            format_func=lambda x: f'<span class="sidebar-item">{x}</span>',
+            key='auth_select'
+        )
+    
+    # Page Routing
+    if not st.session_state.authenticated:
+        if page == "Login":
+            login_page()
+        elif page == "Register":
+            register_page()
+    else:
+        if page == "Dashboard":
+            dashboard_page()
+        elif page == "NMAP Scanner":
+            nmap_scan_page()
+        elif page == "Settings":
+            settings_page()
 
 if __name__ == "__main__":
-    main()
+    main()    
