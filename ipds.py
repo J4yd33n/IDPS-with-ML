@@ -1591,7 +1591,7 @@ def main():
                     st.session_state.username = username
                     logger.info(f"Session state updated: authenticated={st.session_state.authenticated}, username={st.session_state.username}")
                     log_user_activity(username, "Signed in")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Invalid username or password")
     else:
