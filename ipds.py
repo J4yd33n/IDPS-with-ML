@@ -1578,7 +1578,7 @@ def display_threat_intelligence():
                 textposition='auto'
             )
         ])
-       fig.update_layout(
+        fig.update_layout(
             title="Threat Severity Distribution",
             xaxis_title="Severity",
             yaxis_title="Count",
