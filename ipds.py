@@ -427,37 +427,37 @@ def render_auth_ui():
             const secondForm = document.getElementById("form2");
             const container = document.querySelector(".container");
 
-            signInBtn.addEventListener("click", () => {
+            signInBtn.addEventListener("click", () => {{
                 container.classList.remove("right-panel-active");
                 alert("Switched to Sign In form");
-            });
+            }});
 
-            signUpBtn.addEventListener("click", () => {
+            signUpBtn.addEventListener("click", () => {{
                 container.classList.add("right-panel-active");
                 alert("Switched to Sign Up form");
-            });
+            }});
 
-            firstForm.addEventListener("submit", (e) => {
+            firstForm.addEventListener("submit", (e) => {{
                 e.preventDefault();
                 alert("Sign-up functionality is disabled in this demo. Please use Sign In.");
-            });
+            }});
 
-            secondForm.addEventListener("submit", (e) => {
+            secondForm.addEventListener("submit", (e) => {{
                 e.preventDefault();
                 const username = document.getElementById("signin-username").value;
                 const password = document.getElementById("signin-password").value;
-                if (username === "nama" && password === "admin") {
-                    if (window.Streamlit) {
-                        window.Streamlit.setComponentValue({ authenticated: true });
+                if (username === "nama" && password === "admin") {{
+                    if (window.Streamlit) {{
+                        window.Streamlit.setComponentValue({{ authenticated: true }});
                         localStorage.removeItem("authenticated");
                         alert("Login successful!");
-                    } else {
+                    }} else {{
                         alert("Streamlit communication failed. Please try again.");
-                    }
-                } else {
+                    }}
+                }} else {{
                     alert("Invalid username or password");
-                }
-            });
+                }}
+            }});
         </script>
     </body>
     </html>
