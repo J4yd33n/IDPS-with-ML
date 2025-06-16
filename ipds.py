@@ -8,6 +8,8 @@ import logging
 from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
 import streamlit.components.v1 as components
+import base64
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
@@ -127,12 +129,26 @@ def apply_wicket_css():
                 width: 100%;
                 box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
                 z-index: 2;
-                animation: slideInAuth 0.8s ease-in-out forwards;
+                animation: zoomIn 0.8s ease-in-out;
             }}
             
-            @keyframes slideInAuth {{
-                0% {{ transform: translateX(100vw); opacity: 0; }}
-                100% {{ transform: translateX(0); opacity: 1; }}
+            @keyframes zoomIn {{
+                0% {{ transform: scale(0.8); opacity: 0; }}
+                100% {{ transform: scale(1); opacity: 1; }}
+            }}
+            
+            .auth-form {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }}
+            
+            .auth-form h2 {{
+                font-family: 'Orbitron', sans-serif;
+                color: {WICKET_THEME['text_light']};
+                margin-bottom: 1.5rem;
+                text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
             
             .auth-input {{
@@ -144,6 +160,7 @@ def apply_wicket_css():
                 width: 100%;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
+                transition: all 0.3s ease;
             }}
             .auth-input:focus {{
                 border-color: {WICKET_THEME['accent']};
@@ -161,8 +178,11 @@ def apply_wicket_css():
                 font-family: 'Orbitron', sans-serif;
                 font-size: 0.9rem;
                 font-weight: 700;
+                letter-spacing: 1px;
                 cursor: pointer;
                 margin-top: 1.5rem;
+                transition: all 0.3s ease;
+                box-shadow: 0 0 15px {WICKET_THEME['button_bg']};
             }}
             .auth-btn:hover {{
                 background: {WICKET_THEME['hover']};
@@ -176,6 +196,7 @@ def apply_wicket_css():
                 margin-top: 1rem;
                 text-decoration: none;
                 font-family: 'Roboto Mono', monospace;
+                transition: color 0.3s ease;
             }}
             .auth-link:hover {{
                 color: {WICKET_THEME['hover']};
@@ -193,6 +214,7 @@ def apply_wicket_css():
                 z-index: 2;
                 animation: radarPulse 2s infinite;
             }}
+            
             .radar::before {{
                 content: '';
                 position: absolute;
@@ -210,6 +232,7 @@ def apply_wicket_css():
                 50% {{ transform: scale(1.2); opacity: 0.5; }}
                 100% {{ transform: scale(1); opacity: 0.8; }}
             }}
+            
             @keyframes radarSweep {{
                 0% {{ transform: rotate(0deg); }}
                 100% {{ transform: rotate(360deg); }}
@@ -235,6 +258,8 @@ if 'threats' not in st.session_state:
     st.session_state.threats = []
 if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
+if 'scan_results' not in st.session_state:
+    st.session_state.scan_results = []
 
 # Simulated Drone Detection
 def simulate_drone_data(num_drones=5):
@@ -582,37 +607,118 @@ def display_compliance_metrics():
     )
     st.plotly_chart(fig, use_container_width=True)
 
+# Simulated Network Scan
+def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-1000"):
+    common_ports = {
+        21: ('ftp', 'tcp'), 22: ('ssh', 'tcp'), 23: ('telnet', 'tcp'), 80: ('http', 'tcp'),
+        443: ('https', 'tcp'), 3306: ('mysql', 'tcp'), 3389: ('rdp', 'tcp')
+    }
+    start_port, end_port = map(int, port_range.split('-'))
+    ports_to_scan = [p for p in common_ports.keys() if start_port <= p <= end_port]
+    np.random.seed(42)
+    scan_results = []
+    for port in ports_to_scan:
+        service, proto = common_ports[port]
+        if scan_type == 'TCP SYN' and 'tcp' not in proto:
+            continue
+        if scan_type == 'UDP' and 'udp' not in proto:
+            continue
+        state = 'open' if np.random.random() > 0.5 else 'closed'
+        scan_results.append({
+            'port': port,
+            'protocol': 'tcp' if scan_type != 'UDP' else 'udp',
+            'state': state,
+            'service': service
+        })
+    open_ports = len([r for r in scan_results if r['state'] == 'open'])
+    st.session_state.compliance_metrics['open_ports'] = open_ports
+    st.session_state.alert_log.append({
+        'timestamp': datetime.now(),
+        'type': 'Network Scan',
+        'severity': 'medium',
+        'details': f"Scanned {target}, found {open_ports} open ports"
+    })
+    logger.info(f"Simulated NMAP scan on {target}, found {open_ports} open ports")
+    return scan_results
+
+def display_network_scan():
+    if not st.session_state.scan_results:
+        st.warning("No scan data available. Click 'Simulate Scan' to generate data.")
+        return
+    df = pd.DataFrame(st.session_state.scan_results)
+    st.dataframe(df[['port', 'protocol', 'state', 'service']])
+
+# Generate Report
+def generate_report():
+    buffer = io.BytesIO()
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    elements.append(Paragraph("NAMA IDPS Simulation Report", styles['Title']))
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
+    elements.append(Spacer(1, 12))
+    
+    if st.session_state.alert_log:
+        elements.append(Paragraph("Recent Alerts", styles['Heading2']))
+        alert_data = [[str(a['timestamp']), a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
+        alert_table = Table([['Timestamp', 'Type', 'Severity', 'Details']] + alert_data)
+        alert_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(alert_table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+# Authentication UI
+def render_auth_ui():
+    st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-form"><h2>NAMA IDPS Login</h2>', unsafe_allow_html=True)
+    username = st.text_input("Username", key="login_username", placeholder="Enter username", help="Enter your username")
+    password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password", help="Enter your password")
+    
+    if st.button("Login", key="login_btn", help="Click to login"):
+        if username == "nama" and password == "admin":
+            st.session_state.authenticated = True
+            st.success("Login successful!")
+            st.rerun()
+        else:
+            st.error("Invalid username or password")
+    
+    st.markdown('<a href="#" class="auth-link">Forgot Password?</a>', unsafe_allow_html=True)
+    st.markdown('<div class="radar"></div></div></div>', unsafe_allow_html=True)
+
 # Main Application
 def main():
     apply_wicket_css()
 
     if not st.session_state.authenticated:
-        st.markdown('<div class="auth-container"><div class="auth-overlay"></div>', unsafe_allow_html=True)
-        with st.container():
-            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-            st.markdown('<h2 style="text-align: center;">NAMA IDPS Simulation</h2>')
-            username = st.text_input("Username", key="username", placeholder="Enter username", help="Default: nama")
-            password = st.text_input("Password", type="password", key="password", placeholder="Enter password", help="Default: admin")
-            if st.button("Sign In", key="signin_btn", help="Click to authenticate"):
-                if username == "nama" and password == "admin":
-                    st.session_state.authenticated = True
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials")
-            st.markdown('<a href="#" class="auth-link">Forgot password?</a>', unsafe_allow_html=True)
-            st.markdown('<div class="radar"></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        render_auth_ui()
         return
 
-    st.sidebar.title("NAMA IDPS Simulation")
-    page = st.sidebar.selectbox("Select Feature", ["Dashboard", "Drone Detection", "Radar Surveillance", "ATC Monitoring", "Threat Intelligence", "Compliance Monitoring"])
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
+    page = st.sidebar.selectbox("Select Feature", ["Dashboard", "Network Scan", "Drone Detection", "Radar Surveillance", "ATC Monitoring", "Threat Intelligence", "Compliance Monitoring"])
 
     if page == "Dashboard":
         st.markdown('<div class="card"><h1>NAMA IDPS Simulation Dashboard</h1></div>', unsafe_allow_html=True)
         st.write("Select a feature from the sidebar to simulate and visualize its functionality.")
         if st.button("Generate All Simulations"):
+            st.session_state.scan_results = simulate_nmap_scan()
             st.session_state.drone_results = simulate_drone_data()
             st.session_state.radar_data = simulate_radar_data()
             st.session_state.atc_results = simulate_atc_data()
@@ -622,6 +728,17 @@ def main():
         if st.session_state.alert_log:
             st.subheader("Recent Alerts")
             st.dataframe(pd.DataFrame(st.session_state.alert_log[-5:]))
+        if st.button("Download Report"):
+            buffer = generate_report()
+            b64 = base64.b64encode(buffer.getvalue()).decode()
+            href = f'<a href="data:application/pdf;base64,{b64}" download="nama_idps_report.pdf">Download PDF Report</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
+    elif page == "Network Scan":
+        st.markdown('<div class="card"><h2>Network Scan Simulation</h2></div>', unsafe_allow_html=True)
+        if st.button("Simulate Scan"):
+            st.session_state.scan_results = simulate_nmap_scan()
+        display_network_scan()
 
     elif page == "Drone Detection":
         st.markdown('<div class="card"><h2>Drone Detection Simulation</h2></div>', unsafe_allow_html=True)
