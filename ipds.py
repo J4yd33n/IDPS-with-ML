@@ -32,12 +32,11 @@ WICKET_THEME = {
     "success": "#00FF99"
 }
 
-# Enhanced CSS with Animations
+# Enhanced CSS for Main App
 def apply_wicket_css():
     css = f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
-            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
             
             .stApp {{
                 background: linear-gradient(45deg, {WICKET_THEME['primary_bg']} 0%, {WICKET_THEME['secondary_bg']} 100%);
@@ -63,7 +62,6 @@ def apply_wicket_css():
                 margin-bottom: 20px;
                 box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
                 transition: transform 0.3s ease, box-shadow 0.3s ease;
-                animation: fadeIn 1s ease-in-out;
             }}
             .card:hover {{
                 transform: translateY(-5px);
@@ -101,141 +99,15 @@ def apply_wicket_css():
                 text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
             
-            .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/images/aeroplane.jpg') no-repeat center center fixed;
-                background-size: cover;
-                position: relative;
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                overflow: hidden;
+            .stSidebar .sidebar-content img {{
+                filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
+                animation: pulse 2s infinite;
             }}
             
-            .auth-overlay {{
-                position: absolute;
-                inset: 0;
-                background: linear-gradient(135deg, rgba(10, 15, 45, 0.85), rgba(30, 42, 68, 0.75));
-                z-index: 1;
-            }}
-            
-            .auth-card {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border: 2px solid {WICKET_THEME['border']};
-                border-radius: 15px;
-                padding: 2.5rem;
-                max-width: 450px;
-                width: 100%;
-                box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
-                z-index: 2;
-                animation: zoomIn 0.8s ease-in-out;
-            }}
-            
-            @keyframes zoomIn {{
-                0% {{ transform: scale(0.8); opacity: 0; }}
-                100% {{ transform: scale(1); opacity: 1; }}
-            }}
-            
-            .auth-form {{
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }}
-            
-            .auth-form h2 {{
-                font-family: 'Orbitron', sans-serif;
-                color: {WICKET_THEME['text_light']};
-                margin-bottom: 1.5rem;
-                text-shadow: 0 0 8px {WICKET_THEME['accent']};
-            }}
-            
-            .auth-input {{
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid {WICKET_THEME['border']};
-                border-radius: 8px;
-                padding: 12px;
-                margin: 0.5rem 0;
-                width: 100%;
-                color: {WICKET_THEME['text']};
-                font-family: 'Roboto Mono', monospace;
-                transition: all 0.3s ease;
-            }}
-            .auth-input:focus {{
-                border-color: {WICKET_THEME['accent']};
-                box-shadow: 0 0 12px {WICKET_THEME['accent']};
-                outline: none;
-            }}
-            
-            .auth-btn {{
-                background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
-                color: {WICKET_THEME['button_text']};
-                border-radius: 25px;
-                padding: 12px 0;
-                width: 100%;
-                border: none;
-                font-family: 'Orbitron', sans-serif;
-                font-size: 0.9rem;
-                font-weight: 700;
-                letter-spacing: 1px;
-                cursor: pointer;
-                margin-top: 1.5rem;
-                transition: all 0.3s ease;
-                box-shadow: 0 0 15px {WICKET_THEME['button_bg']};
-            }}
-            .auth-btn:hover {{
-                background: {WICKET_THEME['hover']};
-                box-shadow: 0 0 25px {WICKET_THEME['hover']};
-                transform: scale(1.05);
-            }}
-            
-            .auth-link {{
-                color: {WICKET_THEME['accent']};
-                font-size: 0.9rem;
-                margin-top: 1rem;
-                text-decoration: none;
-                font-family: 'Roboto Mono', monospace;
-                transition: color 0.3s ease;
-            }}
-            .auth-link:hover {{
-                color: {WICKET_THEME['hover']};
-                text-shadow: 0 0 8px {WICKET_THEME['hover']};
-            }}
-            
-            .radar {{
-                position: absolute;
-                bottom: 20px;
-                right: 20px;
-                width: 100px;
-                height: 100px;
-                border-radius: 50%;
-                background: radial-gradient(circle, rgba(0, 212, 255, 0.3) 0%, transparent 70%);
-                z-index: 2;
-                animation: radarPulse 2s infinite;
-            }}
-            
-            .radar::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 50%;
-                width: 2px;
-                height: 50%;
-                background: {WICKET_THEME['accent']};
-                transform-origin: bottom;
-                animation: radarSweep 4s linear infinite;
-            }}
-            
-            @keyframes radarPulse {{
-                0% {{ transform: scale(1); opacity: 0.8; }}
-                50% {{ transform: scale(1.2); opacity: 0.5; }}
-                100% {{ transform: scale(1); opacity: 0.8; }}
-            }}
-            
-            @keyframes radarSweep {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
+            @keyframes pulse {{
+                0% {{ transform: scale(1); }}
+                50% {{ transform: scale(1.05); }}
+                100% {{ transform: scale(1); }}
             }}
         </style>
     """
@@ -260,6 +132,342 @@ if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
+
+# Authentication UI with HTML, CSS, and JS
+def render_auth_ui():
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>NAMA IDPS Login</title>
+        <style>
+            :root {{
+                --white: {WICKET_THEME['card_bg']};
+                --gray: {WICKET_THEME['text']};
+                --blue: {WICKET_THEME['button_bg']};
+                --lightblue: {WICKET_THEME['accent_alt']};
+                --button-radius: 0.7rem;
+                --max-width: 758px;
+                --max-height: 420px;
+                font-size: 16px;
+                font-family: 'Roboto Mono', monospace;
+            }}
+
+            body {{
+                align-items: center;
+                background-color: {WICKET_THEME['primary_bg']};
+                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
+                background-attachment: fixed;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
+                display: grid;
+                height: 100vh;
+                place-items: center;
+                overflow: hidden;
+                margin: 0;
+            }}
+
+            .logo-container {{
+                text-align: center;
+                margin-bottom: 20px;
+            }}
+
+            .logo {{
+                width: 150px;
+                height: auto;
+                filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
+                animation: pulse 2s infinite;
+            }}
+
+            @keyframes pulse {{
+                0% {{ transform: scale(1); }}
+                50% {{ transform: scale(1.05); }}
+                100% {{ transform: scale(1); }}
+            }}
+
+            .form__title {{
+                font-family: 'Orbitron', sans-serif;
+                font-weight: 300;
+                margin: 0;
+                margin-bottom: 1.25rem;
+                color: {WICKET_THEME['text_light']};
+                text-shadow: 0 0 8px {WICKET_THEME['accent']};
+            }}
+
+            .link {{
+                color: {WICKET_THEME['accent']};
+                font-size: 0.9rem;
+                margin: 1.5rem 0;
+                text-decoration: none;
+            }}
+
+            .link:hover {{
+                color: {WICKET_THEME['hover']};
+            }}
+
+            .container {{
+                background-color: var(--white);
+                backdrop-filter: blur(15px);
+                border-radius: var(--button-radius);
+                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25),
+                    0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
+                height: var(--max-height);
+                max-width: var(--max-width);
+                overflow: hidden;
+                position: relative;
+                width: 100%;
+            }}
+
+            .container__form {{
+                height: 100%;
+                position: absolute;
+                top: 0;
+                transition: all 0.6s ease-in-out;
+            }}
+
+            .container--signin {{
+                left: 0;
+                width: 50%;
+                z-index: 2;
+            }}
+
+            .container.right-panel-active .container--signin {{
+                transform: translateX(100%);
+            }}
+
+            .container--signup {{
+                left: 0;
+                opacity: 0;
+                width: 50%;
+                z-index: 1;
+            }}
+
+            .container.right-panel-active .container--signup {{
+                animation: show 0.6s;
+                opacity: 1;
+                transform: translateX(100%);
+                z-index: 5;
+            }}
+
+            .container__overlay {{
+                height: 100%;
+                left: 50%;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                transition: transform 0.6s ease-in-out;
+                width: 50%;
+                z-index: 100;
+            }}
+
+            .container.right-panel-active .container__overlay {{
+                transform: translateX(-100%);
+            }}
+
+            .overlay {{
+                background-color: {WICKET_THEME['card_bg']};
+                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
+                background-attachment: fixed;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
+                height: 100%;
+                left: -100%;
+                position: relative;
+                transform: translateX(0);
+                transition: transform 0.6s ease-in-out;
+                width: 200%;
+            }}
+
+            .container.right-panel-active .overlay {{
+                transform: translateX(50%);
+            }}
+
+            .overlay__panel {{
+                align-items: center;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                justify-content: center;
+                position: absolute;
+                text-align: center;
+                top: 0;
+                transform: translateX(0);
+                transition: transform 0.6s ease-in-out;
+                width: 50%;
+            }}
+
+            .overlay--left {{
+                transform: translateX(-20%);
+            }}
+
+            .container.right-panel-active .overlay--left {{
+                transform: translateX(0);
+            }}
+
+            .overlay--right {{
+                right: 0;
+                transform: translateX(0);
+            }}
+
+            .container.right-panel-active .overlay--right {{
+                transform: translateX(20%);
+            }}
+
+            .btn {{
+                background-color: var(--blue);
+                background-image: linear-gradient(90deg, var(--blue) 0%, var(--lightblue) 74%);
+                border-radius: 20px;
+                border: 1px solid var(--blue);
+                color: {WICKET_THEME['button_text']};
+                cursor: pointer;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.8rem;
+                font-weight: bold;
+                letter-spacing: 0.1rem;
+                padding: 0.9rem 4rem;
+                text-transform: uppercase;
+                transition: transform 80ms ease-in;
+            }}
+
+            .form > .btn {{
+                margin-top: 1.5rem;
+            }}
+
+            .btn:active {{
+                transform: scale(0.95);
+            }}
+
+            .btn:focus {{
+                outline: none;
+            }}
+
+            .form {{
+                background-color: var(--white);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                padding: 0 3rem;
+                height: 100%;
+                text-align: center;
+            }}
+
+            .input {{
+                background-color: rgba(255, 255, 255, 0.1);
+                border: 1px solid {WICKET_THEME['border']};
+                border-radius: 8px;
+                padding: 0.9rem;
+                margin: 0.5rem 0;
+                width: 100%;
+                color: {WICKET_THEME['text']};
+                font-family: 'Roboto Mono', monospace;
+            }}
+
+            .input:focus {{
+                border-color: {WICKET_THEME['accent']};
+                box-shadow: 0 0 10px {WICKET_THEME['accent']};
+                outline: none;
+            }}
+
+            @keyframes show {{
+                0%, 49.99% {{
+                    opacity: 0;
+                    z-index: 1;
+                }}
+                50%, 100% {{
+                    opacity: 1;
+                    z-index: 5;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="logo-container">
+            <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
+        </div>
+        <div class="container right-panel-active">
+            <div class="container__form container--signup">
+                <form action="#" class="form" id="form1">
+                    <h2 class="form__title">Sign Up</h2>
+                    <input type="text" placeholder="Username" class="input" id="signup-username" />
+                    <input type="email" placeholder="Email" class="input" id="signup-email" />
+                    <input type="password" placeholder="Password" class="input" id="signup-password" />
+                    <button class="btn" id="signup-btn">Sign Up</button>
+                </form>
+            </div>
+            <div class="container__form container--signin">
+                <form action="#" class="form" id="form2">
+                    <h2 class="form__title">Sign In</h2>
+                    <input type="text" placeholder="Username" class="input" id="signin-username" />
+                    <input type="password" placeholder="Password" class="input" id="signin-password" />
+                    <a href="#" class="link">Forgot your password?</a>
+                    <button class="btn" id="signin-btn">Sign In</button>
+                </form>
+            </div>
+            <div class="container__overlay">
+                <div class="overlay">
+                    <div class="overlay__panel overlay--left">
+                        <button class="btn" id="signIn">Sign In</button>
+                    </div>
+                    <div class="overlay__panel overlay--right">
+                        <button class="btn" id="signUp">Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            const signInBtn = document.getElementById("signIn");
+            const signUpBtn = document.getElementById("signUp");
+            const firstForm = document.getElementById("form1");
+            const secondForm = document.getElementById("form2");
+            const container = document.querySelector(".container");
+
+            signInBtn.addEventListener("click", () => {{
+                container.classList.remove("right-panel-active");
+            }});
+
+            signUpBtn.addEventListener("click", () => {{
+                container.classList.add("right-panel-active");
+            }});
+
+            firstForm.addEventListener("submit", (e) => {{
+                e.preventDefault();
+                alert("Sign-up functionality is disabled in this demo.");
+            }});
+
+            secondForm.addEventListener("submit", (e) => {{
+                e.preventDefault();
+                const username = document.getElementById("signin-username").value;
+                const password = document.getElementById("signin-password").value;
+                if (username === "nama" && password === "admin") {{
+                    localStorage.setItem("authenticated", "true");
+                    window.location.reload();
+                }} else {{
+                    alert("Invalid username or password");
+                }}
+            }});
+
+            // Check if authenticated
+            if (localStorage.getItem("authenticated") === "true") {{
+                window.Streamlit = window.Streamlit || {{}};
+                window.Streamlit.setAuthenticated = function() {{
+                    Streamlit.sendMessage({{ type: 'authenticated' }});
+                }};
+                Streamlit.setAuthenticated();
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    components.html(html_content, height=600)
+    if st.session_state.get('message') == 'authenticated':
+        st.session_state.authenticated = True
+        st.session_state.message = None
+        st.rerun()
 
 # Simulated Drone Detection
 def simulate_drone_data(num_drones=5):
@@ -295,38 +503,33 @@ def display_drone_data():
     fig = go.Figure()
     for status in df['status'].unique():
         status_df = df[df['status'] == status]
-        fig.add_trace(go.Scattergeo(
+        fig.add_trace(go.Scattermapbox(
             lon=status_df['longitude'],
             lat=status_df['latitude'],
             mode='markers',
             marker=dict(
-                size=10,
+                size=12,
                 color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
-                symbol='triangle-up',
-                line=dict(width=2, color=WICKET_THEME['text'])
+                symbol='copter',
+                opacity=0.8
             ),
             text=status_df['drone_id'],
-            hoverinfo='text',
+            hovertemplate="%{text}<br>Altitude: %{customdata:.0f}m<br>Status: %{marker.color|status}<extra></extra>",
+            customdata=status_df['altitude'],
             name=status.capitalize()
         ))
     fig.update_layout(
-        geo=dict(
-            scope='africa',
-            showland=True,
-            landcolor=WICKET_THEME['secondary_bg'],
-            showocean=True,
-            oceancolor=WICKET_THEME['primary_bg'],
-            showcountries=True,
-            countrycolor=WICKET_THEME['border'],
-            projection_type='mercator',
+        mapbox=dict(
+            style='streets-v12',
             center=dict(lat=9, lon=7),
-            lataxis=dict(range=[4, 14]),
-            lonaxis=dict(range=[2, 15])
+            zoom=6,
+            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5)
+        title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+        margin=dict(l=10, r=10, t=50, b=10)
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
@@ -354,12 +557,14 @@ def display_radar_data():
         return
     df = pd.DataFrame(st.session_state.radar_data)
     fig = go.Figure()
-    # Radar sweep effect
+    # Radar sweep effect (simulated as a cone)
     theta = np.linspace(0, 360, 100)
-    r = np.ones(100) * 10
-    fig.add_trace(go.Scatterpolar(
-        r=r,
-        theta=theta,
+    r = np.ones(100) * 0.5  # Small radius for visual effect
+    lon_sweep = 7 + r * np.cos(np.radians(theta))
+    lat_sweep = 9 + r * np.sin(np.radians(theta))
+    fig.add_trace(go.Scattermapbox(
+        lon=lon_sweep,
+        lat=lat_sweep,
         mode='lines',
         line=dict(color=WICKET_THEME['accent'], width=1),
         fill='toself',
@@ -367,42 +572,33 @@ def display_radar_data():
         name='Radar Sweep'
     ))
     # Aircraft positions
-    fig.add_trace(go.Scattergeo(
+    fig.add_trace(go.Scattermapbox(
         lon=df['longitude'],
         lat=df['latitude'],
         mode='markers',
         marker=dict(
             size=12,
             color=WICKET_THEME['accent'],
-            symbol='cross',
-            line=dict(width=2, color=WICKET_THEME['text'])
+            symbol='x',
+            opacity=0.8
         ),
         text=df['target_id'],
-        hoverinfo='text',
+        hovertemplate="%{text}<br>Altitude: %{customdata:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+        customdata=df[['altitude', 'velocity']].values,
         name='Radar Targets'
     ))
     fig.update_layout(
-        geo=dict(
-            scope='africa',
-            showland=True,
-            landcolor=WICKET_THEME['secondary_bg'],
-            showocean=True,
-            oceancolor=WICKET_THEME['primary_bg'],
-            showcountries=True,
-            countrycolor=WICKET_THEME['border'],
-            projection_type='mercator',
+        mapbox=dict(
+            style='streets-v12',
             center=dict(lat=9, lon=7),
-            lataxis=dict(range=[4, 14]),
-            lonaxis=dict(range=[2, 15])
-        ),
-        polar=dict(
-            radialaxis=dict(visible=False, range=[0, 10]),
-            angularaxis=dict(visible=False)
+            zoom=6,
+            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5)
+        title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+        margin=dict(l=10, r=10, t=50, b=10)
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
@@ -422,7 +618,6 @@ def simulate_atc_data(num_samples=10):
             'source': 'ads-b'
         })
     df = pd.DataFrame(data)
-    # Anomaly detection
     features = ['latitude', 'longitude', 'altitude', 'velocity']
     X = df[features].fillna(0)
     model = IsolationForest(contamination=0.1, random_state=42)
@@ -435,7 +630,6 @@ def simulate_atc_data(num_samples=10):
             'severity': 'high',
             'details': f"Detected {df['anomaly'].sum()} anomalies in ATC data"
         })
-    # Collision risk detection
     conflicts = []
     for i, row1 in df.iterrows():
         for j, row2 in df.iloc[i+1:].iterrows():
@@ -469,38 +663,33 @@ def display_atc_data():
     for anomaly in [False, True]:
         anomaly_df = df[df['anomaly'] == anomaly]
         if not anomaly_df.empty:
-            fig.add_trace(go.Scattergeo(
+            fig.add_trace(go.Scattermapbox(
                 lon=anomaly_df['longitude'],
                 lat=anomaly_df['latitude'],
                 mode='markers',
                 marker=dict(
                     size=12,
                     color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'],
-                    symbol='circle',
-                    line=dict(width=2, color=WICKET_THEME['text'])
+                    symbol='airfield',
+                    opacity=0.8
                 ),
                 text=anomaly_df['icao24'],
-                hoverinfo='text',
+                hovertemplate="%{text}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+                customdata=anomaly_df[['altitude', 'velocity']].values,
                 name='Anomaly' if anomaly else 'Normal'
             ))
     fig.update_layout(
-        geo=dict(
-            scope='africa',
-            showland=True,
-            landcolor=WICKET_THEME['secondary_bg'],
-            showocean=True,
-            oceancolor=WICKET_THEME['primary_bg'],
-            showcountries=True,
-            countrycolor=WICKET_THEME['border'],
-            projection_type='mercator',
+        mapbox=dict(
+            style='streets-v12',
             center=dict(lat=9, lon=7),
-            lataxis=dict(range=[4, 14]),
-            lonaxis=dict(range=[2, 15])
+            zoom=6,
+            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5)
+        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+        margin=dict(l=10, r=10, t=50, b=10)
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'icao24', 'latitude', 'longitude', 'altitude', 'velocity', 'anomaly']])
@@ -681,27 +870,26 @@ def generate_report():
         ]))
         elements.append(alert_table)
     
+    if st.session_state.drone_results:
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("Drone Detection", styles['Heading2']))
+        drone_data = [[str(d['timestamp']), d['drone_id'], f"{d['latitude']:.4f}", f"{d['longitude']:.4f}", f"{d['altitude']:.0f}", d['status']] for d in st.session_state.drone_results]
+        drone_table = Table([['Timestamp', 'Drone ID', 'Latitude', 'Longitude', 'Altitude', 'Status']] + drone_data)
+        drone_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(drone_table)
+    
     doc.build(elements)
     buffer.seek(0)
     return buffer
-
-# Authentication UI
-def render_auth_ui():
-    st.markdown('<div class="auth-container"><div class="auth-overlay"></div><div class="auth-card">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-form"><h2>NAMA IDPS Login</h2>', unsafe_allow_html=True)
-    username = st.text_input("Username", key="login_username", placeholder="Enter username", help="Enter your username")
-    password = st.text_input("Password", type="password", key="login_password", placeholder="Enter password", help="Enter your password")
-    
-    if st.button("Login", key="login_btn", help="Click to login"):
-        if username == "nama" and password == "admin":
-            st.session_state.authenticated = True
-            st.success("Login successful!")
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
-    
-    st.markdown('<a href="#" class="auth-link">Forgot Password?</a>', unsafe_allow_html=True)
-    st.markdown('<div class="radar"></div></div></div>', unsafe_allow_html=True)
 
 # Main Application
 def main():
