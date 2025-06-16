@@ -163,11 +163,12 @@ def render_auth_ui():
                 background-position: center;
                 background-repeat: no-repeat;
                 background-size: cover;
-                display: grid;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
                 height: 100vh;
-                place-items: center;
-                overflow: hidden;
                 margin: 0;
+                overflow: hidden;
             }}
 
             .logo-container {{
@@ -389,7 +390,7 @@ def render_auth_ui():
         <div class="logo-container">
             <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
         </div>
-        <div class="container right-panel-active">
+        <div class="container">
             <div class="container__form container--signup">
                 <form action="#" class="form" id="form1">
                     <h2 class="form__title">Sign Up</h2>
@@ -426,47 +427,45 @@ def render_auth_ui():
             const secondForm = document.getElementById("form2");
             const container = document.querySelector(".container");
 
-            signInBtn.addEventListener("click", () => {{
+            signInBtn.addEventListener("click", () => {
                 container.classList.remove("right-panel-active");
-            }});
+                alert("Switched to Sign In form");
+            });
 
-            signUpBtn.addEventListener("click", () => {{
+            signUpBtn.addEventListener("click", () => {
                 container.classList.add("right-panel-active");
-            }});
+                alert("Switched to Sign Up form");
+            });
 
-            firstForm.addEventListener("submit", (e) => {{
+            firstForm.addEventListener("submit", (e) => {
                 e.preventDefault();
-                alert("Sign-up functionality is disabled in this demo.");
-            }});
+                alert("Sign-up functionality is disabled in this demo. Please use Sign In.");
+            });
 
-            secondForm.addEventListener("submit", (e) => {{
+            secondForm.addEventListener("submit", (e) => {
                 e.preventDefault();
                 const username = document.getElementById("signin-username").value;
                 const password = document.getElementById("signin-password").value;
-                if (username === "nama" && password === "admin") {{
-                    localStorage.setItem("authenticated", "true");
-                    window.location.reload();
-                }} else {{
+                if (username === "nama" && password === "admin") {
+                    if (window.Streamlit) {
+                        window.Streamlit.setComponentValue({ authenticated: true });
+                        localStorage.removeItem("authenticated");
+                        alert("Login successful!");
+                    } else {
+                        alert("Streamlit communication failed. Please try again.");
+                    }
+                } else {
                     alert("Invalid username or password");
-                }}
-            }});
-
-            // Check if authenticated
-            if (localStorage.getItem("authenticated") === "true") {{
-                window.Streamlit = window.Streamlit || {{}};
-                window.Streamlit.setAuthenticated = function() {{
-                    Streamlit.sendMessage({{ type: 'authenticated' }});
-                }};
-                Streamlit.setAuthenticated();
-            }}
+                }
+            });
         </script>
     </body>
     </html>
     """
-    components.html(html_content, height=600)
-    if st.session_state.get('message') == 'authenticated':
+    components.html(html_content, height=600, scrolling=False)
+    if st.session_state.get('component_value', {}).get('authenticated'):
         st.session_state.authenticated = True
-        st.session_state.message = None
+        st.session_state.component_value = None
         st.rerun()
 
 # Simulated Drone Detection
@@ -557,9 +556,8 @@ def display_radar_data():
         return
     df = pd.DataFrame(st.session_state.radar_data)
     fig = go.Figure()
-    # Radar sweep effect (simulated as a cone)
     theta = np.linspace(0, 360, 100)
-    r = np.ones(100) * 0.5  # Small radius for visual effect
+    r = np.ones(100) * 0.5
     lon_sweep = 7 + r * np.cos(np.radians(theta))
     lat_sweep = 9 + r * np.sin(np.radians(theta))
     fig.add_trace(go.Scattermapbox(
@@ -571,7 +569,6 @@ def display_radar_data():
         opacity=0.3,
         name='Radar Sweep'
     ))
-    # Aircraft positions
     fig.add_trace(go.Scattermapbox(
         lon=df['longitude'],
         lat=df['latitude'],
