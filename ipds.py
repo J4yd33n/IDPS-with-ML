@@ -429,11 +429,13 @@ def render_auth_ui():
 
             signInBtn.addEventListener("click", () => {{
                 container.classList.remove("right-panel-active");
+                console.log("Switched to Sign In form");
                 alert("Switched to Sign In form");
             }});
 
             signUpBtn.addEventListener("click", () => {{
                 container.classList.add("right-panel-active");
+                console.log("Switched to Sign Up form");
                 alert("Switched to Sign Up form");
             }});
 
@@ -447,12 +449,16 @@ def render_auth_ui():
                 const username = document.getElementById("signin-username").value;
                 const password = document.getElementById("signin-password").value;
                 if (username === "nama" && password === "admin") {{
-                    if (window.Streamlit) {{
-                        window.Streamlit.setComponentValue({{ authenticated: true }});
-                        localStorage.removeItem("authenticated");
-                        alert("Login successful!");
-                    }} else {{
-                        alert("Streamlit communication failed. Please try again.");
+                    try {{
+                        window.parent.postMessage({{
+                            type: 'streamlit:setComponentValue',
+                            value: {{ authenticated: true }}
+                        }}, '*');
+                        console.log("Sent authentication message to Streamlit");
+                        alert("Login successful! Waiting for Streamlit to process...");
+                    }} catch (err) {{
+                        console.error("Failed to send message to Streamlit:", err);
+                        alert("Streamlit communication failed. Check console and try again.");
                     }}
                 }} else {{
                     alert("Invalid username or password");
@@ -462,8 +468,9 @@ def render_auth_ui():
     </body>
     </html>
     """
-    components.html(html_content, height=600, scrolling=False)
-    if st.session_state.get('component_value', {}).get('authenticated'):
+    component_value = components.html(html_content, height=600, scrolling=False, key="auth_component")
+    if component_value and isinstance(component_value, dict) and component_value.get('authenticated'):
+        logger.info("Received authentication message from JavaScript")
         st.session_state.authenticated = True
         st.session_state.component_value = None
         st.rerun()
