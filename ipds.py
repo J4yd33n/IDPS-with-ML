@@ -702,7 +702,7 @@ def main():
         render_auth_ui()
         return
 
-    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg", use_column_width=True)
+    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg")
     page = st.sidebar.selectbox("Select Feature", ["Dashboard", "Network Scan", "Drone Detection", "Radar Surveillance", "ATC Monitoring", "Threat Intelligence", "Compliance Monitoring"])
 
     if page == "Dashboard":
