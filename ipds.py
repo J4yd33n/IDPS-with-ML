@@ -7,7 +7,6 @@ from datetime import datetime
 import logging
 from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
-import streamlit.components.v1 as components
 import base64
 import io
 
@@ -39,18 +38,12 @@ def apply_wicket_css():
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
             
             .stApp {{
-                background: linear-gradient(45deg, {WICKET_THEME['primary_bg']} 0%, {WICKET_THEME['secondary_bg']} 100%);
-                background-size: 200% 200%;
-                animation: gradientShift 15s ease-in-out infinite;
+                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg');
+                background-size: cover;
+                background-position: center;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
                 overflow-x: hidden;
-            }}
-            
-            @keyframes gradientShift {{
-                0% {{ background-position: 0% 50%; }}
-                50% {{ background-position: 100% 50%; }}
-                100% {{ background-position: 0% 50%; }}
             }}
             
             .card {{
@@ -109,6 +102,61 @@ def apply_wicket_css():
                 50% {{ transform: scale(1.05); }}
                 100% {{ transform: scale(1); }}
             }}
+            
+            .auth-container {{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                padding: 20px;
+            }}
+            
+            .form-container {{
+                background: {WICKET_THEME['card_bg']};
+                backdrop-filter: blur(15px);
+                border-radius: 10px;
+                padding: 30px;
+                width: 100%;
+                max-width: 400px;
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+                position: relative;
+                transition: transform 0.6s ease-in-out;
+            }}
+            
+            .form-container.sign-up-active {{
+                transform: translateX(100%);
+            }}
+            
+            .stTextInput input, .stTextInput input:focus {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid {WICKET_THEME['border']};
+                border-radius: 8px;
+                color: {WICKET_THEME['text']};
+                font-family: 'Roboto Mono', monospace;
+            }}
+            
+            .stTextInput input:focus {{
+                border-color: {WICKET_THEME['accent']};
+                box-shadow: 0 0 10px {WICKET_THEME['accent']};
+            }}
+            
+            .logo {{
+                display: block;
+                margin: 0 auto 20px;
+                width: 150px;
+            }}
+            
+            .forgot-password {{
+                color: {WICKET_THEME['accent']};
+                font-size: 0.9rem;
+                text-decoration: none;
+                display: block;
+                margin: 10px 0;
+            }}
+            
+            .forgot-password:hover {{
+                color: {WICKET_THEME['hover']};
+            }}
         </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -132,141 +180,45 @@ if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
+if 'panel_state' not in st.session_state:
+    st.session_state.panel_state = 'sign_in'
 
-# Authentication UI with Simplified HTML/JS
+# Authentication UI with Native Streamlit
 def render_auth_ui():
-    # Check query parameters for authentication
-    query_params = st.query_params
-    if query_params.get('auth') == 'success' and query_params.get('username') == 'nama':
-        st.session_state.authenticated = True
-        logger.info("Authenticated via URL parameters: username=nama")
-        st.query_params.clear()
-        st.rerun()
+    st.markdown(
+        '<div class="auth-container">'
+        f'<img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" class="logo">'
+        f'<div class="form-container {"sign-up-active" if st.session_state.panel_state == "sign_up" else ""}">',
+        unsafe_allow_html=True
+    )
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>NAMA IDPS Login</title>
-        <style>
-            body {{
-                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
-                background-size: cover;
-                background-position: center;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-                font-family: 'Roboto Mono', monospace;
-                color: {WICKET_THEME['text']};
-            }}
-            .logo {{
-                width: 150px;
-                margin-bottom: 20px;
-            }}
-            .form-container {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border-radius: 10px;
-                padding: 20px;
-                width: 300px;
-                text-align: center;
-            }}
-            h2 {{
-                font-family: 'Orbitron', sans-serif;
-                color: {WICKET_THEME['text_light']};
-                text-shadow: 0 0 8px {WICKET_THEME['accent']};
-            }}
-            input {{
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid {WICKET_THEME['border']};
-                border-radius: 8px;
-                padding: 10px;
-                margin: 10px 0;
-                width: 100%;
-                color: {WICKET_THEME['text']};
-            }}
-            input:focus {{
-                border-color: {WICKET_THEME['accent']};
-                box-shadow: 0 0 10px {WICKET_THEME['accent']};
-                outline: none;
-            }}
-            button {{
-                background: linear-gradient(90deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
-                color: {WICKET_THEME['button_text']};
-                border: none;
-                border-radius: 20px;
-                padding: 10px;
-                width: 100%;
-                cursor: pointer;
-                font-family: 'Orbitron', sans-serif;
-            }}
-            button:hover {{
-                background: linear-gradient(90deg, {WICKET_THEME['hover']}, {WICKET_THEME['accent_alt']});
-            }}
-            .link {{
-                color: {WICKET_THEME['accent']};
-                text-decoration: none;
-                font-size: 0.9rem;
-            }}
-            .link:hover {{
-                color: {WICKET_THEME['hover']};
-            }}
-        </style>
-    </head>
-    <body>
-        <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
-        <div class="form-container">
-            <h2>Sign In</h2>
-            <form id="signin-form">
-                <input type="text" id="username" placeholder="Username" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <a href="#" class="link">Forgot your password?</a>
-                <button type="submit">Sign In</button>
-            </form>
-        </div>
-        <script>
-            document.getElementById("signin-form").addEventListener("submit", (e) => {{
-                e.preventDefault();
-                const username = document.getElementById("username").value;
-                const password = document.getElementById("password").value;
-                if (username === "nama" && password === "admin") {{
-                    try {{
-                        const form = document.createElement("form");
-                        form.method = "GET";
-                        form.action = window.location.pathname;
-                        form.innerHTML = `
-                            <input type="hidden" name="auth" value="success">
-                            <input type="hidden" name="username" value="nama">
-                        `;
-                        document.body.appendChild(form);
-                        form.submit();
-                        console.log("Authentication submitted via URL parameters");
-                    }} catch (err) {{
-                        console.error("Submission failed:", err);
-                        alert("Authentication failed. Please try again.");
-                    }}
-                }} else {{
-                    alert("Invalid username or password");
-                }}
-            }});
-        </script>
-    </body>
-    </html>
-    """
-    try:
-        components.html(html_content, height=600, scrolling=False, key="auth_component")
-        logger.info("Rendered auth component successfully")
-    except Exception as e:
-        logger.error(f"Failed to render auth component: {str(e)}")
-        st.error("Authentication UI failed to load. Please check logs or try again later.")
-    if st.session_state.authenticated:
-        logger.info("Authentication completed, rerunning app")
-        st.rerun()
+    if st.session_state.panel_state == 'sign_in':
+        with st.form(key='sign_in_form'):
+            st.markdown('<h2 style="text-align: center;">Sign In</h2>', unsafe_allow_html=True)
+            username = st.text_input('Username', placeholder='Username')
+            password = st.text_input('Password', type='password', placeholder='Password')
+            st.markdown('<a href="#" class="forgot-password">Forgot your password?</a>', unsafe_allow_html=True)
+            submit = st.form_submit_button('Sign In')
+            if submit:
+                if username == 'nama' and password == 'admin':
+                    st.session_state.authenticated = True
+                    logger.info("Authenticated: username=nama")
+                    st.rerun()
+                else:
+                    st.error('Invalid username or password')
+        st.button('Switch to Sign Up', on_click=lambda: st.session_state.update(panel_state='sign_up'))
+    else:
+        with st.form(key='sign_up_form'):
+            st.markdown('<h2 style="text-align: center;">Sign Up</h2>', unsafe_allow_html=True)
+            username = st.text_input('Username', placeholder='Username', key='signup_username')
+            email = st.text_input('Email', placeholder='Email')
+            password = st.text_input('Password', type='password', placeholder='Password', key='signup_password')
+            submit = st.form_submit_button('Sign Up')
+            if submit:
+                st.warning('Sign-up functionality is disabled in this demo.')
+        st.button('Switch to Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
 
 # Simulated Drone Detection
 def simulate_drone_data(num_drones=5):
@@ -485,7 +437,7 @@ def display_atc_data():
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20)),
         margin=dict(l=10, r=10, t=50, b=10)
     )
     st.plotly_chart(fig, use_container_width=True)
