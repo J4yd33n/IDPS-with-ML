@@ -133,14 +133,14 @@ if 'compliance_metrics' not in st.session_state:
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
 
-# Authentication UI with HTML, CSS, and JS (URL Parameter Fallback)
+# Authentication UI with Simplified HTML/JS
 def render_auth_ui():
     # Check query parameters for authentication
     query_params = st.query_params
     if query_params.get('auth') == 'success' and query_params.get('username') == 'nama':
         st.session_state.authenticated = True
         logger.info("Authenticated via URL parameters: username=nama")
-        st.query_params.clear()  # Clear parameters after processing
+        st.query_params.clear()
         st.rerun()
 
     html_content = f"""
@@ -151,331 +151,104 @@ def render_auth_ui():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>NAMA IDPS Login</title>
         <style>
-            :root {{
-                --white: {WICKET_THEME['card_bg']};
-                --gray: {WICKET_THEME['text']};
-                --blue: {WICKET_THEME['button_bg']};
-                --lightblue: {WICKET_THEME['accent_alt']};
-                --button-radius: 0.7rem;
-                --max-width: 758px;
-                --max-height: 420px;
-                font-size: 16px;
-                font-family: 'Roboto Mono', monospace;
-            }}
-
             body {{
-                align-items: center;
-                background-color: {WICKET_THEME['primary_bg']};
                 background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
-                background-attachment: fixed;
-                background-position: center;
-                background-repeat: no-repeat;
                 background-size: cover;
+                background-position: center;
                 display: flex;
                 flex-direction: column;
+                align-items: center;
                 justify-content: center;
                 height: 100vh;
                 margin: 0;
-                overflow: hidden;
+                font-family: 'Roboto Mono', monospace;
+                color: {WICKET_THEME['text']};
             }}
-
-            .logo-container {{
-                text-align: center;
-                margin-bottom: 20px;
-            }}
-
             .logo {{
                 width: 150px;
-                height: auto;
-                filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
-                animation: pulse 2s infinite;
+                margin-bottom: 20px;
             }}
-
-            @keyframes pulse {{
-                0% {{ transform: scale(1); }}
-                50% {{ transform: scale(1.05); }}
-                100% {{ transform: scale(1); }}
+            .form-container {{
+                background: {WICKET_THEME['card_bg']};
+                backdrop-filter: blur(15px);
+                border-radius: 10px;
+                padding: 20px;
+                width: 300px;
+                text-align: center;
             }}
-
-            .form__title {{
+            h2 {{
                 font-family: 'Orbitron', sans-serif;
-                font-weight: 300;
-                margin: 0;
-                margin-bottom: 1.25rem;
                 color: {WICKET_THEME['text_light']};
                 text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
-
-            .link {{
-                color: {WICKET_THEME['accent']};
-                font-size: 0.9rem;
-                margin: 1.5rem 0;
-                text-decoration: none;
-            }}
-
-            .link:hover {{
-                color: {WICKET_THEME['hover']};
-            }}
-
-            .container {{
-                background-color: var(--white);
-                backdrop-filter: blur(15px);
-                border-radius: var(--button-radius);
-                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25),
-                    0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
-                height: var(--max-height);
-                max-width: var(--max-width);
-                overflow: hidden;
-                position: relative;
-                width: 100%;
-            }}
-
-            .container__form {{
-                height: 100%;
-                position: absolute;
-                top: 0;
-                transition: all 0.6s ease-in-out;
-            }}
-
-            .container--signin {{
-                left: 0;
-                width: 50%;
-                z-index: 2;
-            }}
-
-            .container.right-panel-active .container--signin {{
-                transform: translateX(100%);
-            }}
-
-            .container--signup {{
-                left: 0;
-                opacity: 0;
-                width: 50%;
-                z-index: 1;
-            }}
-
-            .container.right-panel-active .container--signup {{
-                animation: show 0.6s;
-                opacity: 1;
-                transform: translateX(100%);
-                z-index: 5;
-            }}
-
-            .container__overlay {{
-                height: 100%;
-                left: 50%;
-                overflow: hidden;
-                position: absolute;
-                top: 0;
-                transition: transform 0.6s ease-in-out;
-                width: 50%;
-                z-index: 100;
-            }}
-
-            .container.right-panel-active .container__overlay {{
-                transform: translateX(-100%);
-            }}
-
-            .overlay {{
-                background-color: {WICKET_THEME['card_bg']};
-                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
-                background-attachment: fixed;
-                background-position: center;
-                background-repeat: no-repeat;
-                background-size: cover;
-                height: 100%;
-                left: -100%;
-                position: relative;
-                transform: translateX(0);
-                transition: transform 0.6s ease-in-out;
-                width: 200%;
-            }}
-
-            .container.right-panel-active .overlay {{
-                transform: translateX(50%);
-            }}
-
-            .overlay__panel {{
-                align-items: center;
-                display: flex;
-                flex-direction: column;
-                height: 100%;
-                justify-content: center;
-                position: absolute;
-                text-align: center;
-                top: 0;
-                transform: translateX(0);
-                transition: transform 0.6s ease-in-out;
-                width: 50%;
-            }}
-
-            .overlay--left {{
-                transform: translateX(-20%);
-            }}
-
-            .container.right-panel-active .overlay--left {{
-                transform: translateX(0);
-            }}
-
-            .overlay--right {{
-                right: 0;
-                transform: translateX(0);
-            }}
-
-            .container.right-panel-active .overlay--right {{
-                transform: translateX(20%);
-            }}
-
-            .btn {{
-                background-color: var(--blue);
-                background-image: linear-gradient(90deg, var(--blue) 0%, var(--lightblue) 74%);
-                border-radius: 20px;
-                border: 1px solid var(--blue);
-                color: {WICKET_THEME['button_text']};
-                cursor: pointer;
-                font-family: 'Orbitron', sans-serif;
-                font-size: 0.8rem;
-                font-weight: bold;
-                letter-spacing: 0.1rem;
-                padding: 0.9rem 4rem;
-                text-transform: uppercase;
-                transition: transform 80ms ease-in;
-            }}
-
-            .form > .btn {{
-                margin-top: 1.5rem;
-            }}
-
-            .btn:active {{
-                transform: scale(0.95);
-            }}
-
-            .btn:focus {{
-                outline: none;
-            }}
-
-            .form {{
-                background-color: var(--white);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-direction: column;
-                padding: 0 3rem;
-                height: 100%;
-                text-align: center;
-            }}
-
-            .input {{
-                background-color: rgba(255, 255, 255, 0.1);
+            input {{
+                background: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
-                padding: 0.9rem;
-                margin: 0.5rem 0;
+                padding: 10px;
+                margin: 10px 0;
                 width: 100%;
                 color: {WICKET_THEME['text']};
-                font-family: 'Roboto Mono', monospace;
             }}
-
-            .input:focus {{
+            input:focus {{
                 border-color: {WICKET_THEME['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
                 outline: none;
             }}
-
-            @keyframes show {{
-                0%, 49.99% {{
-                    opacity: 0;
-                    z-index: 1;
-                }}
-                50%, 100% {{
-                    opacity: 1;
-                    z-index: 5;
-                }}
+            button {{
+                background: linear-gradient(90deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
+                color: {WICKET_THEME['button_text']};
+                border: none;
+                border-radius: 20px;
+                padding: 10px;
+                width: 100%;
+                cursor: pointer;
+                font-family: 'Orbitron', sans-serif;
+            }}
+            button:hover {{
+                background: linear-gradient(90deg, {WICKET_THEME['hover']}, {WICKET_THEME['accent_alt']});
+            }}
+            .link {{
+                color: {WICKET_THEME['accent']};
+                text-decoration: none;
+                font-size: 0.9rem;
+            }}
+            .link:hover {{
+                color: {WICKET_THEME['hover']};
             }}
         </style>
     </head>
     <body>
-        <div class="logo-container">
-            <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
-        </div>
-        <div class="container">
-            <div class="container__form container--signup">
-                <form action="#" class="form" id="form1">
-                    <h2 class="form__title">Sign Up</h2>
-                    <input type="text" placeholder="Username" class="input" id="signup-username" />
-                    <input type="email" placeholder="Email" class="input" id="signup-email" />
-                    <input type="password" placeholder="Password" class="input" id="signup-password" />
-                    <button class="btn" id="signup-btn">Sign Up</button>
-                </form>
-            </div>
-            <div class="container__form container--signin">
-                <form action="#" class="form" id="form2">
-                    <h2 class="form__title">Sign In</h2>
-                    <input type="text" placeholder="Username" class="input" id="signin-username" />
-                    <input type="password" placeholder="Password" class="input" id="signin-password" />
-                    <a href="#" class="link">Forgot your password?</a>
-                    <button class="btn" id="signin-btn">Sign In</button>
-                </form>
-            </div>
-            <div class="container__overlay">
-                <div class="overlay">
-                    <div class="overlay__panel overlay--left">
-                        <button class="btn" id="signIn">Sign In</button>
-                    </div>
-                    <div class="overlay__panel overlay--right">
-                        <button class="btn" id="signUp">Sign Up</button>
-                    </div>
-                </div>
-            </div>
+        <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
+        <div class="form-container">
+            <h2>Sign In</h2>
+            <form id="signin-form">
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <a href="#" class="link">Forgot your password?</a>
+                <button type="submit">Sign In</button>
+            </form>
         </div>
         <script>
-            const signInBtn = document.getElementById("signIn");
-            const signUpBtn = document.getElementById("signUp");
-            const firstForm = document.getElementById("form1");
-            const secondForm = document.getElementById("form2");
-            const container = document.querySelector(".container");
-
-            signInBtn.addEventListener("click", () => {{
-                container.classList.remove("right-panel-active");
-                console.log("Switched to Sign In form");
-            }});
-
-            signUpBtn.addEventListener("click", () => {{
-                container.classList.add("right-panel-active");
-                console.log("Switched to Sign Up form");
-            }});
-
-            firstForm.addEventListener("submit", (e) => {{
+            document.getElementById("signin-form").addEventListener("submit", (e) => {{
                 e.preventDefault();
-                alert("Sign-up functionality is disabled in this demo. Please use Sign In.");
-            }});
-
-            secondForm.addEventListener("submit", (e) => {{
-                e.preventDefault();
-                const username = document.getElementById("signin-username").value;
-                const password = document.getElementById("signin-password").value;
+                const username = document.getElementById("username").value;
+                const password = document.getElementById("password").value;
                 if (username === "nama" && password === "admin") {{
                     try {{
-                        // Create hidden form for URL parameter submission
-                        const form = document.createElement('form');
-                        form.method = 'GET';
+                        const form = document.createElement("form");
+                        form.method = "GET";
                         form.action = window.location.pathname;
-                        const authInput = document.createElement('input');
-                        authInput.type = 'hidden';
-                        authInput.name = 'auth';
-                        authInput.value = 'success';
-                        form.appendChild(authInput);
-                        const userInput = document.createElement('input');
-                        userInput.type = 'hidden';
-                        userInput.name = 'username';
-                        userInput.value = 'nama';
-                        form.appendChild(userInput);
+                        form.innerHTML = `
+                            <input type="hidden" name="auth" value="success">
+                            <input type="hidden" name="username" value="nama">
+                        `;
                         document.body.appendChild(form);
                         form.submit();
-                        console.log("Submitted authentication via URL parameters");
+                        console.log("Authentication submitted via URL parameters");
                     }} catch (err) {{
-                        console.error("Failed to submit authentication:", err);
-                        alert("Authentication failed. Please try again or check console.");
+                        console.error("Submission failed:", err);
+                        alert("Authentication failed. Please try again.");
                     }}
                 }} else {{
                     alert("Invalid username or password");
@@ -485,7 +258,12 @@ def render_auth_ui():
     </body>
     </html>
     """
-    components.html(html_content, height=600, scrolling=False, key=f"auth_component_{hash(html_content)}")
+    try:
+        components.html(html_content, height=600, scrolling=False, key="auth_component")
+        logger.info("Rendered auth component successfully")
+    except Exception as e:
+        logger.error(f"Failed to render auth component: {str(e)}")
+        st.error("Authentication UI failed to load. Please check logs or try again later.")
     if st.session_state.authenticated:
         logger.info("Authentication completed, rerunning app")
         st.rerun()
