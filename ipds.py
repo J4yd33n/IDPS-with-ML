@@ -7,6 +7,7 @@ from datetime import datetime
 import logging
 from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
+import streamlit.components.v1 as components
 import base64
 import io
 
@@ -131,167 +132,240 @@ if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
-if 'panel_state' not in st.session_state:
-    st.session_state.panel_state = 'signin'
 
-# Authentication UI with Native Streamlit Components
+# Authentication UI with HTML, CSS, and JS (URL Parameter Fallback)
 def render_auth_ui():
-    css = f"""
+    # Check query parameters for authentication
+    query_params = st.query_params
+    if query_params.get('auth') == 'success' and query_params.get('username') == 'nama':
+        st.session_state.authenticated = True
+        logger.info("Authenticated via URL parameters: username=nama")
+        st.query_params.clear()  # Clear parameters after processing
+        st.rerun()
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>NAMA IDPS Login</title>
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
-            
-            .auth-container {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg');
-                background-size: cover;
-                background-position: center;
+            :root {{
+                --white: {WICKET_THEME['card_bg']};
+                --gray: {WICKET_THEME['text']};
+                --blue: {WICKET_THEME['button_bg']};
+                --lightblue: {WICKET_THEME['accent_alt']};
+                --button-radius: 0.7rem;
+                --max-width: 758px;
+                --max-height: 420px;
+                font-size: 16px;
+                font-family: 'Roboto Mono', monospace;
+            }}
+
+            body {{
+                align-items: center;
+                background-color: {WICKET_THEME['primary_bg']};
+                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
                 background-attachment: fixed;
-                min-height: 100vh;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
                 display: flex;
                 flex-direction: column;
-                align-items: center;
                 justify-content: center;
+                height: 100vh;
                 margin: 0;
-                padding: 20px;
-                box-sizing: border-box;
-                font-family: 'Roboto Mono', monospace;
-                color: {WICKET_THEME['text']};
+                overflow: hidden;
             }}
-            
+
             .logo-container {{
                 text-align: center;
                 margin-bottom: 20px;
             }}
-            
+
             .logo {{
                 width: 150px;
                 height: auto;
                 filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
                 animation: pulse 2s infinite;
             }}
-            
+
             @keyframes pulse {{
                 0% {{ transform: scale(1); }}
                 50% {{ transform: scale(1.05); }}
                 100% {{ transform: scale(1); }}
             }}
-            
-            .form-container {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border-radius: 0.7rem;
-                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25), 0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
-                width: 100%;
-                max-width: 758px;
-                height: 420px;
-                position: relative;
-                overflow: hidden;
-            }}
-            
-            .form-panel {{
-                position: absolute;
-                top: 0;
-                width: 50%;
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 0 3rem;
-                transition: all 0.6s ease-in-out;
-            }}
-            
-            .signin-panel {{
-                left: 0;
-                z-index: 2;
-            }}
-            
-            .signup-panel {{
-                left: 0;
-                opacity: 0;
-                z-index: 1;
-            }}
-            
-            .form-container.right-panel-active .signin-panel {{
-                transform: translateX(100%);
-                opacity: 0;
-            }}
-            
-            .form-container.right-panel-active .signup-panel {{
-                transform: translateX(100%);
-                opacity: 1;
-                z-index: 5;
-            }}
-            
-            .overlay-container {{
-                position: absolute;
-                top: 0;
-                left: 50%;
-                width: 50%;
-                height: 100%;
-                overflow: hidden;
-                transition: transform 0.6s ease-in-out;
-                z-index: 100;
-            }}
-            
-            .form-container.right-panel-active .overlay-container {{
-                transform: translateX(-100%);
-            }}
-            
-            .overlay {{
-                background: {WICKET_THEME['card_bg']};
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg');
-                background-size: cover;
-                background-position: center;
-                height: 100%;
-                width: 200%;
-                position: relative;
-                left: -100%;
-                transition: transform 0.6s ease-in-out;
-            }}
-            
-            .form-container.right-panel-active .overlay {{
-                transform: translateX(50%);
-            }}
-            
-            .overlay-panel {{
-                position: absolute;
-                top: 0;
-                height: 100%;
-                width: 50%;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                transition: transform 0.6s ease-in-out;
-            }}
-            
-            .overlay-left {{
-                transform: translateX(-20%);
-            }}
-            
-            .form-container.right-panel-active .overlay-left {{
-                transform: translateX(0);
-            }}
-            
-            .overlay-right {{
-                right: 0;
-                transform: translateX(0);
-            }}
-            
-            .form-container.right-panel-active .overlay-right {{
-                transform: translateX(20%);
-            }}
-            
-            .form-title {{
+
+            .form__title {{
                 font-family: 'Orbitron', sans-serif;
                 font-weight: 300;
+                margin: 0;
                 margin-bottom: 1.25rem;
                 color: {WICKET_THEME['text_light']};
                 text-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
-            
-            .stTextInput input {{
+
+            .link {{
+                color: {WICKET_THEME['accent']};
+                font-size: 0.9rem;
+                margin: 1.5rem 0;
+                text-decoration: none;
+            }}
+
+            .link:hover {{
+                color: {WICKET_THEME['hover']};
+            }}
+
+            .container {{
+                background-color: var(--white);
+                backdrop-filter: blur(15px);
+                border-radius: var(--button-radius);
+                box-shadow: 0 0.9rem 1.7rem rgba(0, 0, 0, 0.25),
+                    0 0.7rem 0.7rem rgba(0, 0, 0, 0.22);
+                height: var(--max-height);
+                max-width: var(--max-width);
+                overflow: hidden;
+                position: relative;
+                width: 100%;
+            }}
+
+            .container__form {{
+                height: 100%;
+                position: absolute;
+                top: 0;
+                transition: all 0.6s ease-in-out;
+            }}
+
+            .container--signin {{
+                left: 0;
+                width: 50%;
+                z-index: 2;
+            }}
+
+            .container.right-panel-active .container--signin {{
+                transform: translateX(100%);
+            }}
+
+            .container--signup {{
+                left: 0;
+                opacity: 0;
+                width: 50%;
+                z-index: 1;
+            }}
+
+            .container.right-panel-active .container--signup {{
+                animation: show 0.6s;
+                opacity: 1;
+                transform: translateX(100%);
+                z-index: 5;
+            }}
+
+            .container__overlay {{
+                height: 100%;
+                left: 50%;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                transition: transform 0.6s ease-in-out;
+                width: 50%;
+                z-index: 100;
+            }}
+
+            .container.right-panel-active .container__overlay {{
+                transform: translateX(-100%);
+            }}
+
+            .overlay {{
+                background-color: {WICKET_THEME['card_bg']};
+                background: url("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg");
+                background-attachment: fixed;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
+                height: 100%;
+                left: -100%;
+                position: relative;
+                transform: translateX(0);
+                transition: transform 0.6s ease-in-out;
+                width: 200%;
+            }}
+
+            .container.right-panel-active .overlay {{
+                transform: translateX(50%);
+            }}
+
+            .overlay__panel {{
+                align-items: center;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                justify-content: center;
+                position: absolute;
+                text-align: center;
+                top: 0;
+                transform: translateX(0);
+                transition: transform 0.6s ease-in-out;
+                width: 50%;
+            }}
+
+            .overlay--left {{
+                transform: translateX(-20%);
+            }}
+
+            .container.right-panel-active .overlay--left {{
+                transform: translateX(0);
+            }}
+
+            .overlay--right {{
+                right: 0;
+                transform: translateX(0);
+            }}
+
+            .container.right-panel-active .overlay--right {{
+                transform: translateX(20%);
+            }}
+
+            .btn {{
+                background-color: var(--blue);
+                background-image: linear-gradient(90deg, var(--blue) 0%, var(--lightblue) 74%);
+                border-radius: 20px;
+                border: 1px solid var(--blue);
+                color: {WICKET_THEME['button_text']};
+                cursor: pointer;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.8rem;
+                font-weight: bold;
+                letter-spacing: 0.1rem;
+                padding: 0.9rem 4rem;
+                text-transform: uppercase;
+                transition: transform 80ms ease-in;
+            }}
+
+            .form > .btn {{
+                margin-top: 1.5rem;
+            }}
+
+            .btn:active {{
+                transform: scale(0.95);
+            }}
+
+            .btn:focus {{
+                outline: none;
+            }}
+
+            .form {{
+                background-color: var(--white);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                padding: 0 3rem;
+                height: 100%;
+                text-align: center;
+            }}
+
+            .input {{
                 background-color: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
                 border-radius: 8px;
@@ -301,82 +375,120 @@ def render_auth_ui():
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
             }}
-            
-            .stTextInput input:focus {{
+
+            .input:focus {{
                 border-color: {WICKET_THEME['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
                 outline: none;
             }}
-            
-            .forgot-link {{
-                color: {WICKET_THEME['accent']};
-                font-size: 0.9rem;
-                margin: 1.5rem 0;
-                text-decoration: none;
-            }}
-            
-            .forgot-link:hover {{
-                color: {WICKET_THEME['hover']};
+
+            @keyframes show {{
+                0%, 49.99% {{
+                    opacity: 0;
+                    z-index: 1;
+                }}
+                50%, 100% {{
+                    opacity: 1;
+                    z-index: 5;
+                }}
             }}
         </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    </head>
+    <body>
+        <div class="logo-container">
+            <img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo">
+        </div>
+        <div class="container">
+            <div class="container__form container--signup">
+                <form action="#" class="form" id="form1">
+                    <h2 class="form__title">Sign Up</h2>
+                    <input type="text" placeholder="Username" class="input" id="signup-username" />
+                    <input type="email" placeholder="Email" class="input" id="signup-email" />
+                    <input type="password" placeholder="Password" class="input" id="signup-password" />
+                    <button class="btn" id="signup-btn">Sign Up</button>
+                </form>
+            </div>
+            <div class="container__form container--signin">
+                <form action="#" class="form" id="form2">
+                    <h2 class="form__title">Sign In</h2>
+                    <input type="text" placeholder="Username" class="input" id="signin-username" />
+                    <input type="password" placeholder="Password" class="input" id="signin-password" />
+                    <a href="#" class="link">Forgot your password?</a>
+                    <button class="btn" id="signin-btn">Sign In</button>
+                </form>
+            </div>
+            <div class="container__overlay">
+                <div class="overlay">
+                    <div class="overlay__panel overlay--left">
+                        <button class="btn" id="signIn">Sign In</button>
+                    </div>
+                    <div class="overlay__panel overlay--right">
+                        <button class="btn" id="signUp">Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            const signInBtn = document.getElementById("signIn");
+            const signUpBtn = document.getElementById("signUp");
+            const firstForm = document.getElementById("form1");
+            const secondForm = document.getElementById("form2");
+            const container = document.querySelector(".container");
 
-    with st.container():
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown('<div class="logo-container"><img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" alt="NAMA Logo" class="logo"></div>', unsafe_allow_html=True)
-        
-        panel_class = 'right-panel-active' if st.session_state.panel_state == 'signup' else ''
-        st.markdown(f'<div class="form-container {panel_class}">', unsafe_allow_html=True)
-        
-        # Sign In Panel
-        st.markdown('<div class="form-panel signin-panel">', unsafe_allow_html=True)
-        st.markdown('<h2 class="form-title">Sign In</h2>', unsafe_allow_html=True)
-        with st.form(key="signin_form"):
-            username = st.text_input("Username", key="signin_username")
-            password = st.text_input("Password", type="password", key="signin_password")
-            st.markdown('<a href="#" class="forgot-link">Forgot your password?</a>', unsafe_allow_html=True)
-            signin_submit = st.form_submit_button("Sign In")
-            if signin_submit:
-                if username == "nama" and password == "admin":
-                    st.session_state.authenticated = True
-                    logger.info("User authenticated successfully")
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Sign Up Panel
-        st.markdown('<div class="form-panel signup-panel">', unsafe_allow_html=True)
-        st.markdown('<h2 class="form-title">Sign Up</h2>', unsafe_allow_html=True)
-        with st.form(key="signup_form"):
-            st.text_input("Username", key="signup_username", disabled=True)
-            st.text_input("Email", key="signup_email", disabled=True)
-            st.text_input("Password", type="password", key="signup_password", disabled=True)
-            signup_submit = st.form_submit_button("Sign Up", disabled=True)
-            if signup_submit:
-                st.warning("Sign-up functionality is disabled in this demo. Please use Sign In.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Overlay Panels
-        st.markdown('<div class="overlay-container">', unsafe_allow_html=True)
-        st.markdown('<div class="overlay">', unsafe_allow_html=True)
-        st.markdown('<div class="overlay-panel overlay-left">', unsafe_allow_html=True)
-        if st.button("Sign In", key="overlay_signin"):
-            st.session_state.panel_state = 'signin'
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div class="overlay-panel overlay-right">', unsafe_allow_html=True)
-        if st.button("Sign Up", key="overlay_signup"):
-            st.session_state.panel_state = 'signup'
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            signInBtn.addEventListener("click", () => {{
+                container.classList.remove("right-panel-active");
+                console.log("Switched to Sign In form");
+            }});
+
+            signUpBtn.addEventListener("click", () => {{
+                container.classList.add("right-panel-active");
+                console.log("Switched to Sign Up form");
+            }});
+
+            firstForm.addEventListener("submit", (e) => {{
+                e.preventDefault();
+                alert("Sign-up functionality is disabled in this demo. Please use Sign In.");
+            }});
+
+            secondForm.addEventListener("submit", (e) => {{
+                e.preventDefault();
+                const username = document.getElementById("signin-username").value;
+                const password = document.getElementById("signin-password").value;
+                if (username === "nama" && password === "admin") {{
+                    try {{
+                        // Create hidden form for URL parameter submission
+                        const form = document.createElement('form');
+                        form.method = 'GET';
+                        form.action = window.location.pathname;
+                        const authInput = document.createElement('input');
+                        authInput.type = 'hidden';
+                        authInput.name = 'auth';
+                        authInput.value = 'success';
+                        form.appendChild(authInput);
+                        const userInput = document.createElement('input');
+                        userInput.type = 'hidden';
+                        userInput.name = 'username';
+                        userInput.value = 'nama';
+                        form.appendChild(userInput);
+                        document.body.appendChild(form);
+                        form.submit();
+                        console.log("Submitted authentication via URL parameters");
+                    }} catch (err) {{
+                        console.error("Failed to submit authentication:", err);
+                        alert("Authentication failed. Please try again or check console.");
+                    }}
+                }} else {{
+                    alert("Invalid username or password");
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    components.html(html_content, height=600, scrolling=False, key=f"auth_component_{hash(html_content)}")
+    if st.session_state.authenticated:
+        logger.info("Authentication completed, rerunning app")
+        st.rerun()
 
 # Simulated Drone Detection
 def simulate_drone_data(num_drones=5):
