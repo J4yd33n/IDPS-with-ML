@@ -9,10 +9,29 @@ from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
 import base64
 import io
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())  # Log to stderr for Streamlit Cloud
+
+# Log Python and package versions
+logger.info(f"Python version: {sys.version}")
+try:
+    import streamlit
+    import pandas
+    import numpy
+    import plotly
+    import geopy
+    import sklearn
+    import reportlab
+    logger.info(f"Streamlit: {streamlit.__version__}, Pandas: {pandas.__version__}, "
+                f"Numpy: {numpy.__version__}, Plotly: {plotly.__version__}, "
+                f"Geopy: {geopy.__version__}, Scikit-learn: {sklearn.__version__}, "
+                f"Reportlab: {reportlab.__version__}")
+except ImportError as e:
+    logger.error(f"Dependency import failed: {str(e)}")
 
 # Enhanced Cyberpunk Theme
 WICKET_THEME = {
@@ -259,28 +278,39 @@ def display_drone_data():
             lat=status_df['latitude'],
             mode='markers',
             marker=dict(
-                size=12,
+                size=15,
                 color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
                 symbol='copter',
-                opacity=0.8
+                opacity=0.9,
+                allowoverlap=True
             ),
             text=status_df['drone_id'],
-            hovertemplate="%{text}<br>Altitude: %{customdata:.0f}m<br>Status: %{marker.color|status}<extra></extra>",
+            hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata:.0f}m<br>Status: %{marker.color|status}<extra></extra>",
             customdata=status_df['altitude'],
             name=status.capitalize()
         ))
     fig.update_layout(
         mapbox=dict(
-            style='streets-v12',
+            style='satellite-streets-v12',
             center=dict(lat=9, lon=7),
-            zoom=6,
+            zoom=7,
+            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
             layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
         title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
-        margin=dict(l=10, r=10, t=50, b=10)
+        margin=dict(l=10, r=10, t=50, b=10),
+        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+    )
+    fig.add_annotation(
+        text="Real-time drone tracking",
+        xref="paper", yref="paper",
+        x=0.01, y=0.99,
+        showarrow=False,
+        font=dict(color=WICKET_THEME['text_light'], size=12),
+        bgcolor=WICKET_THEME['card_bg']
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
@@ -308,46 +338,60 @@ def display_radar_data():
         return
     df = pd.DataFrame(st.session_state.radar_data)
     fig = go.Figure()
+    # Animated radar sweep
     theta = np.linspace(0, 360, 100)
-    r = np.ones(100) * 0.5
+    r = np.ones(100) * 0.7
     lon_sweep = 7 + r * np.cos(np.radians(theta))
     lat_sweep = 9 + r * np.sin(np.radians(theta))
     fig.add_trace(go.Scattermapbox(
         lon=lon_sweep,
         lat=lat_sweep,
         mode='lines',
-        line=dict(color=WICKET_THEME['accent'], width=1),
+        line=dict(color=WICKET_THEME['accent'], width=2),
         fill='toself',
-        opacity=0.3,
-        name='Radar Sweep'
+        opacity=0.4,
+        name='Radar Sweep',
+        customdata=[0] * len(theta),
+        hoverinfo='skip'
     ))
+    # Radar targets
     fig.add_trace(go.Scattermapbox(
         lon=df['longitude'],
         lat=df['latitude'],
         mode='markers',
         marker=dict(
             size=12,
-            color=WICKET_THEME['accent'],
-            symbol='x',
-            opacity=0.8
+            color=WICKET_THEME['text_light'],
+            symbol='cross',
+            opacity=0.9
         ),
         text=df['target_id'],
-        hovertemplate="%{text}<br>Altitude: %{customdata:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+        hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
         customdata=df[['altitude', 'velocity']].values,
         name='Radar Targets'
     ))
     fig.update_layout(
         mapbox=dict(
-            style='streets-v12',
+            style='satellite-streets-v12',
             center=dict(lat=9, lon=7),
-            zoom=6,
+            zoom=7,
+            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
             layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
         title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
-        margin=dict(l=10, r=10, t=50, b=10)
+        margin=dict(l=10, r=10, t=50, b=10),
+        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+    )
+    fig.add_annotation(
+        text="Radar sweep simulation",
+        xref="paper", yref="paper",
+        x=0.01, y=0.99,
+        showarrow=False,
+        font=dict(color=WICKET_THEME['text_light'], size=12),
+        bgcolor=WICKET_THEME['card_bg']
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
@@ -417,28 +461,38 @@ def display_atc_data():
                 lat=anomaly_df['latitude'],
                 mode='markers',
                 marker=dict(
-                    size=12,
+                    size=15,
                     color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'],
-                    symbol='airfield',
-                    opacity=0.8
+                    symbol='airplane',
+                    opacity=0.9
                 ),
                 text=anomaly_df['icao24'],
-                hovertemplate="%{text}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+                hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
                 customdata=anomaly_df[['altitude', 'velocity']].values,
                 name='Anomaly' if anomaly else 'Normal'
             ))
     fig.update_layout(
         mapbox=dict(
-            style='streets-v12',
+            style='satellite-streets-v12',
             center=dict(lat=9, lon=7),
-            zoom=6,
+            zoom=7,
+            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
             layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
         ),
         showlegend=True,
         paper_bgcolor=WICKET_THEME['card_bg'],
         plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20)),
-        margin=dict(l=10, r=10, t=50, b=10)
+        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+        margin=dict(l=10, r=10, t=50, b=10),
+        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+    )
+    fig.add_annotation(
+        text="ATC anomaly detection",
+        xref="paper", yref="paper",
+        x=0.01, y=0.99,
+        showarrow=False,
+        font=dict(color=WICKET_THEME['text_light'], size=12),
+        bgcolor=WICKET_THEME['card_bg']
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'icao24', 'latitude', 'longitude', 'altitude', 'velocity', 'anomaly']])
