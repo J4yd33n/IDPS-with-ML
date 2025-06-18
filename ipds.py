@@ -43,13 +43,24 @@ try:
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
 
-# Initialize SQLite database
+# Initialize SQLite database with admin user
 def init_db():
     try:
         with sqlite3.connect('users.db') as conn:
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS users
                         (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT)''')
+            # Insert admin user if not exists
+            c.execute('SELECT username FROM users WHERE username = ?', ('nama',))
+            if not c.fetchone():
+                admin_password = 'admin'
+                if BCRYPT_AVAILABLE:
+                    hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                else:
+                    hashed_pw = admin_password  # Insecure fallback
+                c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                          ('nama', 'admin@nama.com', hashed_pw))
+                logger.info("Admin user 'nama' created")
             conn.commit()
             logger.info("Database initialized successfully")
     except sqlite3.Error as e:
@@ -296,6 +307,9 @@ def render_auth_ui():
             if submit:
                 if not username or not email or not password:
                     st.error('All fields are required')
+                elif username.lower() == 'nama':
+                    st.error('Username "nama" is reserved for admin')
+                    logger.warning(f"Sign-up failed: attempted to use reserved username 'nama'")
                 elif not is_valid_email(email):
                     st.error('Invalid email format')
                 elif not is_valid_password(password):
