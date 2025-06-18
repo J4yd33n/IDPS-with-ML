@@ -10,6 +10,9 @@ from sklearn.ensemble import IsolationForest
 import base64
 import io
 import sys
+import sqlite3
+import bcrypt
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,12 +29,35 @@ try:
     import geopy
     import sklearn
     import reportlab
+    import bcrypt
     logger.info(f"Streamlit: {streamlit.__version__}, Pandas: {pandas.__version__}, "
                 f"Numpy: {numpy.__version__}, Plotly: {plotly.__version__}, "
                 f"Geopy: {geopy.__version__}, Scikit-learn: {sklearn.__version__}, "
-                f"Reportlab: {reportlab.__version__}")
+                f"Reportlab: {reportlab.__version__}, Bcrypt: {bcrypt.__version__}")
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
+
+# Initialize SQLite database
+def init_db():
+    try:
+        with sqlite3.connect('users.db') as conn:
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS users
+                        (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT)''')
+            conn.commit()
+            logger.info("Database initialized successfully")
+    except sqlite3.Error as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        st.error("Database error. Please try again later.")
+
+# Validate email format
+def is_valid_email(email):
+    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(pattern, email)
+
+# Validate password strength
+def is_valid_password(password):
+    return len(password) >= 8 and any(c.isupper() for c in password) and any(c.isdigit() for c in password)
 
 # Enhanced Cyberpunk Theme
 WICKET_THEME = {
@@ -202,6 +228,9 @@ if 'scan_results' not in st.session_state:
 if 'panel_state' not in st.session_state:
     st.session_state.panel_state = 'sign_in'
 
+# Initialize database
+init_db()
+
 # Authentication UI with Native Streamlit
 def render_auth_ui():
     st.markdown(
@@ -219,12 +248,21 @@ def render_auth_ui():
             st.markdown('<a href="#" class="forgot-password">Forgot your password?</a>', unsafe_allow_html=True)
             submit = st.form_submit_button('Sign In')
             if submit:
-                if username == 'nama' and password == 'admin':
-                    st.session_state.authenticated = True
-                    logger.info("Authenticated: username=nama")
-                    st.rerun()
-                else:
-                    st.error('Invalid username or password')
+                try:
+                    with sqlite3.connect('users.db') as conn:
+                        c = conn.cursor()
+                        c.execute('SELECT password FROM users WHERE username = ?', (username,))
+                        result = c.fetchone()
+                        if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
+                            st.session_state.authenticated = True
+                            logger.info(f"Authenticated: username={username}")
+                            st.rerun()
+                        else:
+                            st.error('Invalid username or password')
+                            logger.warning(f"Failed login attempt: username={username}")
+                except sqlite3.Error as e:
+                    st.error('Database error during login')
+                    logger.error(f"Login database error: {str(e)}")
         st.button('Switch to Sign Up', on_click=lambda: st.session_state.update(panel_state='sign_up'))
     else:
         with st.form(key='sign_up_form'):
@@ -234,13 +272,36 @@ def render_auth_ui():
             password = st.text_input('Password', type='password', placeholder='Password', key='signup_password')
             submit = st.form_submit_button('Sign Up')
             if submit:
-                st.warning('Sign-up functionality is disabled in this demo.')
+                if not username or not email or not password:
+                    st.error('All fields are required')
+                elif not is_valid_email(email):
+                    st.error('Invalid email format')
+                elif not is_valid_password(password):
+                    st.error('Password must be at least 8 characters, include an uppercase letter and a number')
+                else:
+                    try:
+                        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                        with sqlite3.connect('users.db') as conn:
+                            c = conn.cursor()
+                            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                                      (username, email, hashed_pw.decode('utf-8')))
+                            conn.commit()
+                            st.success('Account created! Please sign in.')
+                            st.session_state.panel_state = 'sign_in'
+                            logger.info(f"New user registered: username={username}")
+                            st.rerun()
+                    except sqlite3.IntegrityError:
+                        st.error('Username or email already exists')
+                        logger.warning(f"Sign-up failed: username={username}, email={email} already exists")
+                    except sqlite3.Error as e:
+                        st.error('Database error during sign-up')
+                        logger.error(f"Sign-up database error: {str(e)}")
         st.button('Switch to Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
 
     st.markdown('</div></div>', unsafe_allow_html=True)
 
 # Simulated Drone Detection
-def simulate_drone_data(num_drones=5):
+def simulate_drone_data(num_drones=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     drones = []
     for i in range(num_drones):
@@ -270,53 +331,58 @@ def display_drone_data():
         st.warning("No drone data available. Click 'Simulate Drones' to generate data.")
         return
     df = pd.DataFrame(st.session_state.drone_results)
-    fig = go.Figure()
-    for status in df['status'].unique():
-        status_df = df[df['status'] == status]
-        fig.add_trace(go.Scattermapbox(
-            lon=status_df['longitude'],
-            lat=status_df['latitude'],
-            mode='markers',
-            marker=dict(
-                size=15,
-                color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
-                symbol='copter',
-                opacity=0.9,
-                allowoverlap=True
+    try:
+        fig = go.Figure()
+        for status in df['status'].unique():
+            status_df = df[df['status'] == status]
+            fig.add_trace(go.Scattermapbox(
+                lon=status_df['longitude'],
+                lat=status_df['latitude'],
+                mode='markers',
+                marker=dict(
+                    size=10,  # Smaller size for 30 drones
+                    color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
+                    symbol='copter',
+                    opacity=0.8,
+                    allowoverlap=True
+                ),
+                text=status_df['drone_id'],
+                hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata:.0f}m<br>Status: %{marker.color|status}<extra></extra>",
+                customdata=status_df['altitude'],
+                name=status.capitalize()
+            ))
+        mapbox_token = st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+        fig.update_layout(
+            mapbox=dict(
+                style='streets-v12',  # Fallback to streets
+                center=dict(lat=9, lon=7),
+                zoom=7,
+                accesstoken=mapbox_token
             ),
-            text=status_df['drone_id'],
-            hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata:.0f}m<br>Status: %{marker.color|status}<extra></extra>",
-            customdata=status_df['altitude'],
-            name=status.capitalize()
-        ))
-    fig.update_layout(
-        mapbox=dict(
-            style='satellite-streets-v12',
-            center=dict(lat=9, lon=7),
-            zoom=7,
-            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
-            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
-        ),
-        showlegend=True,
-        paper_bgcolor=WICKET_THEME['card_bg'],
-        plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
-        margin=dict(l=10, r=10, t=50, b=10),
-        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
-    )
-    fig.add_annotation(
-        text="Real-time drone tracking",
-        xref="paper", yref="paper",
-        x=0.01, y=0.99,
-        showarrow=False,
-        font=dict(color=WICKET_THEME['text_light'], size=12),
-        bgcolor=WICKET_THEME['card_bg']
-    )
-    st.plotly_chart(fig, use_container_width=True)
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            margin=dict(l=10, r=10, t=50, b=10),
+            hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+        )
+        fig.add_annotation(
+            text="Real-time drone tracking",
+            xref="paper", yref="paper",
+            x=0.01, y=0.99,
+            showarrow=False,
+            font=dict(color=WICKET_THEME['text_light'], size=12),
+            bgcolor=WICKET_THEME['card_bg']
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        logger.info("Drone map rendered successfully")
+    except Exception as e:
+        st.error("Failed to render drone map. Please check your Mapbox token and internet connection.")
+        logger.error(f"Drone map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
 
 # Simulated Radar Surveillance
-def simulate_radar_data(num_targets=5):
+def simulate_radar_data(num_targets=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     radar_data = []
     for i in range(num_targets):
@@ -337,67 +403,72 @@ def display_radar_data():
         st.warning("No radar data available. Click 'Simulate Radar' to generate data.")
         return
     df = pd.DataFrame(st.session_state.radar_data)
-    fig = go.Figure()
-    # Animated radar sweep
-    theta = np.linspace(0, 360, 100)
-    r = np.ones(100) * 0.7
-    lon_sweep = 7 + r * np.cos(np.radians(theta))
-    lat_sweep = 9 + r * np.sin(np.radians(theta))
-    fig.add_trace(go.Scattermapbox(
-        lon=lon_sweep,
-        lat=lat_sweep,
-        mode='lines',
-        line=dict(color=WICKET_THEME['accent'], width=2),
-        fill='toself',
-        opacity=0.4,
-        name='Radar Sweep',
-        customdata=[0] * len(theta),
-        hoverinfo='skip'
-    ))
-    # Radar targets
-    fig.add_trace(go.Scattermapbox(
-        lon=df['longitude'],
-        lat=df['latitude'],
-        mode='markers',
-        marker=dict(
-            size=12,
-            color=WICKET_THEME['text_light'],
-            symbol='cross',
-            opacity=0.9
-        ),
-        text=df['target_id'],
-        hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
-        customdata=df[['altitude', 'velocity']].values,
-        name='Radar Targets'
-    ))
-    fig.update_layout(
-        mapbox=dict(
-            style='satellite-streets-v12',
-            center=dict(lat=9, lon=7),
-            zoom=7,
-            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
-            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
-        ),
-        showlegend=True,
-        paper_bgcolor=WICKET_THEME['card_bg'],
-        plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
-        margin=dict(l=10, r=10, t=50, b=10),
-        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
-    )
-    fig.add_annotation(
-        text="Radar sweep simulation",
-        xref="paper", yref="paper",
-        x=0.01, y=0.99,
-        showarrow=False,
-        font=dict(color=WICKET_THEME['text_light'], size=12),
-        bgcolor=WICKET_THEME['card_bg']
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    try:
+        fig = go.Figure()
+        # Animated radar sweep
+        theta = np.linspace(0, 360, 100)
+        r = np.ones(100) * 0.7
+        lon_sweep = 7 + r * np.cos(np.radians(theta))
+        lat_sweep = 9 + r * np.sin(np.radians(theta))
+        fig.add_trace(go.Scattermapbox(
+            lon=lon_sweep,
+            lat=lat_sweep,
+            mode='lines',
+            line=dict(color=WICKET_THEME['accent'], width=2),
+            fill='toself',
+            opacity=0.4,
+            name='Radar Sweep',
+            customdata=[0] * len(theta),
+            hoverinfo='skip'
+        ))
+        # Radar targets
+        fig.add_trace(go.Scattermapbox(
+            lon=df['longitude'],
+            lat=df['latitude'],
+            mode='markers',
+            marker=dict(
+                size=8,  # Smaller size for 30 targets
+                color=WICKET_THEME['text_light'],
+                symbol='cross',
+                opacity=0.8
+            ),
+            text=df['target_id'],
+            hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+            customdata=df[['altitude', 'velocity']].values,
+            name='Radar Targets'
+        ))
+        mapbox_token = st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+        fig.update_layout(
+            mapbox=dict(
+                style='streets-v12',
+                center=dict(lat=9, lon=7),
+                zoom=7,
+                accesstoken=mapbox_token
+            ),
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            margin=dict(l=10, r=10, t=50, b=10),
+            hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+        )
+        fig.add_annotation(
+            text="Radar sweep simulation",
+            xref="paper", yref="paper",
+            x=0.01, y=0.99,
+            showarrow=False,
+            font=dict(color=WICKET_THEME['text_light'], size=12),
+            bgcolor=WICKET_THEME['card_bg']
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        logger.info("Radar map rendered successfully")
+    except Exception as e:
+        st.error("Failed to render radar map. Please check your Mapbox token and internet connection.")
+        logger.error(f"Radar map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
 
 # Simulated ATC Monitoring
-def simulate_atc_data(num_samples=10):
+def simulate_atc_data(num_samples=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     data = []
     for i in range(num_samples):
@@ -452,56 +523,61 @@ def display_atc_data():
         st.warning("No ATC data available. Click 'Simulate ATC' to generate data.")
         return
     df = pd.DataFrame(st.session_state.atc_results)
-    fig = go.Figure()
-    for anomaly in [False, True]:
-        anomaly_df = df[df['anomaly'] == anomaly]
-        if not anomaly_df.empty:
-            fig.add_trace(go.Scattermapbox(
-                lon=anomaly_df['longitude'],
-                lat=anomaly_df['latitude'],
-                mode='markers',
-                marker=dict(
-                    size=15,
-                    color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'],
-                    symbol='airplane',
-                    opacity=0.9
-                ),
-                text=anomaly_df['icao24'],
-                hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
-                customdata=anomaly_df[['altitude', 'velocity']].values,
-                name='Anomaly' if anomaly else 'Normal'
-            ))
-    fig.update_layout(
-        mapbox=dict(
-            style='satellite-streets-v12',
-            center=dict(lat=9, lon=7),
-            zoom=7,
-            accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q'),
-            layers=[{'sourcetype': 'raster', 'source': ['mapbox://mapbox.terrain-rgb']}]
-        ),
-        showlegend=True,
-        paper_bgcolor=WICKET_THEME['card_bg'],
-        plot_bgcolor=WICKET_THEME['card_bg'],
-        title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
-        margin=dict(l=10, r=10, t=50, b=10),
-        hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
-    )
-    fig.add_annotation(
-        text="ATC anomaly detection",
-        xref="paper", yref="paper",
-        x=0.01, y=0.99,
-        showarrow=False,
-        font=dict(color=WICKET_THEME['text_light'], size=12),
-        bgcolor=WICKET_THEME['card_bg']
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    try:
+        fig = go.Figure()
+        for anomaly in [False, True]:
+            anomaly_df = df[df['anomaly'] == anomaly]
+            if not anomaly_df.empty:
+                fig.add_trace(go.Scattermapbox(
+                    lon=anomaly_df['longitude'],
+                    lat=anomaly_df['latitude'],
+                    mode='markers',
+                    marker=dict(
+                        size=10,  # Smaller size for 30 targets
+                        color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'],
+                        symbol='airplane',
+                        opacity=0.8
+                    ),
+                    text=anomaly_df['icao24'],
+                    hovertemplate="%{text}<br>Lat: %{lat:.4f}<br>Lon: %{lon:.4f}<br>Altitude: %{customdata[0]:.0f}ft<br>Velocity: %{customdata[1]:.0f}kts<extra></extra>",
+                    customdata=anomaly_df[['altitude', 'velocity']].values,
+                    name='Anomaly' if anomaly else 'Normal'
+                ))
+        mapbox_token = st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+        fig.update_layout(
+            mapbox=dict(
+                style='streets-v12',
+                center=dict(lat=9, lon=7),
+                zoom=7,
+                accesstoken=mapbox_token
+            ),
+            showlegend=True,
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg'],
+            title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            margin=dict(l=10, r=10, t=50, b=10),
+            hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
+        )
+        fig.add_annotation(
+            text="ATC anomaly detection",
+            xref="paper", yref="paper",
+            x=0.01, y=0.99,
+            showarrow=False,
+            font=dict(color=WICKET_THEME['text_light'], size=12),
+            bgcolor=WICKET_THEME['card_bg']
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        logger.info("ATC map rendered successfully")
+    except Exception as e:
+        st.error("Failed to render ATC map. Please check your Mapbox token and internet connection.")
+        logger.error(f"ATC map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'icao24', 'latitude', 'longitude', 'altitude', 'velocity', 'anomaly']])
     if st.session_state.flight_conflicts:
         st.subheader("Collision Risks")
         st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
 
 # Simulated Threat Intelligence
-def simulate_threat_intelligence(num_threats=5):
+def simulate_threat_intelligence(num_threats=30):
     threats = []
     for i in range(num_threats):
         threats.append({
