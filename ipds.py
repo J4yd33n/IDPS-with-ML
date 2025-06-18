@@ -11,8 +11,15 @@ import base64
 import io
 import sys
 import sqlite3
-import bcrypt
 import re
+
+# Attempt to import bcrypt, fallback to insecure mode if unavailable
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
+    logging.warning("bcrypt not available. Using insecure password storage for testing.")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, filename='nama_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,11 +36,10 @@ try:
     import geopy
     import sklearn
     import reportlab
-    import bcrypt
     logger.info(f"Streamlit: {streamlit.__version__}, Pandas: {pandas.__version__}, "
                 f"Numpy: {numpy.__version__}, Plotly: {plotly.__version__}, "
                 f"Geopy: {geopy.__version__}, Scikit-learn: {sklearn.__version__}, "
-                f"Reportlab: {reportlab.__version__}, Bcrypt: {bcrypt.__version__}")
+                f"Reportlab: {reportlab.__version__}, Bcrypt: {'available' if BCRYPT_AVAILABLE else 'not available'}")
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
 
@@ -233,6 +239,8 @@ init_db()
 
 # Authentication UI with Native Streamlit
 def render_auth_ui():
+    if not BCRYPT_AVAILABLE:
+        st.warning("Secure password hashing unavailable. Using insecure mode for testing.")
     st.markdown(
         '<div class="auth-container">'
         f'<img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" class="logo">'
@@ -253,10 +261,24 @@ def render_auth_ui():
                         c = conn.cursor()
                         c.execute('SELECT password FROM users WHERE username = ?', (username,))
                         result = c.fetchone()
-                        if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
-                            st.session_state.authenticated = True
-                            logger.info(f"Authenticated: username={username}")
-                            st.rerun()
+                        if result:
+                            stored_password = result[0]
+                            if BCRYPT_AVAILABLE:
+                                if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                                    st.session_state.authenticated = True
+                                    logger.info(f"Authenticated: username={username}")
+                                    st.rerun()
+                                else:
+                                    st.error('Invalid username or password')
+                                    logger.warning(f"Failed login attempt: username={username}")
+                            else:
+                                if password == stored_password:  # Insecure fallback
+                                    st.session_state.authenticated = True
+                                    logger.info(f"Authenticated (insecure): username={username}")
+                                    st.rerun()
+                                else:
+                                    st.error('Invalid username or password')
+                                    logger.warning(f"Failed login attempt: username={username}")
                         else:
                             st.error('Invalid username or password')
                             logger.warning(f"Failed login attempt: username={username}")
@@ -280,11 +302,14 @@ def render_auth_ui():
                     st.error('Password must be at least 8 characters, include an uppercase letter and a number')
                 else:
                     try:
-                        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                        if BCRYPT_AVAILABLE:
+                            hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                        else:
+                            hashed_pw = password  # Insecure fallback
                         with sqlite3.connect('users.db') as conn:
                             c = conn.cursor()
                             c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                                      (username, email, hashed_pw.decode('utf-8')))
+                                      (username, email, hashed_pw))
                             conn.commit()
                             st.success('Account created! Please sign in.')
                             st.session_state.panel_state = 'sign_in'
@@ -340,7 +365,7 @@ def display_drone_data():
                 lat=status_df['latitude'],
                 mode='markers',
                 marker=dict(
-                    size=10,  # Smaller size for 30 drones
+                    size=10,
                     color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'],
                     symbol='copter',
                     opacity=0.8,
@@ -354,7 +379,7 @@ def display_drone_data():
         mapbox_token = st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
         fig.update_layout(
             mapbox=dict(
-                style='streets-v12',  # Fallback to streets
+                style='streets-v12',
                 center=dict(lat=9, lon=7),
                 zoom=7,
                 accesstoken=mapbox_token
@@ -405,7 +430,6 @@ def display_radar_data():
     df = pd.DataFrame(st.session_state.radar_data)
     try:
         fig = go.Figure()
-        # Animated radar sweep
         theta = np.linspace(0, 360, 100)
         r = np.ones(100) * 0.7
         lon_sweep = 7 + r * np.cos(np.radians(theta))
@@ -421,13 +445,12 @@ def display_radar_data():
             customdata=[0] * len(theta),
             hoverinfo='skip'
         ))
-        # Radar targets
         fig.add_trace(go.Scattermapbox(
             lon=df['longitude'],
             lat=df['latitude'],
             mode='markers',
             marker=dict(
-                size=8,  # Smaller size for 30 targets
+                size=8,
                 color=WICKET_THEME['text_light'],
                 symbol='cross',
                 opacity=0.8
@@ -533,7 +556,7 @@ def display_atc_data():
                     lat=anomaly_df['latitude'],
                     mode='markers',
                     marker=dict(
-                        size=10,  # Smaller size for 30 targets
+                        size=10,
                         color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'],
                         symbol='airplane',
                         opacity=0.8
