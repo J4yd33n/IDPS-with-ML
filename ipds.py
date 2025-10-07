@@ -16,7 +16,7 @@ try:
     BCRYPT_AVAILABLE = True
 except ImportError:
     BCRYPT_AVAILABLE = False
-    logging.warning("bcrypt not available. Using insecure password storage.")
+    logging.warning("bcrypt unavailable. Using insecure password storage.")
 logging.basicConfig(level=logging.INFO, filename='guardianeye.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -42,195 +42,104 @@ def is_valid_email(email):
 def is_valid_password(password):
     return len(password) >= 8 and any(c.isupper() for c in password) and any(c.isdigit() for c in password)
 WICKET_THEME = {
-    "primary_bg": "#0A0F2D",
-    "secondary_bg": "#1E2A44",
+    "primary_bg": "#1E2A44",
     "accent": "#00D4FF",
-    "accent_alt": "#FF00FF",
     "text": "#E6E6FA",
     "text_light": "#FFFFFF",
-    "card_bg": "rgba(30, 42, 68, 0.5)",
+    "card_bg": "rgba(30, 42, 68, 0.7)",
     "border": "#3B82F6",
     "button_bg": "#00D4FF",
     "button_text": "#0A0F2D",
-    "hover": "#FF00FF",
     "error": "#FF4D4D",
     "success": "#00FF99"
 }
 def apply_wicket_css():
     css = f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
-                background: url('https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg');
-                background-size: cover;
-                background-position: center;
+                background: {WICKET_THEME['primary_bg']};
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
-                overflow-x: hidden;
-                position: relative;
-            }}
-            .stApp::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(45deg, rgba(10,15,45,0.7), rgba(30,42,68,0.5));
-                z-index: -1;
             }}
             .card {{
                 background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 12px;
-                padding: 15px;
-                margin-bottom: 15px;
-                box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }}
-            .card:hover {{
-                transform: translateY(-3px);
-                box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
+                border: 1px solid {WICKET_THEME['border']};
+                border-radius: 8px;
+                padding: 10px;
+                margin-bottom: 10px;
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
             }}
             .stButton>button {{
-                background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
+                background: {WICKET_THEME['button_bg']};
                 color: {WICKET_THEME['button_text']};
-                border-radius: 20px;
-                padding: 10px 25px;
+                border-radius: 15px;
+                padding: 8px 20px;
                 border: none;
-                font-family: 'Orbitron', sans-serif;
-                font-weight: 700;
-                transition: all 0.3s ease;
-                box-shadow: 0 0 10px {WICKET_THEME['button_bg']};
+                font-family: 'Roboto Mono', monospace;
+                font-weight: 500;
             }}
             .stButton>button:hover {{
-                transform: scale(1.05);
-                box-shadow: 0 0 20px {WICKET_THEME['hover']};
+                background: {WICKET_THEME['accent']};
+                box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
             .plotly-graph-div {{
                 background: {WICKET_THEME['card_bg']};
                 border-radius: 8px;
                 padding: 5px;
-                box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
             }}
             h1, h2, h3 {{
-                font-family: 'Orbitron', sans-serif;
+                font-family: 'Roboto Mono', monospace;
                 color: {WICKET_THEME['text_light']};
-                text-shadow: 0 0 5px {WICKET_THEME['accent']};
             }}
             .stSidebar .sidebar-content img {{
-                filter: drop-shadow(0 0 5px {WICKET_THEME['accent']});
-                animation: pulse 2s infinite;
-            }}
-            @keyframes pulse {{
-                0%, 100% {{ transform: scale(1); }}
-                50% {{ transform: scale(1.05); }}
+                width: 100px;
+                margin: 0 auto;
+                display: block;
             }}
             .auth-container {{
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 min-height: 100vh;
-                padding: 20px;
+                padding: 10px;
             }}
             .form-container {{
                 background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(10px);
                 border-radius: 8px;
-                padding: 25px;
+                padding: 20px;
                 width: 100%;
-                max-width: 350px;
-                box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+                max-width: 300px;
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
             }}
             .stTextInput input, .stTextInput input:focus {{
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
-                border-radius: 6px;
+                border-radius: 5px;
                 color: {WICKET_THEME['text']};
             }}
             .stTextInput input:focus {{
                 border-color: {WICKET_THEME['accent']};
-                box-shadow: 0 0 8px {WICKET_THEME['accent']};
             }}
             .logo {{
                 display: block;
-                margin: 0 auto 15px;
-                width: 120px;
-                animation: rotate 15s linear infinite;
-            }}
-            @keyframes rotate {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
+                margin: 0 auto 10px;
+                width: 100px;
             }}
             .forgot-password {{
                 color: {WICKET_THEME['accent']};
                 font-size: 0.8rem;
                 text-decoration: none;
-                margin: 8px 0;
+                margin: 5px 0;
                 display: block;
             }}
-            .forgot-password:hover {{
-                color: {WICKET_THEME['hover']};
-            }}
-            .particles {{
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                pointer-events: none;
-                z-index: -1;
-            }}
-            .particle {{
-                position: absolute;
-                background: {WICKET_THEME['accent']};
-                border-radius: 50%;
-                animation: float 8s linear infinite;
-                opacity: 0.4;
-            }}
-            @keyframes float {{
-                0% {{ transform: translateY(0); opacity: 0.4; }}
-                50% {{ opacity: 0.7; }}
-                100% {{ transform: translateY(-80vh); opacity: 0; }}
-            }}
-            .scanline {{
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 2px;
-                background: linear-gradient(90deg, transparent, {WICKET_THEME['accent']}, transparent);
-                animation: scan 4s linear infinite;
-                z-index: 1;
-                pointer-events: none;
-            }}
-            @keyframes scan {{
-                0% {{ top: 0; opacity: 0; }}
-                10% {{ opacity: 1; }}
-                90% {{ opacity: 1; }}
-                100% {{ top: 100%; opacity: 0; }}
+            .debug-text {{
+                color: {WICKET_THEME['success']};
+                font-size: 1.2em;
+                text-align: center;
             }}
         </style>
-        <div class="scanline"></div>
-        <script>
-            function createParticles() {{
-                const particleContainer = document.createElement('div');
-                particleContainer.className = 'particles';
-                document.body.appendChild(particleContainer);
-                for (let i = 0; i < 20; i++) {{
-                    const particle = document.createElement('div');
-                    particle.className = 'particle';
-                    particle.style.width = Math.random() * 3 + 2 + 'px';
-                    particle.style.height = particle.style.width;
-                    particle.style.left = Math.random() * 100 + 'vw';
-                    particle.style.animationDuration = (Math.random() * 6 + 4) + 's';
-                    particle.style.animationDelay = Math.random() * 3 + 's';
-                    particleContainer.appendChild(particle);
-                }}
-            }}
-            window.onload = createParticles;
-        </script>
+        <div class="debug-text">GuardianEye: Rendering Dashboard</div>
     """
     st.markdown(css, unsafe_allow_html=True)
 if 'authenticated' not in st.session_state:
@@ -258,11 +167,11 @@ if 'panel_state' not in st.session_state:
 init_db()
 def render_auth_ui():
     if not BCRYPT_AVAILABLE:
-        st.warning("Secure password hashing unavailable. Using insecure mode.")
+        st.warning("Secure password hashing unavailable.")
     st.markdown(
         '<div class="auth-container">'
         f'<img src="https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg" class="logo">'
-        f'<div class="form-container {"sign-up-active" if st.session_state.panel_state == "sign_up" else ""}">',
+        f'<div class="form-container">',
         unsafe_allow_html=True
     )
     if st.session_state.panel_state == 'sign_in':
@@ -270,7 +179,7 @@ def render_auth_ui():
             st.markdown('<h2 style="text-align: center;">Sign In</h2>', unsafe_allow_html=True)
             username = st.text_input('Username', placeholder='Username')
             password = st.text_input('Password', type='password', placeholder='Password')
-            st.markdown('<a href="#" class="forgot-password">Forgot your password?</a>', unsafe_allow_html=True)
+            st.markdown('<a href="#" class="forgot-password">Forgot password?</a>', unsafe_allow_html=True)
             submit = st.form_submit_button('Sign In')
             if submit:
                 try:
@@ -306,7 +215,6 @@ def render_auth_ui():
                     st.error('All fields required')
                 elif username.lower() == 'guardian':
                     st.error('Username "guardian" reserved')
-                    logger.warning("Attempted reserved username")
                 elif not is_valid_email(email):
                     st.error('Invalid email')
                 elif not is_valid_password(password):
@@ -325,18 +233,17 @@ def render_auth_ui():
                             st.rerun()
                     except sqlite3.IntegrityError:
                         st.error('Username or email exists')
-                        logger.warning(f"Sign-up failed: {username}")
                     except sqlite3.Error as e:
                         st.error('Database error')
                         logger.error(f"Sign-up error: {str(e)}")
         st.button('Switch to Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
     st.markdown('</div></div>', unsafe_allow_html=True)
-def simulate_drone_data(num_drones=20):
+def simulate_drone_data(num_drones=10):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     drones = []
     for i in range(num_drones):
         altitude = np.random.uniform(50, 1000)
-        is_unauthorized = altitude < 400 and np.random.random() > 0.4
+        is_unauthorized = altitude < 400 and np.random.random() > 0.5
         drones.append({
             'timestamp': datetime.now(),
             'drone_id': f"DRN{i:03d}",
@@ -391,7 +298,7 @@ def display_drone_data():
         st.error("Failed to render drone map. Check Mapbox token.")
         logger.error(f"Drone map error: {str(e)}")
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status']])
-def simulate_radar_data(num_targets=20):
+def simulate_radar_data(num_targets=10):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     radar_data = []
     for i in range(num_targets):
@@ -413,20 +320,6 @@ def display_radar_data():
     df = pd.DataFrame(st.session_state.radar_data)
     try:
         fig = go.Figure()
-        theta = np.linspace(0, 360, 100)
-        r = np.ones(100) * 0.5
-        lon_sweep = 8 + r * np.cos(np.radians(theta))
-        lat_sweep = 9 + r * np.sin(np.radians(theta))
-        fig.add_trace(go.Scattermapbox(
-            lon=lon_sweep,
-            lat=lat_sweep,
-            mode='lines',
-            line=dict(color=WICKET_THEME['accent'], width=2),
-            fill='toself',
-            opacity=0.3,
-            name='Radar Sweep',
-            hoverinfo='skip'
-        ))
         fig.add_trace(go.Scattermapbox(
             lon=df['longitude'],
             lat=df['latitude'],
@@ -454,7 +347,7 @@ def display_radar_data():
         st.error("Failed to render radar map. Check Mapbox token.")
         logger.error(f"Radar map error: {str(e)}")
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
-def simulate_atc_data(num_samples=20):
+def simulate_atc_data(num_samples=10):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     data = []
     for i in range(num_samples):
@@ -543,7 +436,7 @@ def display_atc_data():
     if st.session_state.flight_conflicts:
         st.subheader("Collision Risks")
         st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
-def simulate_threat_intelligence(num_threats=20):
+def simulate_threat_intelligence(num_threats=10):
     threats = []
     for i in range(num_threats):
         threats.append({
@@ -615,23 +508,6 @@ def display_compliance_metrics():
         st.metric("Open Ports", metrics['open_ports'])
     with col3:
         st.metric("Alerts", metrics['alerts'])
-    fig = go.Figure()
-    fig.add_trace(go.Indicator(
-        mode="gauge+number",
-        value=metrics['detection_rate'],
-        title={'text': "Detection Rate"},
-        gauge={
-            'axis': {'range': [0, 100]},
-            'bar': {'color': WICKET_THEME['accent']},
-            'threshold': {'line': {'color': WICKET_THEME['error'], 'width': 4}, 'value': 80}
-        }
-    ))
-    fig.update_layout(
-        paper_bgcolor=WICKET_THEME['card_bg'],
-        plot_bgcolor=WICKET_THEME['card_bg'],
-        font={'color': WICKET_THEME['text_light']}
-    )
-    st.plotly_chart(fig, use_container_width=True)
 def simulate_nmap_scan(target="192.168.1.1"):
     common_ports = {21: 'ftp', 22: 'ssh', 80: 'http', 443: 'https', 3306: 'mysql'}
     np.random.seed(42)
@@ -661,18 +537,11 @@ def simulate_nigerian_airports():
         {"name": "Nnamdi Azikiwe Int'l", "state": "Abuja", "lat": 9.0068, "lon": 7.2632, "icao": "DNAA"},
         {"name": "Mallam Aminu Kano Int'l", "state": "Kano", "lat": 12.0470, "lon": 8.5247, "icao": "DNKN"},
         {"name": "Port Harcourt Int'l", "state": "Rivers", "lat": 4.8772, "lon": 7.0161, "icao": "DNPO"},
-        {"name": "Akanu Ibiam Int'l", "state": "Enugu", "lat": 6.4744, "lon": 7.5617, "icao": "DNEN"},
-        {"name": "Margaret Ekpo Int'l", "state": "Cross River", "lat": 4.9731, "lon": 8.3408, "icao": "DNCA"},
-        {"name": "Ibadan Airport", "state": "Oyo", "lat": 7.3643, "lon": 3.9783, "icao": "DNIB"},
-        {"name": "Ilorin Int'l", "state": "Kwara", "lat": 8.5094, "lon": 4.5580, "icao": "DNIL"},
-        {"name": "Asaba Int'l", "state": "Delta", "lat": 6.1983, "lon": 6.6711, "icao": "DNAS"},
-        {"name": "Akure Airport", "state": "Ondo", "lat": 7.2500, "lon": 5.0333, "icao": "DNAK"},
-        {"name": "Gombe Lawanti Int'l", "state": "Gombe", "lat": 10.2986, "lon": 11.1714, "icao": "DNGO"},
-        {"name": "Sam Mbakwe Int'l", "state": "Imo", "lat": 5.4000, "lon": 7.0333, "icao": "DNIM"}
+        {"name": "Akanu Ibiam Int'l", "state": "Enugu", "lat": 6.4744, "lon": 7.5617, "icao": "DNEN"}
     ]
     for airport in airports:
-        airport['threats'] = np.random.randint(0, 8)
-        airport['vuln_level'] = 'low' if airport['threats'] < 3 else 'medium' if airport['threats'] < 6 else 'high'
+        airport['threats'] = np.random.randint(0, 6)
+        airport['vuln_level'] = 'low' if airport['threats'] < 2 else 'medium' if airport['threats'] < 4 else 'high'
         if airport['vuln_level'] == 'high':
             st.session_state.alert_log.append({
                 'timestamp': datetime.now(),
@@ -775,7 +644,7 @@ def main():
         render_auth_ui()
         return
     st.sidebar.image("https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg", caption="GuardianEye")
-    st.markdown('<div style="text-align:center;"><h1 style="font-size:3em;">GUARDIANEYE</h1><p style="color:#00D4FF; font-family:Orbitron;">Nigerian Airspace Security</p></div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;"><h1>GUARDIANEYE</h1><p style="color:#00D4FF;">Nigerian Airspace Security</p></div>', unsafe_allow_html=True)
     page = st.sidebar.selectbox("Select Feature", [
         "🏠 Dashboard",
         "🔍 Network Scan",
@@ -787,8 +656,7 @@ def main():
         "🗺️ Airport Security"
     ])
     if page == "🏠 Dashboard":
-        st.markdown('<div class="card"><h2>Security Dashboard</h2></div>', unsafe_allow_html=True)
-        st.write("Monitor Nigerian airspace security.")
+        st.markdown('<div class="card"><h2>Security Dashboard</h2><p>Monitor Nigerian airspace.</p></div>', unsafe_allow_html=True)
         if st.button("Run All Simulations"):
             st.session_state.scan_results = simulate_nmap_scan()
             st.session_state.drone_results = simulate_drone_data()
