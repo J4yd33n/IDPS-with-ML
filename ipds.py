@@ -12,21 +12,15 @@ import io
 import sys
 import sqlite3
 import re
-
-# Attempt to import bcrypt, fallback to insecure mode if unavailable
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
 except ImportError:
     BCRYPT_AVAILABLE = False
     logging.warning("bcrypt not available. Using insecure password storage for testing.")
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, filename='nama_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, filename='guardianeye_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())  # Log to stderr for Streamlit Cloud
-
-# Log Python and package versions
+logger.addHandler(logging.StreamHandler())
 logger.info(f"Python version: {sys.version}")
 try:
     import streamlit
@@ -42,41 +36,32 @@ try:
                 f"Reportlab: {reportlab.__version__}, Bcrypt: {'available' if BCRYPT_AVAILABLE else 'not available'}")
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
-
-# Initialize SQLite database with admin user
 def init_db():
     try:
         with sqlite3.connect('users.db') as conn:
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS users
                         (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT)''')
-            # Insert admin user if not exists
-            c.execute('SELECT username FROM users WHERE username = ?', ('nama',))
+            c.execute('SELECT username FROM users WHERE username = ?', ('guardian',))
             if not c.fetchone():
                 admin_password = 'admin'
                 if BCRYPT_AVAILABLE:
                     hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 else:
-                    hashed_pw = admin_password  # Insecure fallback
+                    hashed_pw = admin_password
                 c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                          ('nama', 'admin@nama.com', hashed_pw))
-                logger.info("Admin user 'nama' created")
+                          ('guardian', 'admin@guardianeye.com', hashed_pw))
+                logger.info("Admin user 'guardian' created")
             conn.commit()
             logger.info("Database initialized successfully")
     except sqlite3.Error as e:
         logger.error(f"Database initialization failed: {str(e)}")
         st.error("Database error. Please try again later.")
-
-# Validate email format
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
-
-# Validate password strength
 def is_valid_password(password):
     return len(password) >= 8 and any(c.isupper() for c in password) and any(c.isdigit() for c in password)
-
-# Enhanced Cyberpunk Theme
 WICKET_THEME = {
     "primary_bg": "#0A0F2D",
     "secondary_bg": "#1E2A44",
@@ -92,22 +77,18 @@ WICKET_THEME = {
     "error": "#FF4D4D",
     "success": "#00FF99"
 }
-
-# Enhanced CSS for Main App
 def apply_wicket_css():
     css = f"""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
-            
             .stApp {{
-                background: url('https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/airplane.jpg');
+                background: url('https://images.stockcake.com/public/1/f/e/1feb2775-2b8a-42ef-b84f-8f7d192e681b_large/glowing-pixel-radar-stockcake.jpg');
                 background-size: cover;
                 background-position: center;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
                 overflow-x: hidden;
             }}
-            
             .card {{
                 background: {WICKET_THEME['card_bg']};
                 backdrop-filter: blur(15px);
@@ -115,14 +96,13 @@ def apply_wicket_css():
                 border-radius: 16px;
                 padding: 20px;
                 margin-bottom: 20px;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2), 0 0 40px rgba(255, 0, 255, 0.1);
                 transition: transform 0.3s ease, box-shadow 0.3s ease;
             }}
             .card:hover {{
                 transform: translateY(-5px);
-                box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
+                box-shadow: 0 0 30px rgba(0, 212, 255, 0.4), 0 0 50px rgba(255, 0, 255, 0.2);
             }}
-            
             .stButton>button {{
                 background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
                 color: {WICKET_THEME['button_text']};
@@ -133,38 +113,33 @@ def apply_wicket_css():
                 font-weight: 700;
                 letter-spacing: 1px;
                 transition: all 0.3s ease;
-                box-shadow: 0 0 10px {WICKET_THEME['button_bg']};
+                box-shadow: 0 0 10px {WICKET_THEME['button_bg']}, 0 0 20px {WICKET_THEME['accent_alt']};
             }}
             .stButton>button:hover {{
                 transform: scale(1.05);
-                box-shadow: 0 0 20px {WICKET_THEME['hover']};
+                box-shadow: 0 0 30px {WICKET_THEME['hover']}, 0 0 40px {WICKET_THEME['accent_alt']};
                 background: linear-gradient(45deg, {WICKET_THEME['hover']}, {WICKET_THEME['accent_alt']});
             }}
-            
             .plotly-graph-div {{
                 background: {WICKET_THEME['card_bg']};
                 border-radius: 12px;
                 padding: 10px;
                 box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
             }}
-            
             h1, h2, h3 {{
                 font-family: 'Orbitron', sans-serif;
                 color: {WICKET_THEME['text_light']};
-                text-shadow: 0 0 8px {WICKET_THEME['accent']};
+                text-shadow: 0 0 8px {WICKET_THEME['accent']}, 0 0 12px {WICKET_THEME['hover']};
             }}
-            
             .stSidebar .sidebar-content img {{
                 filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
                 animation: pulse 2s infinite;
             }}
-            
             @keyframes pulse {{
                 0% {{ transform: scale(1); }}
                 50% {{ transform: scale(1.05); }}
                 100% {{ transform: scale(1); }}
             }}
-            
             .auth-container {{
                 display: flex;
                 justify-content: center;
@@ -172,7 +147,6 @@ def apply_wicket_css():
                 min-height: 100vh;
                 padding: 20px;
             }}
-            
             .form-container {{
                 background: {WICKET_THEME['card_bg']};
                 backdrop-filter: blur(15px);
@@ -184,11 +158,9 @@ def apply_wicket_css():
                 position: relative;
                 transition: transform 0.6s ease-in-out;
             }}
-            
             .form-container.sign-up-active {{
                 transform: translateX(100%);
             }}
-            
             .stTextInput input, .stTextInput input:focus {{
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid {WICKET_THEME['border']};
@@ -196,18 +168,15 @@ def apply_wicket_css():
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
             }}
-            
             .stTextInput input:focus {{
                 border-color: {WICKET_THEME['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
-            
             .logo {{
                 display: block;
                 margin: 0 auto 20px;
                 width: 150px;
             }}
-            
             .forgot-password {{
                 color: {WICKET_THEME['accent']};
                 font-size: 0.9rem;
@@ -215,15 +184,51 @@ def apply_wicket_css():
                 display: block;
                 margin: 10px 0;
             }}
-            
             .forgot-password:hover {{
                 color: {WICKET_THEME['hover']};
             }}
+            .particles {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: -1;
+                background: transparent;
+            }}
+            .particle {{
+                position: absolute;
+                background: {WICKET_THEME['accent']};
+                border-radius: 50%;
+                animation: float 10s linear infinite;
+                opacity: 0.3;
+            }}
+            @keyframes float {{
+                0% {{ transform: translateY(0); opacity: 0.3; }}
+                50% {{ opacity: 0.6; }}
+                100% {{ transform: translateY(-100vh); opacity: 0; }}
+            }}
         </style>
+        <script>
+            function createParticles() {
+                const particleContainer = document.createElement('div');
+                particleContainer.className = 'particles';
+                document.body.appendChild(particleContainer);
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.width = '3px';
+                    particle.style.height = '3px';
+                    particle.style.left = `${Math.random() * 100}vw`;
+                    particle.style.animationDelay = `${Math.random() * 10}s`;
+                    particleContainer.appendChild(particle);
+                }
+            }
+            window.onload = createParticles;
+        </script>
     """
     st.markdown(css, unsafe_allow_html=True)
-
-# Initialize session state
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'alert_log' not in st.session_state:
@@ -244,21 +249,16 @@ if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
 if 'panel_state' not in st.session_state:
     st.session_state.panel_state = 'sign_in'
-
-# Initialize database
 init_db()
-
-# Authentication UI with Native Streamlit
 def render_auth_ui():
     if not BCRYPT_AVAILABLE:
         st.warning("Secure password hashing unavailable. Using insecure mode for testing.")
     st.markdown(
         '<div class="auth-container">'
-        f'<img src="https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg" class="logo">'
+        f'<img src="https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg" class="logo">'
         f'<div class="form-container {"sign-up-active" if st.session_state.panel_state == "sign_up" else ""}">',
         unsafe_allow_html=True
     )
-
     if st.session_state.panel_state == 'sign_in':
         with st.form(key='sign_in_form'):
             st.markdown('<h2 style="text-align: center;">Sign In</h2>', unsafe_allow_html=True)
@@ -283,7 +283,7 @@ def render_auth_ui():
                                     st.error('Invalid username or password')
                                     logger.warning(f"Failed login attempt: username={username}")
                             else:
-                                if password == stored_password:  # Insecure fallback
+                                if password == stored_password:
                                     st.session_state.authenticated = True
                                     logger.info(f"Authenticated (insecure): username={username}")
                                     st.rerun()
@@ -307,9 +307,9 @@ def render_auth_ui():
             if submit:
                 if not username or not email or not password:
                     st.error('All fields are required')
-                elif username.lower() == 'nama':
-                    st.error('Username "nama" is reserved for admin')
-                    logger.warning(f"Sign-up failed: attempted to use reserved username 'nama'")
+                elif username.lower() == 'guardian':
+                    st.error('Username "guardian" is reserved for admin')
+                    logger.warning(f"Sign-up failed: attempted to use reserved username 'guardian'")
                 elif not is_valid_email(email):
                     st.error('Invalid email format')
                 elif not is_valid_password(password):
@@ -319,7 +319,7 @@ def render_auth_ui():
                         if BCRYPT_AVAILABLE:
                             hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                         else:
-                            hashed_pw = password  # Insecure fallback
+                            hashed_pw = password
                         with sqlite3.connect('users.db') as conn:
                             c = conn.cursor()
                             c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
@@ -336,10 +336,7 @@ def render_auth_ui():
                         st.error('Database error during sign-up')
                         logger.error(f"Sign-up database error: {str(e)}")
         st.button('Switch to Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
-
     st.markdown('</div></div>', unsafe_allow_html=True)
-
-# Simulated Drone Detection
 def simulate_drone_data(num_drones=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     drones = []
@@ -364,7 +361,6 @@ def simulate_drone_data(num_drones=30):
         })
     logger.info(f"Simulated {len(drones)} drones, {sum(d['status'] == 'unidentified' for d in drones)} unauthorized")
     return drones
-
 def display_drone_data():
     if not st.session_state.drone_results:
         st.warning("No drone data available. Click 'Simulate Drones' to generate data.")
@@ -419,8 +415,6 @@ def display_drone_data():
         st.error("Failed to render drone map. Please check your Mapbox token and internet connection.")
         logger.error(f"Drone map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
-
-# Simulated Radar Surveillance
 def simulate_radar_data(num_targets=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     radar_data = []
@@ -436,7 +430,6 @@ def simulate_radar_data(num_targets=30):
         })
     logger.info(f"Simulated {len(radar_data)} radar targets")
     return radar_data
-
 def display_radar_data():
     if not st.session_state.radar_data:
         st.warning("No radar data available. Click 'Simulate Radar' to generate data.")
@@ -503,8 +496,6 @@ def display_radar_data():
         st.error("Failed to render radar map. Please check your Mapbox token and internet connection.")
         logger.error(f"Radar map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
-
-# Simulated ATC Monitoring
 def simulate_atc_data(num_samples=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     data = []
@@ -554,7 +545,6 @@ def simulate_atc_data(num_samples=30):
     st.session_state.flight_conflicts = conflicts
     logger.info(f"Simulated {len(data)} ATC records, {df['anomaly'].sum()} anomalies, {len(conflicts)} conflicts")
     return df.to_dict('records')
-
 def display_atc_data():
     if not st.session_state.atc_results:
         st.warning("No ATC data available. Click 'Simulate ATC' to generate data.")
@@ -612,15 +602,13 @@ def display_atc_data():
     if st.session_state.flight_conflicts:
         st.subheader("Collision Risks")
         st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
-
-# Simulated Threat Intelligence
 def simulate_threat_intelligence(num_threats=30):
     threats = []
     for i in range(num_threats):
         threats.append({
             'timestamp': datetime.now(),
             'threat_id': f"THR{i:03d}",
-            'description': f"Simulated threat {i+1}",
+            'description': f"Simulated airspace threat {i+1}",
             'indicators': [f"192.168.{np.random.randint(0,255)}.{np.random.randint(0,255)}"],
             'severity': np.random.choice(['low', 'medium', 'high']),
             'source': 'simulated'
@@ -628,13 +616,12 @@ def simulate_threat_intelligence(num_threats=30):
     if any(t['severity'] in ['high', 'medium'] for t in threats):
         st.session_state.alert_log.append({
             'timestamp': datetime.now(),
-            'type': 'Threat Intelligence',
+            'type': 'Airspace Threat Intelligence',
             'severity': 'high',
             'details': f"Detected {sum(t['severity'] in ['high', 'medium'] for t in threats)} notable threats"
         })
-    logger.info(f"Simulated {len(threats)} threats")
+    logger.info(f"Simulated {len(threats)} airspace threats")
     return threats
-
 def display_threat_intelligence():
     if not st.session_state.threats:
         st.warning("No threat data available. Click 'Simulate Threats' to generate data.")
@@ -651,7 +638,7 @@ def display_threat_intelligence():
         )
     ])
     fig.update_layout(
-        title="Threat Severity Distribution",
+        title="Airspace Threat Severity Distribution",
         xaxis_title="Severity",
         yaxis_title="Count",
         paper_bgcolor=WICKET_THEME['card_bg'],
@@ -660,8 +647,6 @@ def display_threat_intelligence():
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'threat_id', 'description', 'severity', 'source']])
-
-# Simulated Compliance Monitoring
 def simulate_compliance_metrics():
     metrics = {
         'detection_rate': np.random.uniform(70, 95),
@@ -677,7 +662,6 @@ def simulate_compliance_metrics():
         })
     logger.info(f"Simulated compliance metrics: {metrics}")
     return metrics
-
 def display_compliance_metrics():
     if not st.session_state.compliance_metrics['detection_rate']:
         st.warning("No compliance data available. Click 'Simulate Compliance' to generate data.")
@@ -694,7 +678,7 @@ def display_compliance_metrics():
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=metrics['detection_rate'],
-        title={'text': "Intrusion Detection Rate"},
+        title={'text': "Airspace Intrusion Detection Rate"},
         gauge={
             'axis': {'range': [0, 100]},
             'bar': {'color': WICKET_THEME['accent']},
@@ -711,8 +695,6 @@ def display_compliance_metrics():
         font={'color': WICKET_THEME['text_light']}
     )
     st.plotly_chart(fig, use_container_width=True)
-
-# Simulated Network Scan
 def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-1000"):
     common_ports = {
         21: ('ftp', 'tcp'), 22: ('ssh', 'tcp'), 23: ('telnet', 'tcp'), 80: ('http', 'tcp'),
@@ -745,31 +727,25 @@ def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-
     })
     logger.info(f"Simulated NMAP scan on {target}, found {open_ports} open ports")
     return scan_results
-
 def display_network_scan():
     if not st.session_state.scan_results:
         st.warning("No scan data available. Click 'Simulate Scan' to generate data.")
         return
     df = pd.DataFrame(st.session_state.scan_results)
     st.dataframe(df[['port', 'protocol', 'state', 'service']])
-
-# Generate Report
 def generate_report():
     buffer = io.BytesIO()
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
-    
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     elements = []
-    
-    elements.append(Paragraph("NAMA IDPS Simulation Report", styles['Title']))
+    elements.append(Paragraph("GuardianEye IDPS Simulation Report", styles['Title']))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
     elements.append(Spacer(1, 12))
-    
     if st.session_state.alert_log:
         elements.append(Paragraph("Recent Alerts", styles['Heading2']))
         alert_data = [[str(a['timestamp']), a['type'], a['severity'], a['details']] for a in st.session_state.alert_log]
@@ -785,7 +761,6 @@ def generate_report():
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         elements.append(alert_table)
-    
     if st.session_state.drone_results:
         elements.append(Spacer(1, 12))
         elements.append(Paragraph("Drone Detection", styles['Heading2']))
@@ -802,25 +777,19 @@ def generate_report():
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         elements.append(drone_table)
-    
     doc.build(elements)
     buffer.seek(0)
     return buffer
-
-# Main Application
 def main():
     apply_wicket_css()
-
     if not st.session_state.authenticated:
         render_auth_ui()
         return
-
-    st.sidebar.image("https://raw.githubusercontent.com/J4yd33n/IDPS-with-ML/main/nama_logo.jpg")
+    st.sidebar.image("https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg")
     page = st.sidebar.selectbox("Select Feature", ["Dashboard", "Network Scan", "Drone Detection", "Radar Surveillance", "ATC Monitoring", "Threat Intelligence", "Compliance Monitoring"])
-
     if page == "Dashboard":
-        st.markdown('<div class="card"><h1>NAMA IDPS Simulation Dashboard</h1></div>', unsafe_allow_html=True)
-        st.write("Select a feature from the sidebar to simulate and visualize its functionality.")
+        st.markdown('<div class="card"><h1>GuardianEye Airspace Security Dashboard</h1></div>', unsafe_allow_html=True)
+        st.write("Select a feature from the sidebar to simulate and visualize airspace security functions.")
         if st.button("Generate All Simulations"):
             st.session_state.scan_results = simulate_nmap_scan()
             st.session_state.drone_results = simulate_drone_data()
@@ -835,44 +804,37 @@ def main():
         if st.button("Download Report"):
             buffer = generate_report()
             b64 = base64.b64encode(buffer.getvalue()).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="nama_idps_report.pdf">Download PDF Report</a>'
+            href = f'<a href="data:application/pdf;base64,{b64}" download="guardianeye_idps_report.pdf">Download PDF Report</a>'
             st.markdown(href, unsafe_allow_html=True)
-
     elif page == "Network Scan":
         st.markdown('<div class="card"><h2>Network Scan Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Scan"):
             st.session_state.scan_results = simulate_nmap_scan()
         display_network_scan()
-
     elif page == "Drone Detection":
         st.markdown('<div class="card"><h2>Drone Detection Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Drones"):
             st.session_state.drone_results = simulate_drone_data()
         display_drone_data()
-
     elif page == "Radar Surveillance":
         st.markdown('<div class="card"><h2>Radar Surveillance Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Radar"):
             st.session_state.radar_data = simulate_radar_data()
         display_radar_data()
-
     elif page == "ATC Monitoring":
         st.markdown('<div class="card"><h2>ATC Monitoring Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate ATC"):
             st.session_state.atc_results = simulate_atc_data()
         display_atc_data()
-
     elif page == "Threat Intelligence":
-        st.markdown('<div class="card"><h2>Threat Intelligence Simulation</h2></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card"><h2>Airspace Threat Intelligence Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Threats"):
             st.session_state.threats = simulate_threat_intelligence()
         display_threat_intelligence()
-
     elif page == "Compliance Monitoring":
         st.markdown('<div class="card"><h2>Compliance Monitoring Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Compliance"):
             st.session_state.compliance_metrics = simulate_compliance_metrics()
         display_compliance_metrics()
-
 if __name__ == "__main__":
     main()
