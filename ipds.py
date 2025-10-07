@@ -82,12 +82,23 @@ def apply_wicket_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
-                background: url('https://images.stockcake.com/public/1/f/e/1feb2775-2b8a-42ef-b84f-8f7d192e681b_large/glowing-pixel-radar-stockcake.jpg');
+                background: url('https://images.stockcake.com/public/1/8/5/1852332_1221726_large/cybernetic-eye-glows-stockcake.jpg');
                 background-size: cover;
                 background-position: center;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
                 overflow-x: hidden;
+                position: relative;
+            }}
+            .stApp::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, rgba(10,15,45,0.7), rgba(30,42,68,0.5));
+                z-index: -1;
             }}
             .card {{
                 background: {WICKET_THEME['card_bg']};
@@ -96,11 +107,33 @@ def apply_wicket_css():
                 border-radius: 16px;
                 padding: 20px;
                 margin-bottom: 20px;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2), 0 0 40px rgba(255, 0, 255, 0.1);
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2), 0 0 40px rgba(255, 0, 255, 0.1), inset 0 0 20px rgba(0, 212, 255, 0.05);
                 transition: transform 0.3s ease, box-shadow 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }}
+            .card::before {{
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: linear-gradient(45deg, transparent, rgba(0, 212, 255, 0.1), transparent);
+                transform: rotate(45deg);
+                transition: all 0.6s ease;
+                opacity: 0;
+            }}
+            .card:hover::before {{
+                opacity: 1;
+                animation: shine 1s ease-in-out;
+            }}
+            @keyframes shine {{
+                0% {{ transform: translateX(-100%) translateY(-100%) rotate(45deg); }}
+                100% {{ transform: translateX(100%) translateY(100%) rotate(45deg); }}
             }}
             .card:hover {{
-                transform: translateY(-5px);
+                transform: translateY(-5px) rotateX(5deg);
                 box-shadow: 0 0 30px rgba(0, 212, 255, 0.4), 0 0 50px rgba(255, 0, 255, 0.2);
             }}
             .stButton>button {{
@@ -114,9 +147,24 @@ def apply_wicket_css():
                 letter-spacing: 1px;
                 transition: all 0.3s ease;
                 box-shadow: 0 0 10px {WICKET_THEME['button_bg']}, 0 0 20px {WICKET_THEME['accent_alt']};
+                position: relative;
+                overflow: hidden;
+            }}
+            .stButton>button::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+                transition: left 0.5s;
+            }}
+            .stButton>button:hover::before {{
+                left: 100%;
             }}
             .stButton>button:hover {{
-                transform: scale(1.05);
+                transform: scale(1.05) rotate(2deg);
                 box-shadow: 0 0 30px {WICKET_THEME['hover']}, 0 0 40px {WICKET_THEME['accent_alt']};
                 background: linear-gradient(45deg, {WICKET_THEME['hover']}, {WICKET_THEME['accent_alt']});
             }}
@@ -125,20 +173,29 @@ def apply_wicket_css():
                 border-radius: 12px;
                 padding: 10px;
                 box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+                border: 1px solid rgba(59, 130, 246, 0.3);
             }}
             h1, h2, h3 {{
                 font-family: 'Orbitron', sans-serif;
                 color: {WICKET_THEME['text_light']};
                 text-shadow: 0 0 8px {WICKET_THEME['accent']}, 0 0 12px {WICKET_THEME['hover']};
+                animation: glow 2s infinite alternate;
+            }}
+            @keyframes glow {{
+                0% {{ text-shadow: 0 0 10px {WICKET_THEME['accent']}, 0 0 20px {WICKET_THEME['hover']}; }}
+                100% {{ text-shadow: 0 0 20px {WICKET_THEME['accent']}, 0 0 30px {WICKET_THEME['hover']}, 0 0 40px {WICKET_THEME['accent']}; }}
             }}
             .stSidebar .sidebar-content img {{
                 filter: drop-shadow(0 0 10px {WICKET_THEME['accent']});
-                animation: pulse 2s infinite;
+                animation: pulse 2s infinite, rotate 10s linear infinite;
+            }}
+            @keyframes rotate {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
             }}
             @keyframes pulse {{
-                0% {{ transform: scale(1); }}
-                50% {{ transform: scale(1.05); }}
-                100% {{ transform: scale(1); }}
+                0%, 100% {{ transform: scale(1); opacity: 1; }}
+                50% {{ transform: scale(1.05); opacity: 0.8; }}
             }}
             .auth-container {{
                 display: flex;
@@ -157,6 +214,11 @@ def apply_wicket_css():
                 box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
                 position: relative;
                 transition: transform 0.6s ease-in-out;
+                animation: fadeIn 1s ease-in;
+            }}
+            @keyframes fadeIn {{
+                0% {{ opacity: 0; transform: scale(0.9); }}
+                100% {{ opacity: 1; transform: scale(1); }}
             }}
             .form-container.sign-up-active {{
                 transform: translateX(100%);
@@ -167,6 +229,7 @@ def apply_wicket_css():
                 border-radius: 8px;
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
+                transition: box-shadow 0.3s ease;
             }}
             .stTextInput input:focus {{
                 border-color: {WICKET_THEME['accent']};
@@ -176,6 +239,7 @@ def apply_wicket_css():
                 display: block;
                 margin: 0 auto 20px;
                 width: 150px;
+                animation: rotate 20s linear infinite;
             }}
             .forgot-password {{
                 color: {WICKET_THEME['accent']};
@@ -183,6 +247,7 @@ def apply_wicket_css():
                 text-decoration: none;
                 display: block;
                 margin: 10px 0;
+                transition: color 0.3s ease;
             }}
             .forgot-password:hover {{
                 color: {WICKET_THEME['hover']};
@@ -203,28 +268,48 @@ def apply_wicket_css():
                 border-radius: 50%;
                 animation: float 10s linear infinite;
                 opacity: 0.3;
+                box-shadow: 0 0 5px {WICKET_THEME['accent']};
             }}
             @keyframes float {{
-                0% {{ transform: translateY(0); opacity: 0.3; }}
-                50% {{ opacity: 0.6; }}
-                100% {{ transform: translateY(-100vh); opacity: 0; }}
+                0% {{ transform: translateY(0) translateX(0); opacity: 0.3; }}
+                50% {{ opacity: 0.6; transform: translateY(-50vh) translateX(10vw); }}
+                100% {{ transform: translateY(-100vh) translateX(20vw); opacity: 0; }}
+            }}
+            .scanline {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 2px;
+                background: linear-gradient(90deg, transparent, {WICKET_THEME['accent']}, transparent);
+                animation: scan 3s linear infinite;
+                z-index: 1;
+                pointer-events: none;
+            }}
+            @keyframes scan {{
+                0% {{ top: 0; opacity: 0; }}
+                10% {{ opacity: 1; }}
+                90% {{ opacity: 1; }}
+                100% {{ top: 100%; opacity: 0; }}
             }}
         </style>
+        <div class="scanline"></div>
         <script>
-            function createParticles() {{
+            function createParticles() {
                 const particleContainer = document.createElement('div');
                 particleContainer.className = 'particles';
                 document.body.appendChild(particleContainer);
-                for (let i = 0; i < 20; i++) {{
+                for (let i = 0; i < 30; i++) {
                     const particle = document.createElement('div');
                     particle.className = 'particle';
-                    particle.style.width = '3px';
-                    particle.style.height = '3px';
-                    particle.style.left = `${{Math.random() * 100}}vw`;
-                    particle.style.animationDelay = `${{Math.random() * 10}}s`;
+                    particle.style.width = Math.random() * 4 + 'px';
+                    particle.style.height = particle.style.width;
+                    particle.style.left = Math.random() * 100 + 'vw';
+                    particle.style.animationDuration = (Math.random() * 10 + 5) + 's';
+                    particle.style.animationDelay = Math.random() * 5 + 's';
                     particleContainer.appendChild(particle);
-                }}
-            }}
+                }
+            }
             window.onload = createParticles;
         </script>
     """
@@ -247,6 +332,8 @@ if 'compliance_metrics' not in st.session_state:
     st.session_state.compliance_metrics = {'detection_rate': 0, 'open_ports': 0, 'alerts': 0}
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = []
+if 'airports_data' not in st.session_state:
+    st.session_state.airports_data = []
 if 'panel_state' not in st.session_state:
     st.session_state.panel_state = 'sign_in'
 init_db()
@@ -357,7 +444,7 @@ def simulate_drone_data(num_drones=30):
             'timestamp': datetime.now(),
             'type': 'Drone Intrusion',
             'severity': 'high',
-            'details': f"Detected {sum(d['status'] == 'unidentified' for d in drones)} unauthorized drones"
+            'details': f"Detected {sum(d['status'] == 'unidentified' for d in drones)} unauthorized drones over Nigerian airspace"
         })
     logger.info(f"Simulated {len(drones)} drones, {sum(d['status'] == 'unidentified' for d in drones)} unauthorized")
     return drones
@@ -390,19 +477,19 @@ def display_drone_data():
         fig.update_layout(
             mapbox=dict(
                 style='streets-v12',
-                center=dict(lat=9, lon=7),
-                zoom=7,
+                center=dict(lat=9, lon=8),
+                zoom=5,
                 accesstoken=mapbox_token
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
-            title=dict(text="Drone Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            title=dict(text="Drone Surveillance - Nigerian Airspace", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
             margin=dict(l=10, r=10, t=50, b=10),
             hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
         )
         fig.add_annotation(
-            text="Real-time drone tracking",
+            text="Real-time drone tracking across Nigeria",
             xref="paper", yref="paper",
             x=0.01, y=0.99,
             showarrow=False,
@@ -439,7 +526,7 @@ def display_radar_data():
         fig = go.Figure()
         theta = np.linspace(0, 360, 100)
         r = np.ones(100) * 0.7
-        lon_sweep = 7 + r * np.cos(np.radians(theta))
+        lon_sweep = 8 + r * np.cos(np.radians(theta))
         lat_sweep = 9 + r * np.sin(np.radians(theta))
         fig.add_trace(go.Scattermapbox(
             lon=lon_sweep,
@@ -471,19 +558,19 @@ def display_radar_data():
         fig.update_layout(
             mapbox=dict(
                 style='streets-v12',
-                center=dict(lat=9, lon=7),
-                zoom=7,
+                center=dict(lat=9, lon=8),
+                zoom=5,
                 accesstoken=mapbox_token
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
-            title=dict(text="Radar Surveillance", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            title=dict(text="Radar Surveillance - Nigerian Airspace", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
             margin=dict(l=10, r=10, t=50, b=10),
             hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
         )
         fig.add_annotation(
-            text="Radar sweep simulation",
+            text="Radar sweep simulation across Nigeria",
             xref="paper", yref="paper",
             x=0.01, y=0.99,
             showarrow=False,
@@ -520,7 +607,7 @@ def simulate_atc_data(num_samples=30):
             'timestamp': datetime.now(),
             'type': 'ATC Anomaly',
             'severity': 'high',
-            'details': f"Detected {df['anomaly'].sum()} anomalies in ATC data"
+            'details': f"Detected {df['anomaly'].sum()} anomalies in Nigerian ATC data"
         })
     conflicts = []
     for i, row1 in df.iterrows():
@@ -540,7 +627,7 @@ def simulate_atc_data(num_samples=30):
             'timestamp': datetime.now(),
             'type': 'Flight Conflict',
             'severity': 'high',
-            'details': f"Detected {len(conflicts)} collision risks"
+            'details': f"Detected {len(conflicts)} collision risks in Nigerian airspace"
         })
     st.session_state.flight_conflicts = conflicts
     logger.info(f"Simulated {len(data)} ATC records, {df['anomaly'].sum()} anomalies, {len(conflicts)} conflicts")
@@ -574,19 +661,19 @@ def display_atc_data():
         fig.update_layout(
             mapbox=dict(
                 style='streets-v12',
-                center=dict(lat=9, lon=7),
-                zoom=7,
+                center=dict(lat=9, lon=8),
+                zoom=5,
                 accesstoken=mapbox_token
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
             plot_bgcolor=WICKET_THEME['card_bg'],
-            title=dict(text="ATC Monitoring", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
+            title=dict(text="ATC Monitoring - Nigerian Airspace", font=dict(color=WICKET_THEME['text_light'], size=20), x=0.5),
             margin=dict(l=10, r=10, t=50, b=10),
             hoverlabel=dict(bgcolor=WICKET_THEME['card_bg'], font_color=WICKET_THEME['text_light'])
         )
         fig.add_annotation(
-            text="ATC anomaly detection",
+            text="ATC anomaly detection across Nigeria",
             xref="paper", yref="paper",
             x=0.01, y=0.99,
             showarrow=False,
@@ -608,7 +695,7 @@ def simulate_threat_intelligence(num_threats=30):
         threats.append({
             'timestamp': datetime.now(),
             'threat_id': f"THR{i:03d}",
-            'description': f"Simulated airspace threat {i+1}",
+            'description': f"Simulated airspace threat {i+1} near Nigerian airports",
             'indicators': [f"192.168.{np.random.randint(0,255)}.{np.random.randint(0,255)}"],
             'severity': np.random.choice(['low', 'medium', 'high']),
             'source': 'simulated'
@@ -618,7 +705,7 @@ def simulate_threat_intelligence(num_threats=30):
             'timestamp': datetime.now(),
             'type': 'Airspace Threat Intelligence',
             'severity': 'high',
-            'details': f"Detected {sum(t['severity'] in ['high', 'medium'] for t in threats)} notable threats"
+            'details': f"Detected {sum(t['severity'] in ['high', 'medium'] for t in threats)} notable threats to Nigerian airports"
         })
     logger.info(f"Simulated {len(threats)} airspace threats")
     return threats
@@ -638,7 +725,7 @@ def display_threat_intelligence():
         )
     ])
     fig.update_layout(
-        title="Airspace Threat Severity Distribution",
+        title="Airspace Threat Severity Distribution - Nigeria",
         xaxis_title="Severity",
         yaxis_title="Count",
         paper_bgcolor=WICKET_THEME['card_bg'],
@@ -658,7 +745,7 @@ def simulate_compliance_metrics():
             'timestamp': datetime.now(),
             'type': 'Compliance Alert',
             'severity': 'high',
-            'details': f"High open ports ({metrics['open_ports']}) or alerts ({metrics['alerts']})"
+            'details': f"High open ports ({metrics['open_ports']}) or alerts ({metrics['alerts']}) at Nigerian airports"
         })
     logger.info(f"Simulated compliance metrics: {metrics}")
     return metrics
@@ -678,7 +765,7 @@ def display_compliance_metrics():
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=metrics['detection_rate'],
-        title={'text': "Airspace Intrusion Detection Rate"},
+        title={'text': "Nigerian Airspace Intrusion Detection Rate"},
         gauge={
             'axis': {'range': [0, 100]},
             'bar': {'color': WICKET_THEME['accent']},
@@ -723,7 +810,7 @@ def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-
         'timestamp': datetime.now(),
         'type': 'Network Scan',
         'severity': 'medium',
-        'details': f"Scanned {target}, found {open_ports} open ports"
+        'details': f"Scanned {target}, found {open_ports} open ports at airport network"
     })
     logger.info(f"Simulated NMAP scan on {target}, found {open_ports} open ports")
     return scan_results
@@ -733,6 +820,79 @@ def display_network_scan():
         return
     df = pd.DataFrame(st.session_state.scan_results)
     st.dataframe(df[['port', 'protocol', 'state', 'service']])
+def simulate_nigerian_airports():
+    airports = [
+        {"name": "Murtala Muhammed Int'l", "state": "Lagos State", "lat": 6.5772, "lon": 3.3212},
+        {"name": "Nnamdi Azikiwe Int'l", "state": "FCT Abuja", "lat": 9.0068, "lon": 7.2632},
+        {"name": "Mallam Aminu Kano Int'l", "state": "Kano State", "lat": 12.0470, "lon": 8.5247},
+        {"name": "Port Harcourt Int'l", "state": "Rivers State", "lat": 4.8772, "lon": 7.0161},
+        {"name": "Akanu Ibiam Int'l", "state": "Enugu State", "lat": 6.4744, "lon": 7.5617},
+        {"name": "Margaret Ekpo Int'l", "state": "Cross River State", "lat": 4.9731, "lon": 8.3408},
+        {"name": "Ibadan Airport", "state": "Oyo State", "lat": 7.3643, "lon": 3.9783},
+        {"name": "Ilorin Int'l", "state": "Kwara State", "lat": 8.5094, "lon": 4.5580},
+        {"name": "Asaba Int'l", "state": "Delta State", "lat": 6.1983, "lon": 6.6711},
+        {"name": "Akure Airport", "state": "Ondo State", "lat": 7.2500, "lon": 5.0333},
+        {"name": "Gombe Lawanti Int'l", "state": "Gombe State", "lat": 10.2986, "lon": 11.1714},
+        {"name": "Sam Mbakwe Int'l", "state": "Imo State", "lat": 5.4000, "lon": 7.0333}
+    ]
+    for airport in airports:
+        airport['threats'] = np.random.randint(0, 11)
+        airport['vuln_level'] = 'low' if airport['threats'] < 4 else 'medium' if airport['threats'] < 8 else 'high'
+        if airport['vuln_level'] == 'high':
+            st.session_state.alert_log.append({
+                'timestamp': datetime.now(),
+                'type': 'Airport Vulnerability',
+                'severity': 'high',
+                'details': f"High threats at {airport['name']} ({airport['state']})"
+            })
+    logger.info(f"Simulated data for {len(airports)} Nigerian airports")
+    return airports
+def display_nigerian_airports():
+    if not st.session_state.airports_data:
+        st.warning("No airport data available. Click 'Simulate Airports' to generate data.")
+        return
+    df = pd.DataFrame(st.session_state.airports_data)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Airports by State & Threats")
+        st.dataframe(df[['name', 'state', 'threats', 'vuln_level']])
+    with col2:
+        vuln_counts = df['vuln_level'].value_counts()
+        fig_pie = go.Figure(data=[go.Pie(labels=vuln_counts.index, values=vuln_counts.values, hole=0.4)])
+        fig_pie.update_layout(title="Vulnerability Distribution", paper_bgcolor=WICKET_THEME['card_bg'], plot_bgcolor=WICKET_THEME['card_bg'])
+        st.plotly_chart(fig_pie, use_container_width=True)
+    try:
+        fig = go.Figure(go.Scattermapbox(
+            lon=df['lon'],
+            lat=df['lat'],
+            mode='markers+text',
+            marker=dict(
+                size=df['threats'] * 3 + 5,
+                color=['green' if v == 'low' else 'orange' if v == 'medium' else 'red' for v in df['vuln_level']],
+                opacity=0.8
+            ),
+            text=df['name'],
+            textposition="top center",
+            hovertemplate="<b>%{text}</b><br>State: %{customdata[0]}<br>Threats: %{customdata[1]}<br>Vuln: %{customdata[2]}<extra></extra>",
+            customdata=df[['state', 'threats', 'vuln_level']].values
+        ))
+        mapbox_token = st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+        fig.update_layout(
+            mapbox=dict(
+                style='streets-v12',
+                center=dict(lat=9, lon=8),
+                zoom=5,
+                accesstoken=mapbox_token
+            ),
+            title="Nigerian Airports Vulnerability Map",
+            paper_bgcolor=WICKET_THEME['card_bg'],
+            plot_bgcolor=WICKET_THEME['card_bg']
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        logger.info("Airports map rendered successfully")
+    except Exception as e:
+        st.error("Failed to render airports map. Please check your Mapbox token.")
+        logger.error(f"Airports map rendering failed: {str(e)}")
 def generate_report():
     buffer = io.BytesIO()
     from reportlab.lib.pagesizes import letter
@@ -742,7 +902,7 @@ def generate_report():
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     elements = []
-    elements.append(Paragraph("GuardianEye IDPS Simulation Report", styles['Title']))
+    elements.append(Paragraph("GuardianEye Nigerian Airspace Security Report", styles['Title']))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(f"Generated on: {datetime.now()}", styles['Normal']))
     elements.append(Spacer(1, 12))
@@ -761,6 +921,22 @@ def generate_report():
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         elements.append(alert_table)
+    if st.session_state.airports_data:
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("Nigerian Airports Vulnerabilities", styles['Heading2']))
+        airport_data = [[a['name'], a['state'], a['threats'], a['vuln_level']] for a in st.session_state.airports_data]
+        airport_table = Table([['Airport', 'State', 'Threats', 'Vuln Level']] + airport_data)
+        airport_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(airport_table)
     if st.session_state.drone_results:
         elements.append(Spacer(1, 12))
         elements.append(Paragraph("Drone Detection", styles['Heading2']))
@@ -785,11 +961,21 @@ def main():
     if not st.session_state.authenticated:
         render_auth_ui()
         return
-    st.sidebar.image("https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg")
-    page = st.sidebar.selectbox("Select Feature", ["Dashboard", "Network Scan", "Drone Detection", "Radar Surveillance", "ATC Monitoring", "Threat Intelligence", "Compliance Monitoring"])
-    if page == "Dashboard":
-        st.markdown('<div class="card"><h1>GuardianEye Airspace Security Dashboard</h1></div>', unsafe_allow_html=True)
-        st.write("Select a feature from the sidebar to simulate and visualize airspace security functions.")
+    st.sidebar.image("https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg", caption="GuardianEye Sentinel")
+    st.markdown('<div style="text-align:center; margin-bottom:20px;"><h1 style="font-size:4em; animation: glow 2s infinite alternate;">GUARDIANEYE</h1><p style="color:#00D4FF; font-family:Orbitron;">Nigerian Airspace Sentinel</p></div>', unsafe_allow_html=True)
+    page = st.sidebar.selectbox("Select Feature", [
+        "🏠 Dashboard",
+        "🔍 Network Scan",
+        "🚁 Drone Detection",
+        "📡 Radar Surveillance",
+        "✈️ ATC Monitoring",
+        "⚠️ Threat Intelligence",
+        "🛡️ Compliance Monitoring",
+        "🗺️ Nigerian Airports Security"
+    ])
+    if page == "🏠 Dashboard":
+        st.markdown('<div class="card"><h2>GuardianEye Airspace Security Dashboard</h2></div>', unsafe_allow_html=True)
+        st.write("Select a feature from the sidebar to simulate and visualize Nigerian airspace security functions.")
         if st.button("Generate All Simulations"):
             st.session_state.scan_results = simulate_nmap_scan()
             st.session_state.drone_results = simulate_drone_data()
@@ -797,44 +983,50 @@ def main():
             st.session_state.atc_results = simulate_atc_data()
             st.session_state.threats = simulate_threat_intelligence()
             st.session_state.compliance_metrics = simulate_compliance_metrics()
-            st.success("Simulations generated!")
+            st.session_state.airports_data = simulate_nigerian_airports()
+            st.success("All simulations generated for Nigerian airspace!")
         if st.session_state.alert_log:
             st.subheader("Recent Alerts")
             st.dataframe(pd.DataFrame(st.session_state.alert_log[-5:]))
         if st.button("Download Report"):
             buffer = generate_report()
             b64 = base64.b64encode(buffer.getvalue()).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="guardianeye_idps_report.pdf">Download PDF Report</a>'
+            href = f'<a href="data:application/pdf;base64,{b64}" download="guardianeye_nigeria_report.pdf">Download PDF Report</a>'
             st.markdown(href, unsafe_allow_html=True)
-    elif page == "Network Scan":
+    elif page == "🔍 Network Scan":
         st.markdown('<div class="card"><h2>Network Scan Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Scan"):
             st.session_state.scan_results = simulate_nmap_scan()
         display_network_scan()
-    elif page == "Drone Detection":
+    elif page == "🚁 Drone Detection":
         st.markdown('<div class="card"><h2>Drone Detection Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Drones"):
             st.session_state.drone_results = simulate_drone_data()
         display_drone_data()
-    elif page == "Radar Surveillance":
+    elif page == "📡 Radar Surveillance":
         st.markdown('<div class="card"><h2>Radar Surveillance Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Radar"):
             st.session_state.radar_data = simulate_radar_data()
         display_radar_data()
-    elif page == "ATC Monitoring":
+    elif page == "✈️ ATC Monitoring":
         st.markdown('<div class="card"><h2>ATC Monitoring Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate ATC"):
             st.session_state.atc_results = simulate_atc_data()
         display_atc_data()
-    elif page == "Threat Intelligence":
+    elif page == "⚠️ Threat Intelligence":
         st.markdown('<div class="card"><h2>Airspace Threat Intelligence Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Threats"):
             st.session_state.threats = simulate_threat_intelligence()
         display_threat_intelligence()
-    elif page == "Compliance Monitoring":
+    elif page == "🛡️ Compliance Monitoring":
         st.markdown('<div class="card"><h2>Compliance Monitoring Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Compliance"):
             st.session_state.compliance_metrics = simulate_compliance_metrics()
         display_compliance_metrics()
+    elif page == "🗺️ Nigerian Airports Security":
+        st.markdown('<div class="card"><h2>Nigerian Airports Vulnerability Assessment</h2></div>', unsafe_allow_html=True)
+        if st.button("Simulate Airports"):
+            st.session_state.airports_data = simulate_nigerian_airports()
+        display_nigerian_airports()
 if __name__ == "__main__":
     main()
