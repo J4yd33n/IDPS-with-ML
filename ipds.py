@@ -82,7 +82,7 @@ def apply_wicket_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
-                background: url('https://images.stockcake.com/public/1/8/5/1852332_1221726_large/cybernetic-eye-glows-stockcake.jpg');
+                background: url('https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg');
                 background-size: cover;
                 background-position: center;
                 color: {WICKET_THEME['text']};
