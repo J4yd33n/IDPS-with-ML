@@ -211,20 +211,20 @@ def apply_wicket_css():
             }}
         </style>
         <script>
-            function createParticles() {
+            function createParticles() {{
                 const particleContainer = document.createElement('div');
                 particleContainer.className = 'particles';
                 document.body.appendChild(particleContainer);
-                for (let i = 0; i < 20; i++) {
+                for (let i = 0; i < 20; i++) {{
                     const particle = document.createElement('div');
                     particle.className = 'particle';
                     particle.style.width = '3px';
                     particle.style.height = '3px';
-                    particle.style.left = `${Math.random() * 100}vw`;
-                    particle.style.animationDelay = `${Math.random() * 10}s`;
+                    particle.style.left = `${{Math.random() * 100}}vw`;
+                    particle.style.animationDelay = `${{Math.random() * 10}}s`;
                     particleContainer.appendChild(particle);
-                }
-            }
+                }}
+            }}
             window.onload = createParticles;
         </script>
     """
