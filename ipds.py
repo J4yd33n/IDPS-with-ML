@@ -58,9 +58,23 @@ def apply_wicket_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
-                background: {WICKET_THEME['primary_bg']};
+                background: url('https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg');
+                background-size: cover;
+                background-position: center;
+                background-color: {WICKET_THEME['primary_bg']};
                 color: {WICKET_THEME['text']};
                 font-family: 'Roboto Mono', monospace;
+                position: relative;
+            }}
+            .stApp::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(30, 42, 68, 0.3);
+                z-index: -1;
             }}
             .card {{
                 background: {WICKET_THEME['card_bg']};
@@ -137,9 +151,64 @@ def apply_wicket_css():
                 color: {WICKET_THEME['success']};
                 font-size: 1.2em;
                 text-align: center;
+                z-index: 10;
+            }}
+            .particles {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 0;
+            }}
+            .particle {{
+                position: absolute;
+                background: {WICKET_THEME['accent']};
+                border-radius: 50%;
+                opacity: 0.5;
+                animation: float 10s linear infinite;
+            }}
+            @keyframes float {{
+                0% {{ transform: translateY(0); opacity: 0.5; }}
+                100% {{ transform: translateY(-100vh); opacity: 0; }}
+            }}
+            .scanline {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 2px;
+                background: {WICKET_THEME['accent']};
+                opacity: 0.5;
+                animation: scan 5s linear infinite;
+                z-index: 1;
+                pointer-events: none;
+            }}
+            @keyframes scan {{
+                0% {{ top: 0; opacity: 0.5; }}
+                100% {{ top: 100%; opacity: 0; }}
             }}
         </style>
         <div class="debug-text">GuardianEye: Rendering Dashboard</div>
+        <div class="scanline"></div>
+        <script>
+            function createParticles() {{
+                const particleContainer = document.createElement('div');
+                particleContainer.className = 'particles';
+                document.body.appendChild(particleContainer);
+                for (let i = 0; i < 10; i++) {{
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.width = Math.random() * 2 + 2 + 'px';
+                    particle.style.height = particle.style.width;
+                    particle.style.left = Math.random() * 100 + 'vw';
+                    particle.style.animationDuration = (Math.random() * 5 + 5) + 's';
+                    particleContainer.appendChild(particle);
+                }}
+            }}
+            window.onload = createParticles;
+        </script>
     """
     st.markdown(css, unsafe_allow_html=True)
 if 'authenticated' not in st.session_state:
@@ -275,18 +344,16 @@ def display_drone_data():
                 lon=status_df['longitude'],
                 lat=status_df['latitude'],
                 mode='markers',
-                marker=dict(size=8, color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success'], symbol='copter'),
+                marker=dict(size=8, color=WICKET_THEME['error'] if status == 'unidentified' else WICKET_THEME['success']),
                 text=status_df['drone_id'],
-                hovertemplate="%{text}<br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<br>Alt: %{customdata:.0f}m<extra></extra>",
-                customdata=status_df['altitude'],
+                hoverinfo='text',
                 name=status.capitalize()
             ))
         fig.update_layout(
             mapbox=dict(
-                style='streets-v12',
+                style='open-street-map',
                 center=dict(lat=9, lon=8),
-                zoom=5,
-                accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+                zoom=5
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
@@ -295,7 +362,7 @@ def display_drone_data():
         )
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error("Failed to render drone map. Check Mapbox token.")
+        st.error("Failed to render drone map. Check internet connection.")
         logger.error(f"Drone map error: {str(e)}")
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status']])
 def simulate_radar_data(num_targets=10):
@@ -324,18 +391,16 @@ def display_radar_data():
             lon=df['longitude'],
             lat=df['latitude'],
             mode='markers',
-            marker=dict(size=6, color=WICKET_THEME['text_light'], symbol='cross'),
+            marker=dict(size=6, color=WICKET_THEME['text_light']),
             text=df['target_id'],
-            hovertemplate="%{text}<br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<br>Alt: %{customdata[0]:.0f}ft<extra></extra>",
-            customdata=df[['altitude']],
+            hoverinfo='text',
             name='Radar Targets'
         ))
         fig.update_layout(
             mapbox=dict(
-                style='streets-v12',
+                style='open-street-map',
                 center=dict(lat=9, lon=8),
-                zoom=5,
-                accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+                zoom=5
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
@@ -344,7 +409,7 @@ def display_radar_data():
         )
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error("Failed to render radar map. Check Mapbox token.")
+        st.error("Failed to render radar map. Check internet connection.")
         logger.error(f"Radar map error: {str(e)}")
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
 def simulate_atc_data(num_samples=10):
@@ -410,18 +475,16 @@ def display_atc_data():
                     lon=anomaly_df['longitude'],
                     lat=anomaly_df['latitude'],
                     mode='markers',
-                    marker=dict(size=8, color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success'], symbol='airplane'),
+                    marker=dict(size=8, color=WICKET_THEME['error'] if anomaly else WICKET_THEME['success']),
                     text=anomaly_df['icao24'],
-                    hovertemplate="%{text}<br>Lat: %{lat:.2f}<br>Lon: %{lon:.2f}<br>Alt: %{customdata[0]:.0f}ft<extra></extra>",
-                    customdata=anomaly_df[['altitude']],
+                    hoverinfo='text',
                     name='Anomaly' if anomaly else 'Normal'
                 ))
         fig.update_layout(
             mapbox=dict(
-                style='streets-v12',
+                style='open-street-map',
                 center=dict(lat=9, lon=8),
-                zoom=5,
-                accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+                zoom=5
             ),
             showlegend=True,
             paper_bgcolor=WICKET_THEME['card_bg'],
@@ -430,7 +493,7 @@ def display_atc_data():
         )
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error("Failed to render ATC map. Check Mapbox token.")
+        st.error("Failed to render ATC map. Check internet connection.")
         logger.error(f"ATC map error: {str(e)}")
     st.dataframe(df[['timestamp', 'icao24', 'latitude', 'longitude', 'altitude', 'velocity', 'anomaly']])
     if st.session_state.flight_conflicts:
@@ -571,21 +634,20 @@ def display_nigerian_airports():
             lat=df['lat'],
             mode='markers+text',
             marker=dict(
-                size=df['threats'] * 2 + 8,
+                size=12,
                 color=['#00FF99' if v == 'low' else '#FFA500' if v == 'medium' else '#FF4D4D' for v in df['vuln_level']],
                 opacity=0.8
             ),
             text=df['icao'],
             textposition="top center",
-            hovertemplate="<b>%{text}</b><br>%{customdata[0]}<br>Threats: %{customdata[1]}<br>Vuln: %{customdata[2]}<extra></extra>",
-            customdata=df[['name', 'threats', 'vuln_level']].values
+            hoverinfo='text',
+            hovertext=df['name'] + '<br>Threats: ' + df['threats'].astype(str) + '<br>Vuln: ' + df['vuln_level']
         ))
         fig.update_layout(
             mapbox=dict(
-                style='streets-v12',
+                style='open-street-map',
                 center=dict(lat=9, lon=8),
-                zoom=5,
-                accesstoken=st.secrets.get('MAPBOX_TOKEN', 'pk.eyJ1IjoiZ3JvazMiLCJhIjoiY2x6aG5sOHVrMDM3NjJrbzF0M3A0eTRsZyJ9._ZJqGa-3kT-Zv2Cto0L_2Q')
+                zoom=5
             ),
             title="Nigerian Airports Vulnerability Map",
             paper_bgcolor=WICKET_THEME['card_bg'],
@@ -593,8 +655,9 @@ def display_nigerian_airports():
             font={'color': WICKET_THEME['text_light']}
         )
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown('<div class="debug-text">Map Rendered Successfully</div>', unsafe_allow_html=True)
     except Exception as e:
-        st.error("Failed to render airport map. Check Mapbox token.")
+        st.error("Failed to render airport map. Check internet connection.")
         logger.error(f"Airport map error: {str(e)}")
 def generate_report():
     buffer = io.BytesIO()
