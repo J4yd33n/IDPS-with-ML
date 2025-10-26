@@ -14,402 +14,298 @@ import re
 import bcrypt
 import os
 import random
+import json
 
 logging.basicConfig(level=logging.INFO, filename='atc_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
+# --- Suricata Rules (Simulated) ---
+SURICATA_RULES = [
+    {
+        "sid": 1000001,
+        "action": "alert",
+        "protocol": "tcp",
+        "src_ip": "any",
+        "src_port": "any",
+        "dst_ip": "$ATC_SERVERS",
+        "dst_port": "22",
+        "msg": "SSH Brute Force Attempt",
+        "content": "SSH",
+        "threshold": "limit 5, 60"
+    },
+    {
+        "sid": 1000002,
+        "action": "alert",
+        "protocol": "udp",
+        "src_ip": "any",
+        "src_port": "any",
+        "dst_ip": "$RADAR_FEED",
+        "dst_port": "5000",
+        "msg": "Radar Flood Detected",
+        "content": "RDR",
+        "rate": 100
+    },
+    {
+        "sid": 1000003,
+        "action": "drop",
+        "protocol": "tcp",
+        "src_ip": "any",
+        "src_port": "any",
+        "dst_ip": "$ATC_SERVERS",
+        "dst_port": "80",
+        "msg": "Unauthorized HTTP to ATC",
+        "content": "GET /admin"
+    },
+    {
+        "sid": 1000004,
+        "action": "alert",
+        "protocol": "udp",
+        "src_ip": "any",
+        "src_port": "any",
+        "dst_ip": "$ADS_B",
+        "dst_port": "30003",
+        "msg": "ADS-B Spoofing Pattern",
+        "content": "MSG,3",
+        "pcre": "/callsign.*GHOST/"
+    }
+]
+
+# --- Simulated ATC IPs ---
+ATC_CONFIG = {
+    "$ATC_SERVERS": ["10.10.10.1", "10.10.10.2"],
+    "$RADAR_FEED": ["172.16.1.100"],
+    "$ADS_B": ["192.168.1.50"]
+}
+
 def init_db():
     db_path = 'atc_users.db'
     if os.path.exists(db_path):
         os.remove(db_path)
-        logger.info("Old atc_users.db deleted")
+        logger.info("Old DB deleted")
     try:
         with sqlite3.connect(db_path) as conn:
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS users
                         (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT)''')
-            admin_password = 'admin'
-            hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             c.execute('INSERT OR IGNORE INTO users (username, email, password) VALUES (?, ?, ?)',
-                      ('guardian', 'admin@atcguard.com', hashed_pw))
+                      ('guardian', 'admin@atcguard.com', bcrypt.hashpw('admin'.encode(), bcrypt.gensalt()).decode()))
             conn.commit()
-            logger.info("DB initialized with admin 'guardian'")
-    except sqlite3.Error as e:
-        logger.error(f"DB init failed: {str(e)}")
-        st.error("DB error. Restart app.")
+    except Exception as e:
+        st.error("DB init failed")
 
 def is_valid_email(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email)
+    return re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email)
 
 def is_valid_password(password):
     return len(password) >= 8 and any(c.isupper() for c in password) and any(c.isdigit() for c in password)
 
 WICKET_THEME = {
     "primary_bg": "#0A0F2D",
-    "secondary_bg": "#1E2A44",
-    "accent": "#00D4FF",
-    "accent_alt": "#FF00FF",
-    "text": "#E6E6FA",
-    "text_light": "#FFFFFF",
     "card_bg": "rgba(30, 42, 68, 0.5)",
-    "border": "#3B82F6",
-    "button_bg": "#00D4FF",
-    "button_text": "#0A0F2D",
-    "hover": "#FF00FF",
+    "accent": "#00D4FF",
     "error": "#FF4D4D",
-    "success": "#00FF99"
+    "success": "#00FF99",
+    "text_light": "#FFFFFF"
 }
 
-def apply_wicket_css():
-    css = f"""
+def apply_css():
+    st.markdown(f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
-            .stApp {{
-                background: url('https://github.com/J4yd33n/IDPS-with-ML/blob/main/airplane.jpg?raw=true');
-                background-size: cover;
-                background-position: center;
-                background-color: {WICKET_THEME['primary_bg']};
-                color: {WICKET_THEME['text']};
-                font-family: 'Roboto Mono', monospace;
-            }}
-            .stApp::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: {WICKET_THEME['card_bg']};
-                z-index: -1;
-            }}
-            .card {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 16px;
-                padding: 20px;
-                margin-bottom: 20px;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-            }}
-            .stButton>button {{
-                background: linear-gradient(45deg, {WICKET_THEME['button_bg']}, {WICKET_THEME['accent_alt']});
-                color: {WICKET_THEME['button_text']};
-                border-radius: 25px;
-                padding: 12px 30px;
-                border: none;
-                font-family: 'Orbitron', sans-serif;
-                font-weight: 700;
-            }}
-            .stButton>button:hover {{
-                transform: scale(1.05);
-                box-shadow: 0 0 30px {WICKET_THEME['hover']};
-            }}
-            h1, h2, h3 {{
-                font-family: 'Orbitron', sans-serif;
-                color: {WICKET_THEME['text_light']};
-                text-shadow: 0 0 8px {WICKET_THEME['accent']};
-            }}
-            .auth-container {{
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                padding: 20px;
-            }}
-            .form-container {{
-                background: {WICKET_THEME['card_bg']};
-                backdrop-filter: blur(15px);
-                border-radius: 10px;
-                padding: 30px;
-                width: 100%;
-                max-width: 400px;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-            }}
-            .logo {{
-                display: block;
-                margin: 0 auto 20px;
-                width: 200px;
-            }}
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono&display=swap');
+            .stApp {{background: url('https://github.com/J4yd33n/IDPS-with-ML/blob/main/airplane.jpg?raw=true') cover center #0A0F2D; color: #E6E6FA; font-family: 'Roboto Mono';}}
+            .stApp::before {{content:''; position:absolute; top:0; left:0; width:100%; height:100%; background:{WICKET_THEME['card_bg']}; z-index:-1;}}
+            .card {{background:{WICKET_THEME['card_bg']}; border-radius:16px; padding:20px; margin:10px 0; box-shadow:0 0 20px rgba(0,212,255,0.2);}}
+            .stButton>button {{background:linear-gradient(45deg,#00D4FF,#FF00FF); color:#0A0F2D; border-radius:25px; padding:12px 30px; font-family:'Orbitron';}}
+            h1,h2,h3 {{font-family:'Orbitron'; color:#FFF; text-shadow:0 0 8px #00D4FF;}}
+            .logo {{width:200px; margin:0 auto 20px; display:block;}}
         </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'alert_log' not in st.session_state:
-    st.session_state.alert_log = []
-if 'network_traffic' not in st.session_state:
-    st.session_state.network_traffic = []
-if 'adsb_data' not in st.session_state:
-    st.session_state.adsb_data = []
-if 'radar_data' not in st.session_state:
-    st.session_state.radar_data = []
-if 'acars_data' not in st.session_state:
-    st.session_state.acars_data = []
-if 'blocked_ips' not in st.session_state:
-    st.session_state.blocked_ips = set()
-if 'quarantine_mode' not in st.session_state:
-    st.session_state.quarantine_mode = False
-if 'panel_state' not in st.session_state:
-    st.session_state.panel_state = 'sign_in'
+# --- Session State ---
+for key in ['authenticated', 'alert_log', 'network_traffic', 'adsb_data', 'radar_data', 'acars_data', 'blocked_ips', 'quarantine_mode', 'panel_state']:
+    if key not in st.session_state:
+        st.session_state[key] = False if key in ['authenticated', 'quarantine_mode'] else [] if 'data' in key or 'log' in key else set() if 'blocked' in key else 'sign_in'
 
 init_db()
 
-def render_auth_ui():
-    st.markdown(
-        '<div class="auth-container">'
-        f'<img src="https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true" class="logo">'
-        f'<div class="form-container">',
-        unsafe_allow_html=True
-    )
+def render_auth():
+    st.markdown('<div style="text-align:center;"><img src="https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true" class="logo"></div>', unsafe_allow_html=True)
     if st.session_state.panel_state == 'sign_in':
-        with st.form(key='sign_in_form'):
-            st.markdown('<h2 style="text-align: center;">Sign In</h2>', unsafe_allow_html=True)
-            username = st.text_input('Username')
-            password = st.text_input('Password', type='password')
-            submit = st.form_submit_button('Sign In')
-            if submit:
-                try:
-                    with sqlite3.connect('atc_users.db') as conn:
-                        c = conn.cursor()
-                        c.execute('SELECT password FROM users WHERE username = ?', (username,))
-                        result = c.fetchone()
-                        if result and bcrypt.checkpw(password.encode('utf-8'), result[0].encode('utf-8')):
-                            st.session_state.authenticated = True
-                            st.session_state.current_user = username
-                            st.rerun()
-                        else:
-                            st.error('Invalid credentials')
-                except sqlite3.Error as e:
-                    st.error('DB error')
-        st.button('Sign Up', on_click=lambda: st.session_state.update(panel_state='sign_up'))
+        with st.form("login"):
+            st.markdown("<h2 style='text-align:center;'>Sign In</h2>", unsafe_allow_html=True)
+            u = st.text_input("Username")
+            p = st.text_input("Password", type="password")
+            if st.form_submit_button("Sign In"):
+                with sqlite3.connect('atc_users.db') as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT password FROM users WHERE username=?", (u,))
+                    row = cur.fetchone()
+                    if row and bcrypt.checkpw(p.encode(), row[0].encode()):
+                        st.session_state.authenticated = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid login")
+        st.button("Sign Up", on_click=lambda: st.session_state.update(panel_state='sign_up'))
     else:
-        with st.form(key='sign_up_form'):
-            st.markdown('<h2 style="text-align: center;">Sign Up</h2>', unsafe_allow_html=True)
-            username = st.text_input('Username', key='su_user')
-            email = st.text_input('Email')
-            password = st.text_input('Password', type='password', key='su_pass')
-            submit = st.form_submit_button('Sign Up')
-            if submit:
-                if not username or not email or not password:
-                    st.error('Fill all fields')
-                elif username == 'guardian':
-                    st.error('Reserved username')
-                elif not is_valid_email(email):
-                    st.error('Invalid email')
-                elif not is_valid_password(password):
-                    st.error('Password: 8+ chars, uppercase, number')
+        with st.form("signup"):
+            st.markdown("<h2 style='text-align:center;'>Sign Up</h2>", unsafe_allow_html=True)
+            u = st.text_input("Username", key="su_u")
+            e = st.text_input("Email")
+            p = st.text_input("Password", type="password", key="su_p")
+            if st.form_submit_button("Create"):
+                if u == 'guardian': st.error("Reserved")
+                elif not is_valid_email(e): st.error("Bad email")
+                elif not is_valid_password(p): st.error("Weak password")
                 else:
                     try:
-                        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                         with sqlite3.connect('atc_users.db') as conn:
-                            c = conn.cursor()
-                            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                                      (username, email, hashed))
-                            conn.commit()
-                            st.success('Account created')
-                            st.session_state.panel_state = 'sign_in'
-                            st.rerun()
-                    except sqlite3.IntegrityError:
-                        st.error('Username/email exists')
-        st.button('Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
-    st.markdown('</div></div>', unsafe_allow_html=True)
+                            conn.execute("INSERT INTO users VALUES (?,?,?)", (u, e, bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()))
+                        st.success("Created")
+                        st.session_state.panel_state = 'sign_in'
+                        st.rerun()
+                    except: st.error("Exists")
+        st.button("Sign In", on_click=lambda: st.session_state.update(panel_state='sign_in'))
 
-def simulate_network_traffic(num_packets=200):
+# --- Simulated Traffic ---
+def gen_traffic(n=200):
     traffic = []
-    known_malicious = ['192.168.99.100', '10.0.0.666']
-    for i in range(num_packets):
-        src_ip = f"192.168.{random.randint(0,255)}.{random.randint(1,254)}"
-        dst_ip = '10.10.10.1' if random.random() > 0.7 else f"172.16.{random.randint(0,255)}.{random.randint(1,254)}"
-        protocol = random.choice(['TCP', 'UDP', 'ICMP', 'ADS-B', 'ACARS'])
-        packet_size = random.randint(64, 1500)
-        is_mal = src_ip in known_malicious or (protocol in ['ADS-B', 'ACARS'] and random.random() < 0.2)
+    for _ in range(n):
+        src = f"192.168.{random.randint(0,255)}.{random.randint(1,254)}"
+        dst = random.choice(ATC_CONFIG["$ATC_SERVERS"] + ATC_CONFIG["$RADAR_FEED"] + ATC_CONFIG["$ADS_B"])
+        proto = random.choice(["tcp", "udp", "ADS-B", "ACARS"])
+        port = random.choice([22, 80, 5000, 30003])
+        size = random.randint(64, 1500)
+        content = random.choice(["SSH", "GET /admin", "RDR", "MSG,3,callsign,GHOST123", "CLR NIG123"])
         traffic.append({
-            'timestamp': datetime.now() - timedelta(seconds=random.randint(0, 300)),
-            'src_ip': src_ip,
-            'dst_ip': dst_ip,
-            'protocol': protocol,
-            'size': packet_size,
-            'anomaly_score': random.uniform(0.8, 1.0) if is_mal else random.uniform(0, 0.4),
-            'blocked': src_ip in st.session_state.blocked_ips
+            'ts': datetime.now() - timedelta(seconds=random.randint(0,300)),
+            'src_ip': src,
+            'dst_ip': dst,
+            'proto': proto,
+            'port': port,
+            'size': size,
+            'content': content
         })
     return traffic
 
-def detect_signatures(traffic):
+# --- Suricata Engine (Simulated) ---
+def run_suricata(traffic):
     alerts = []
-    dos_threshold = 50
-    ip_counts = pd.DataFrame(traffic)['src_ip'].value_counts()
-    for ip, count in ip_counts.items():
-        if count > dos_threshold and ip not in st.session_state.blocked_ips:
-            alerts.append({
-                'timestamp': datetime.now(),
-                'type': 'DoS Attempt',
-                'severity': 'high',
-                'details': f"IP {ip} sent {count} packets"
-            })
-            st.session_state.blocked_ips.add(ip)
-    spoofed = [p for p in traffic if p['protocol'] == 'ADS-B' and abs(p['size'] - 120) > 50]
-    if spoofed:
-        alerts.append({
-            'timestamp': datetime.now(),
-            'type': 'ADS-B Spoofing',
-            'severity': 'critical',
-            'details': f"{len(spoofed)} spoofed ADS-B packets"
-        })
+    ip_count = {}
+    for pkt in traffic:
+        ip_count[pkt['src_ip']] = ip_count.get(pkt['src_ip'], 0) + 1
+        for rule in SURICATA_RULES:
+            if pkt['proto'].lower() != rule['protocol']: continue
+            if pkt['dst_ip'] not in [i for v in ATC_CONFIG.values() for i in v]: continue
+            if rule['dst_port'] != 'any' and pkt['port'] != rule['dst_port']: continue
+            if 'content' in rule and rule['content'] not in pkt['content']: continue
+            if 'pcre' in rule and not re.search(rule['pcre'], pkt['content']): continue
+            if rule['sid'] == 1000001 and ip_count[pkt['src_ip']] > 5:
+                alerts.append({"ts": pkt['ts'], "type": rule['msg'], "sev": "high", "sid": rule['sid']})
+            elif rule['sid'] == 1000002 and ip_count[pkt['src_ip']] > 100:
+                alerts.append({"ts": pkt['ts'], "type": rule['msg'], "sev": "high", "sid": rule['sid']})
+            else:
+                alerts.append({"ts": pkt['ts'], "type": rule['msg'], "sev": "critical" if 'drop' in rule['action'] else "high", "sid": rule['sid']})
+            if 'drop' in rule['action']:
+                st.session_state.blocked_ips.add(pkt['src_ip'])
     return alerts
 
-def detect_anomalies(traffic_df):
-    features = ['size', 'anomaly_score']
-    X = traffic_df[features]
-    model = IsolationForest(contamination=0.1, random_state=42)
+# --- ML Anomaly ---
+def ml_anomaly(df):
+    X = df[['size']].values
+    model = IsolationForest(contamination=0.1)
     preds = model.fit_predict(X)
-    anomalies = traffic_df[preds == -1]
-    alerts = []
-    if not anomalies.empty:
-        alerts.append({
-            'timestamp': datetime.now(),
-            'type': 'ML Anomaly',
-            'severity': 'medium',
-            'details': f"{len(anomalies)} anomalous packets"
-        })
-    return alerts, anomalies
+    return len(df[preds == -1])
 
-def simulate_adsb_data(num=30):
-    data = []
-    for i in range(num):
-        lat = np.random.uniform(4, 14)
-        lon = np.random.uniform(2, 15)
-        alt = np.random.uniform(10000, 40000)
-        icao = f"{random.randint(0xA00000, 0xAFFFFF):06X}"
-        is_spoof = random.random() < 0.15
-        data.append({
-            'timestamp': datetime.now(),
-            'icao24': icao,
-            'callsign': f"FLY{random.randint(100,999)}" if not is_spoof else "GHOST123",
-            'latitude': lat + random.uniform(-0.5, 0.5) if is_spoof else lat,
-            'longitude': lon + random.uniform(-0.5, 0.5) if is_spoof else lon,
-            'altitude': alt + 10000 if is_spoof else alt,
-            'velocity': np.random.uniform(300, 600),
-            'spoofed': is_spoof
-        })
-    return data
+# --- Data Generators ---
+def gen_adsb(n=30):
+    return [{
+        'ts': datetime.now(),
+        'icao': f"{random.randint(0xA00000, 0xAFFFFF):06X}",
+        'callsign': "GHOST123" if random.random() < 0.15 else f"FLY{random.randint(100,999)}",
+        'lat': np.random.uniform(4,14),
+        'lon': np.random.uniform(2,15),
+        'alt': np.random.uniform(10000,40000)
+    } for _ in range(n)]
 
-def simulate_radar_data(num=20):
-    data = []
-    for i in range(num):
-        data.append({
-            'timestamp': datetime.now(),
-            'target_id': f"RAD{i:03d}",
-            'latitude': np.random.uniform(4, 14),
-            'longitude': np.random.uniform(2, 15),
-            'altitude': np.random.uniform(10000, 40000),
-            'velocity': np.random.uniform(300, 600),
-            'signal_strength': random.uniform(50, 100) if random.random() > 0.1 else random.uniform(0, 20)
-        })
-    return data
+def gen_radar(n=20):
+    return [{'ts': datetime.now(), 'id': f"RAD{i:03d}", 'lat': np.random.uniform(4,14), 'lon': np.random.uniform(2,15), 'alt': np.random.uniform(10000,40000)} for i in range(n)]
 
-def simulate_acars_data(num=15):
-    messages = ["CLR NIG123", "POS RPT", "FUEL 45T", "ETA 1430"]
-    data = []
-    for i in range(num):
-        data.append({
-            'timestamp': datetime.now(),
-            'aircraft_reg': f"N{random.randint(100,999)}NG",
-            'message': random.choice(messages) if random.random() > 0.2 else "HACKEDCMD",
-            'freq': '131.550'
-        })
-    return data
+def gen_acars(n=15):
+    return [{'ts': datetime.now(), 'reg': f"N{random.randint(100,999)}NG", 'msg': random.choice(["CLR NIG123", "POS RPT", "HACKEDCMD"])} for _ in range(n)]
 
-def display_dashboard():
-    st.markdown('<div class="card"><h1>ATC IDPS Dashboard</h1></div>', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Packets", len(st.session_state.network_traffic))
-    with col2:
-        st.metric("Alerts", len(st.session_state.alert_log))
-    with col3:
-        st.metric("Blocked IPs", len(st.session_state.blocked_ips))
-    with col4:
-        st.metric("Quarantine", "ON" if st.session_state.quarantine_mode else "OFF")
+# --- Dashboard ---
+def dashboard():
+    st.markdown('<div class="card"><h1>ATC IDPS</h1></div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Packets", len(st.session_state.network_traffic))
+    c2.metric("Alerts", len(st.session_state.alert_log))
+    c3.metric("Blocked", len(st.session_state.blocked_ips))
     if st.button("Simulate Traffic"):
-        st.session_state.network_traffic = simulate_network_traffic()
-        traffic_df = pd.DataFrame(st.session_state.network_traffic)
-        sig_alerts = detect_signatures(st.session_state.network_traffic)
-        ml_alerts, _ = detect_anomalies(traffic_df)
-        st.session_state.alert_log.extend(sig_alerts + ml_alerts)
-        st.session_state.adsb_data = simulate_adsb_data()
-        st.session_state.radar_data = simulate_radar_data()
-        st.session_state.acars_data = simulate_acars_data()
-        st.success("Simulation complete")
+        st.session_state.network_traffic = gen_traffic()
+        df = pd.DataFrame(st.session_state.network_traffic)
+        suri_alerts = run_suricata(st.session_state.network_traffic)
+        ml_count = ml_anomaly(df)
+        if ml_count: suri_alerts.append({"ts": datetime.now(), "type": "ML Anomaly", "sev": "medium", "sid": 0})
+        st.session_state.alert_log.extend(suri_alerts)
+        st.session_state.adsb_data = gen_adsb()
+        st.session_state.radar_data = gen_radar()
+        st.session_state.acars_data = gen_acars()
+        st.success("Done")
     if st.session_state.alert_log:
-        st.subheader("Recent Alerts")
-        alert_df = pd.DataFrame(st.session_state.alert_log[-10:])
-        st.dataframe(alert_df[['timestamp', 'type', 'severity', 'details']])
+        st.subheader("Alerts")
+        st.dataframe(pd.DataFrame(st.session_state.alert_log[-10:])[["ts","type","sev"]])
 
-def display_network_map():
-    if not st.session_state.network_traffic:
-        st.warning("Simulate traffic first")
+def network_map():
+    if not st.session_state.network_traffic: 
+        st.warning("Simulate first")
         return
     df = pd.DataFrame(st.session_state.network_traffic)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df['timestamp'], y=df['size'],
-        mode='markers', marker=dict(color=df['anomaly_score'], colorscale='Reds', size=8),
-        text=df['src_ip'] + ' → ' + df['dst_ip']
-    ))
-    fig.update_layout(title="Network Activity", xaxis_title="Time", yaxis_title="Packet Size")
-    st.plotly_chart(fig, use_container_width=True)
+    fig = go.Figure(go.Scatter(x=df['ts'], y=df['size'], mode='markers', marker=dict(color='red' if df['src_ip'].iloc[0] in st.session_state.blocked_ips else 'cyan')))
+    fig.update_layout(title="Traffic", paper_bgcolor=WICKET_THEME['card_bg'])
+    st.plotly_chart(fig)
 
-def display_adsb_map():
-    if not st.session_state.adsb_data:
-        st.warning("Simulate first")
+def adsb_map():
+    if not st.session_state.adsb_data: 
+        st.warning("Simulate")
         return
     df = pd.DataFrame(st.session_state.adsb_data)
     fig = go.Figure()
-    for spoof in [False, True]:
-        sub = df[df['spoofed'] == spoof]
-        fig.add_trace(go.Scattermapbox(
-            lat=sub['latitude'], lon=sub['longitude'],
-            mode='markers', marker=dict(size=10, color=WICKET_THEME['error'] if spoof else WICKET_THEME['success']),
-            name='Spoofed' if spoof else 'Legit'
-        ))
-    fig.update_layout(mapbox=dict(style='open-street-map', center=dict(lat=9, lon=7), zoom=6))
-    st.plotly_chart(fig, use_container_width=True)
+    for spoof in df['callsign'].str.contains("GHOST"):
+        sub = df[spoof] if spoof else df[~df['callsign'].str.contains("GHOST")]
+        fig.add_trace(go.Scattermapbox(lat=sub['lat'], lon=sub['lon'], marker=dict(color=WICKET_THEME['error'] if spoof else WICKET_THEME['success'])))
+    fig.update_layout(mapbox=dict(style='open-street-map', center=dict(lat=9,lon=7), zoom=6))
+    st.plotly_chart(fig)
 
-def display_response():
-    st.markdown('<div class="card"><h2>Response Controls</h2></div>', unsafe_allow_html=True)
-    if st.button("Toggle Quarantine"):
+def response():
+    st.markdown('<div class="card"><h2>Response</h2></div>', unsafe_allow_html=True)
+    if st.button("Quarantine Toggle"):
         st.session_state.quarantine_mode = not st.session_state.quarantine_mode
         st.rerun()
-    blocked = st.multiselect("Blocked IPs", list(st.session_state.blocked_ips))
-    if st.button("Unblock Selected"):
-        for ip in blocked:
-            st.session_state.blocked_ips.discard(ip)
+    ips = st.multiselect("Blocked IPs", list(st.session_state.blocked_ips))
+    if st.button("Unblock"):
+        for ip in ips: st.session_state.blocked_ips.discard(ip)
         st.rerun()
 
+def rules_page():
+    st.markdown('<div class="card"><h2>Suricata Rules</h2></div>', unsafe_allow_html=True)
+    for r in SURICATA_RULES:
+        st.code(f"{r['action']} {r['protocol']} {r['src_ip']} {r['src_port']} -> {r['dst_ip']} {r['dst_port']} (msg:\"{r['msg']}\"; sid:{r['sid']};)", language="text")
+
 def main():
-    apply_wicket_css()
+    apply_css()
     if not st.session_state.authenticated:
-        render_auth_ui()
+        render_auth()
         return
     st.sidebar.image("https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true", use_column_width=True)
-    page = st.sidebar.selectbox("Module", ["Dashboard", "Network Map", "ADS-B Monitor", "Radar Feed", "ACARS Logs", "Response"])
-    if page == "Dashboard":
-        display_dashboard()
-    elif page == "Network Map":
-        display_network_map()
-    elif page == "ADS-B Monitor":
-        display_adsb_map()
-    elif page == "Radar Feed":
-        if st.session_state.radar_data:
-            st.dataframe(pd.DataFrame(st.session_state.radar_data))
-    elif page == "ACARS Logs":
-        if st.session_state.acars_data:
-            st.dataframe(pd.DataFrame(st.session_state.acars_data))
-    elif page == "Response":
-        display_response()
+    page = st.sidebar.selectbox("Menu", ["Dashboard", "Network", "ADS-B", "Radar", "ACARS", "Response", "Suricata Rules"])
+    if page == "Dashboard": dashboard()
+    elif page == "Network": network_map()
+    elif page == "ADS-B": adsb_map()
+    elif page == "Radar": st.dataframe(pd.DataFrame(st.session_state.radar_data)) if st.session_state.radar_data else st.warning("Simulate")
+    elif page == "ACARS": st.dataframe(pd.DataFrame(st.session_state.acars_data)) if st.session_state.acars_data else st.warning("Simulate")
+    elif page == "Response": response()
+    elif page == "Suricata Rules": rules_page()
 
 if __name__ == "__main__":
     main()
