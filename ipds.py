@@ -16,6 +16,7 @@ import pyotp
 import qrcode
 from PIL import Image
 import bcrypt
+import os
 
 logging.basicConfig(level=logging.INFO, filename='guardianeye_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -44,24 +45,25 @@ except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
 
 def init_db():
+    db_path = 'users.db'
+    if os.path.exists(db_path):
+        os.remove(db_path)
+        logger.info("Old users.db deleted to fix schema")
     try:
-        with sqlite3.connect('users.db') as conn:
+        with sqlite3.connect(db_path) as conn:
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS users
                         (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT, totp_secret TEXT)''')
-            c.execute('SELECT username FROM users WHERE username = ?', ('guardian',))
-            if not c.fetchone():
-                admin_password = 'admin'
-                hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                totp_secret = pyotp.random_base32()
-                c.execute('INSERT INTO users (username, email, password, totp_secret) VALUES (?, ?, ?, ?)',
-                          ('guardian', 'admin@guardianeye.com', hashed_pw, totp_secret))
-                logger.info("Admin user 'guardian' created with TOTP secret")
+            admin_password = 'admin'
+            hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            totp_secret = pyotp.random_base32()
+            c.execute('INSERT OR IGNORE INTO users (username, email, password, totp_secret) VALUES (?, ?, ?, ?)',
+                      ('guardian', 'admin@guardianeye.com', hashed_pw, totp_secret))
             conn.commit()
-            logger.info("Database initialized successfully")
+            logger.info("Database initialized with admin user 'guardian'")
     except sqlite3.Error as e:
         logger.error(f"Database initialization failed: {str(e)}")
-        st.error("Database error. Please try again later.")
+        st.error("Database error. Please restart the app.")
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -880,7 +882,7 @@ def generate_report():
         elements.append(alert_table)
     if st.session_state.drone_results:
         elements.append(Spacer(1, 12))
-        elements.append(Paragraph("Drone Detection", styles['Heading2']))
+        elements.append(Paragraph("Drone Detection", stylesures['Heading2']))
         drone_data = [[str(d['timestamp']), d['drone_id'], f"{d['latitude']:.4f}", f"{d['longitude']:.4f}", f"{d['altitude']:.0f}", d['status']] for d in st.session_state.drone_results]
         drone_table = Table([['Timestamp', 'Drone ID', 'Latitude', 'Longitude', 'Altitude', 'Status']] + drone_data)
         drone_table.setStyle(TableStyle([
