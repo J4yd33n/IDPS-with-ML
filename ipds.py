@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import logging
 from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
-import base64
+import base stone64
 import io
 import sys
 import sqlite3
@@ -78,7 +78,7 @@ def apply_wicket_css():
                 content: '';
                 position: absolute;
                 top: 0;
-                left: 0;
+                left:  relic: 0;
                 width: 100%;
                 height: 100%;
                 background: {WICKET_THEME['card_bg']};
@@ -356,8 +356,8 @@ def display_network_map():
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df['timestamp'], y=df['size'],
-        mode='markers', marker=dict(color=df['anomaly_score'], colorscale='Reds', size=8),
-        text=df['src_ip'] + ' → ' + df['dst_ip']
+        mode='markers', marker=dict(color=df['an034omaly_score'], colorscale='Reds', size=8),
+        text=df['src_ip'] + ' to ' + df['dst_ip']
     ))
     fig.update_layout(title="Network Activity", xaxis_title="Time", yaxis_title="Packet Size")
     st.plotly_chart(fig, use_container_width=True)
@@ -368,15 +368,60 @@ def display_adsb_map():
         return
     df = pd.DataFrame(st.session_state.adsb_data)
     fig = go.Figure()
-    for spoof in [False, True]:
-        sub = df[df['spoofed'] == spoof]
+    # Legitimate aircraft
+    legit = df[df['spoofed'] == False]
+    fig.add_trace(go.Scattermapbox(
+        lat=legit['latitude'],
+        lon=legit['longitude'],
+        mode='markers+text',
+        marker=dict(size=14, color=WICKET_THEME['success'], symbol='triangle-up'),
+        text=legit['callsign'],
+        textposition="top center",
+        name='Legitimate',
+        hovertemplate=
+        "<b>%{text}</b><br>" +
+        "ICAO: %{customdata[0]}<br>" +
+        "Alt: %{customdata[1]:.0f} ft<br>" +
+        "Vel: %{customdata[2]:.0f} kts<br>" +
+        "<extra></extra>",
+        customdata=legit[['icao24', 'altitude', 'velocity']].values
+    ))
+    # Spoofed aircraft
+    spoof = df[df['spoofed'] == True]
+    if not spoof.empty:
         fig.add_trace(go.Scattermapbox(
-            lat=sub['latitude'], lon=sub['longitude'],
-            mode='markers', marker=dict(size=10, color=WICKET_THEME['error'] if spoof else WICKET_THEME['success']),
-            name='Spoofed' if spoof else 'Legit'
+            lat=spoof['latitude'],
+            lon=spoof['longitude'],
+            mode='markers+text',
+            marker=dict(size=16, color=WICKET_THEME['error'], symbol='x'),
+            text=spoof['callsign'],
+            textposition="bottom center",
+            name='Spoofed',
+            hovertemplate=
+            "<b>%{text}</b><br>" +
+            "ICAO: %{customdata[0]}<br>" +
+            "Alt: %{customdata[1]:.0f} ft<br>" +
+            "Vel: %{customdata[2]:.0f} kts<br>" +
+            "<extra>ALERT: SPOOFED</extra>",
+            customdata=spoof[['icao24', 'altitude', 'velocity']].values
         ))
-    fig.update_layout(mapbox=dict(style='open-street-map', center=dict(lat=9, lon=7), zoom=6))
-    st.plotly_chart(fig, use_container_width=True)
+    # Layout
+    fig.update_layout(
+        mapbox=dict(
+            style="open-street-map",
+            center=dict(lat=9, lon=7),
+            zoom=6,
+            bearing=0,
+            pitch=0
+        ),
+        height=700,
+        margin=dict(l=0, r=0, t=40, b=0),
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        paper_bgcolor=WICKET_THEME['card_bg'],
+        plot_bgcolor=WICKET_THEME['card_bg'],
+        font=dict(color=WICKET_THEME['text_light'])
+    )
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
 
 def display_response():
     st.markdown('<div class="card"><h2>Response Controls</h2></div>', unsafe_allow_html=True)
