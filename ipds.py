@@ -186,7 +186,7 @@ def apply_wicket_css():
             .logo {{
                 display: block;
                 margin: 0 auto 20px;
-                width: 150px;
+                width: 200px;
             }}
             .forgot-password {{
                 color: {WICKET_THEME['accent']};
@@ -275,7 +275,7 @@ def render_auth_ui():
         st.warning("Secure password hashing unavailable. Using insecure mode for testing.")
     st.markdown(
         '<div class="auth-container">'
-        f'<img src="https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg" class="logo">'
+        f'<img src="https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true" class="logo">'
         f'<div class="form-container {"sign-up-active" if st.session_state.panel_state == "sign_up" else ""}">',
         unsafe_allow_html=True
     )
@@ -859,7 +859,7 @@ def main():
     if not st.session_state.authenticated:
         render_auth_ui()
         return
-    st.sidebar.image("https://images.stockcake.com/public/a/d/0/ad04b73f-08d2-4c89-bdcd-3cc8db5ed03f_large/cybernetic-eye-glows-stockcake.jpg")
+    st.sidebar.image("https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true", use_column_width=True)
     page = st.sidebar.selectbox("Select Feature", [
         "Dashboard",
         "Network Scan",
