@@ -82,7 +82,7 @@ def apply_wicket_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
             .stApp {{
-                background: url('https://images.stockcake.com/public/8/9/0/8905a3a0-7f0b-4d29-8968-b874f7f6c2d8_large/cyber-grid-sphere-stockcake.jpg');
+                background: url('https://github.com/J4yd33n/IDPS-with-ML/blob/main/airplane.jpg?raw=true');
                 background-size: cover;
                 background-position: center;
                 background-color: {WICKET_THEME['primary_bg']};
@@ -896,7 +896,7 @@ def main():
             st.session_state.scan_results = simulate_nmap_scan()
         display_network_scan()
     elif page == "Drone Detection":
-        st.markdown('<div class="card"><h2>Drone Detection Simulation</h2></div>', untouched=True)
+        st.markdown('<div class="card"><h2>Drone Detection Simulation</h2></div>', unsafe_allow_html=True)
         if st.button("Simulate Drones"):
             st.session_state.drone_results = simulate_drone_data()
         display_drone_data()
