@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import logging
 from geopy.distance import geodesic
 from sklearn.ensemble import IsolationForest
-import base stone64
+import base64
 import io
 import sys
 import sqlite3
@@ -78,7 +78,7 @@ def apply_wicket_css():
                 content: '';
                 position: absolute;
                 top: 0;
-                left:  relic: 0;
+                left: 0;
                 width: 100%;
                 height: 100%;
                 background: {WICKET_THEME['card_bg']};
@@ -356,7 +356,7 @@ def display_network_map():
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df['timestamp'], y=df['size'],
-        mode='markers', marker=dict(color=df['an034omaly_score'], colorscale='Reds', size=8),
+        mode='markers', marker=dict(color=df['anomaly_score'], colorscale='Reds', size=8),
         text=df['src_ip'] + ' to ' + df['dst_ip']
     ))
     fig.update_layout(title="Network Activity", xaxis_title="Time", yaxis_title="Packet Size")
