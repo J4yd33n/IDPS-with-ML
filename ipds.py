@@ -16,10 +16,12 @@ import pyotp
 import qrcode
 from PIL import Image
 import bcrypt
+
 logging.basicConfig(level=logging.INFO, filename='guardianeye_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.info(f"Python version: {sys.version}")
+
 try:
     import streamlit
     import pandas
@@ -28,15 +30,19 @@ try:
     import geopy
     import sklearn
     import reportlab
-    import pyotp
-    import qrcode
-    import bcrypt
-    logger.info(f"Streamlit: {streamlit.__version__}, Pandas: {pandas.__version__}, "
-                f"Numpy: {numpy.__version__}, Plotly: {plotly.__version__}, "
-                f"Geopy: {geopy.__version__}, Scikit-learn: {sklearn.__version__}, "
-                f"Reportlab: {reportlab.__version__}, PyOTP: {pyotp.__version__}, Bcrypt: {bcrypt.__version__}")
+    logger.info(
+        f"Streamlit: {streamlit.__version__}, "
+        f"Pandas: {pandas.__version__}, "
+        f"Numpy: {numpy.__version__}, "
+        f"Plotly: {plotly.__version__}, "
+        f"Geopy: {geopy.__version__}, "
+        f"Scikit-learn: {sklearn.__version__}, "
+        f"Reportlab: {reportlab.__version__}, "
+        f"PyOTP: installed, Bcrypt: installed"
+    )
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
+
 def init_db():
     try:
         with sqlite3.connect('users.db') as conn:
@@ -56,11 +62,14 @@ def init_db():
     except sqlite3.Error as e:
         logger.error(f"Database initialization failed: {str(e)}")
         st.error("Database error. Please try again later.")
+
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
+
 def is_valid_password(password):
     return len(password) >= 8 and any(c.isupper() for c in password) and any(c.isdigit() for c in password)
+
 WICKET_THEME = {
     "primary_bg": "#0A0F2D",
     "secondary_bg": "#1E2A44",
@@ -76,6 +85,7 @@ WICKET_THEME = {
     "error": "#FF4D4D",
     "success": "#00FF99"
 }
+
 def apply_wicket_css():
     css = f"""
         <style>
@@ -179,7 +189,7 @@ def apply_wicket_css():
                 font-family: 'Roboto Mono', monospace;
             }}
             .stTextInput input:focus {{
-                border-color: {WICKETGesture['accent']};
+                border-color: {WICKET_THEME['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
             .logo {{
@@ -251,6 +261,7 @@ def apply_wicket_css():
         </script>
     """
     st.markdown(css, unsafe_allow_html=True)
+
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'alert_log' not in st.session_state:
@@ -277,13 +288,16 @@ if 'setup_2fa' not in st.session_state:
     st.session_state.setup_2fa = False
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
+
 init_db()
+
 def generate_qr_code(secret, username, email):
     totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="GuardianEye")
     qr = qrcode.make(totp_uri)
     buffered = io.BytesIO()
     qr.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
+
 def render_auth_ui():
     st.markdown(
         '<div class="auth-container">'
@@ -387,6 +401,7 @@ def render_auth_ui():
                         logger.error(f"Sign-up database error: {str(e)}")
         st.button('Switch to Sign In', on_click=lambda: st.session_state.update(panel_state='sign_in'))
     st.markdown('</div></div>', unsafe_allow_html=True)
+
 def simulate_drone_data(num_drones=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     drones = []
@@ -411,6 +426,7 @@ def simulate_drone_data(num_drones=30):
         })
     logger.info(f"Simulated {len(drones)} drones, {sum(d['status'] == 'unidentified' for d in drones)} unauthorized")
     return drones
+
 def display_drone_data():
     if not st.session_state.drone_results:
         st.warning("No drone data available. Click 'Simulate Drones' to generate data.")
@@ -454,6 +470,7 @@ def display_drone_data():
         st.error("Failed to render drone map. Check internet connection.")
         logger.error(f"Drone map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'drone_id', 'latitude', 'longitude', 'altitude', 'status', 'severity']])
+
 def simulate_radar_data(num_targets=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     radar_data = []
@@ -469,6 +486,7 @@ def simulate_radar_data(num_targets=30):
         })
     logger.info(f"Simulated {len(radar_data)} radar targets")
     return radar_data
+
 def display_radar_data():
     if not st.session_state.radar_data:
         st.warning("No radar data available. Click 'Simulate Radar' to generate data.")
@@ -524,6 +542,7 @@ def display_radar_data():
         st.error("Failed to render radar map. Check internet connection.")
         logger.error(f"Radar map rendering failed: {str(e)}")
     st.dataframe(df[['timestamp', 'target_id', 'latitude', 'longitude', 'altitude', 'velocity']])
+
 def simulate_atc_data(num_samples=30):
     region = {'lat_min': 4, 'lat_max': 14, 'lon_min': 2, 'lon_max': 15}
     data = []
@@ -573,6 +592,7 @@ def simulate_atc_data(num_samples=30):
     st.session_state.flight_conflicts = conflicts
     logger.info(f"Simulated {len(data)} ATC records, {df['anomaly'].sum()} anomalies, {len(conflicts)} conflicts")
     return df.to_dict('records')
+
 def display_atc_data():
     if not st.session_state.atc_results:
         st.warning("No ATC data available. Click 'Simulate ATC' to generate data.")
@@ -620,6 +640,7 @@ def display_atc_data():
     if st.session_state.flight_conflicts:
         st.subheader("Collision Risks")
         st.dataframe(pd.DataFrame(st.session_state.flight_conflicts))
+
 def simulate_threat_intelligence(num_threats=30):
     threats = []
     for i in range(num_threats):
@@ -640,6 +661,7 @@ def simulate_threat_intelligence(num_threats=30):
         })
     logger.info(f"Simulated {len(threats)} airspace threats")
     return threats
+
 def display_threat_intelligence():
     if not st.session_state.threats:
         st.warning("No threat data available. Click 'Simulate Threats' to generate data.")
@@ -665,6 +687,7 @@ def display_threat_intelligence():
     )
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(df[['timestamp', 'threat_id', 'description', 'severity', 'source']])
+
 def simulate_compliance_metrics():
     metrics = {
         'detection_rate': np.random.uniform(70, 95),
@@ -680,6 +703,7 @@ def simulate_compliance_metrics():
         })
     logger.info(f"Simulated compliance metrics: {metrics}")
     return metrics
+
 def display_compliance_metrics():
     if not st.session_state.compliance_metrics['detection_rate']:
         st.warning("No compliance data available. Click 'Simulate Compliance' to generate data.")
@@ -713,6 +737,7 @@ def display_compliance_metrics():
         font={'color': WICKET_THEME['text_light']}
     )
     st.plotly_chart(fig, use_container_width=True)
+
 def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-1000"):
     common_ports = {
         21: ('ftp', 'tcp'), 22: ('ssh', 'tcp'), 23: ('telnet', 'tcp'), 80: ('http', 'tcp'),
@@ -745,12 +770,14 @@ def simulate_nmap_scan(target="192.168.1.1", scan_type="TCP SYN", port_range="1-
     })
     logger.info(f"Simulated NMAP scan on {target}, found {open_ports} open ports")
     return scan_results
+
 def display_network_scan():
     if not st.session_state.scan_results:
         st.warning("No scan data available. Click 'Simulate Scan' to generate data.")
         return
     df = pd.DataFrame(st.session_state.scan_results)
     st.dataframe(df[['port', 'protocol', 'state', 'service']])
+
 def simulate_nigerian_airports():
     airports = [
         {"name": "Murtala Muhammed Int'l", "state": "Lagos", "lat": 6.5772, "lon": 3.3212, "icao": "DNMM"},
@@ -771,6 +798,7 @@ def simulate_nigerian_airports():
             })
     logger.info(f"Simulated {len(airports)} airports")
     return airports
+
 def display_nigerian_airports():
     if not st.session_state.airports_data:
         st.warning("No airport data available. Click 'Simulate Airports' to generate data.")
@@ -821,6 +849,7 @@ def display_nigerian_airports():
     except Exception as e:
         st.error("Failed to render airport map. Check internet connection.")
         logger.error(f"Airport map error: {str(e)}")
+
 def generate_report():
     buffer = io.BytesIO()
     from reportlab.lib.pagesizes import letter
@@ -884,6 +913,7 @@ def generate_report():
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
 def main():
     apply_wicket_css()
     if not st.session_state.authenticated:
@@ -955,5 +985,6 @@ def main():
         if st.button("Simulate Airports"):
             st.session_state.airports_data = simulate_nigerian_airports()
         display_nigerian_airports()
+
 if __name__ == "__main__":
     main()
