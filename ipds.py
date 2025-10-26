@@ -12,12 +12,10 @@ import io
 import sys
 import sqlite3
 import re
-try:
-    import bcrypt
-    BCRYPT_AVAILABLE = True
-except ImportError:
-    BCRYPT_AVAILABLE = False
-    logging.warning("bcrypt not available. Using insecure password storage for testing.")
+import pyotp
+import qrcode
+from PIL import Image
+import bcrypt
 logging.basicConfig(level=logging.INFO, filename='guardianeye_idps_sim.log', format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -30,10 +28,13 @@ try:
     import geopy
     import sklearn
     import reportlab
+    import pyotp
+    import qrcode
+    import bcrypt
     logger.info(f"Streamlit: {streamlit.__version__}, Pandas: {pandas.__version__}, "
                 f"Numpy: {numpy.__version__}, Plotly: {plotly.__version__}, "
                 f"Geopy: {geopy.__version__}, Scikit-learn: {sklearn.__version__}, "
-                f"Reportlab: {reportlab.__version__}, Bcrypt: {'available' if BCRYPT_AVAILABLE else 'not available'}")
+                f"Reportlab: {reportlab.__version__}, PyOTP: {pyotp.__version__}, Bcrypt: {bcrypt.__version__}")
 except ImportError as e:
     logger.error(f"Dependency import failed: {str(e)}")
 def init_db():
@@ -41,17 +42,15 @@ def init_db():
         with sqlite3.connect('users.db') as conn:
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS users
-                        (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT)''')
+                        (username TEXT PRIMARY KEY, email TEXT UNIQUE, password TEXT, totp_secret TEXT)''')
             c.execute('SELECT username FROM users WHERE username = ?', ('guardian',))
             if not c.fetchone():
                 admin_password = 'admin'
-                if BCRYPT_AVAILABLE:
-                    hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                else:
-                    hashed_pw = admin_password
-                c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                          ('guardian', 'admin@guardianeye.com', hashed_pw))
-                logger.info("Admin user 'guardian' created")
+                hashed_pw = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                totp_secret = pyotp.random_base32()
+                c.execute('INSERT INTO users (username, email, password, totp_secret) VALUES (?, ?, ?, ?)',
+                          ('guardian', 'admin@guardianeye.com', hashed_pw, totp_secret))
+                logger.info("Admin user 'guardian' created with TOTP secret")
             conn.commit()
             logger.info("Database initialized successfully")
     except sqlite3.Error as e:
@@ -180,7 +179,7 @@ def apply_wicket_css():
                 font-family: 'Roboto Mono', monospace;
             }}
             .stTextInput input:focus {{
-                border-color: {WICKET_THEME['accent']};
+                border-color: {WICKETGesture['accent']};
                 box-shadow: 0 0 10px {WICKET_THEME['accent']};
             }}
             .logo {{
@@ -226,6 +225,11 @@ def apply_wicket_css():
                 text-align: center;
                 z-index: 10;
             }}
+            .qr-code {{
+                display: block;
+                margin: 20px auto;
+                width: 200px;
+            }}
         </style>
         <div class="debug-text">GuardianEye: Rendering Dashboard</div>
         <script>
@@ -269,50 +273,78 @@ if 'airports_data' not in st.session_state:
     st.session_state.airports_data = []
 if 'panel_state' not in st.session_state:
     st.session_state.panel_state = 'sign_in'
+if 'setup_2fa' not in st.session_state:
+    st.session_state.setup_2fa = False
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
 init_db()
+def generate_qr_code(secret, username, email):
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="GuardianEye")
+    qr = qrcode.make(totp_uri)
+    buffered = io.BytesIO()
+    qr.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
 def render_auth_ui():
-    if not BCRYPT_AVAILABLE:
-        st.warning("Secure password hashing unavailable. Using insecure mode for testing.")
     st.markdown(
         '<div class="auth-container">'
         f'<img src="https://github.com/J4yd33n/IDPS-with-ML/blob/main/FullLogo.jpg?raw=true" class="logo">'
         f'<div class="form-container {"sign-up-active" if st.session_state.panel_state == "sign_up" else ""}">',
         unsafe_allow_html=True
     )
-    if st.session_state.panel_state == 'sign_in':
+    if st.session_state.setup_2fa:
+        username = st.session_state.current_user
+        with sqlite3.connect('users.db') as conn:
+            c = conn.cursor()
+            c.execute('SELECT totp_secret FROM users WHERE username = ?', (username,))
+            secret = c.fetchone()[0]
+        st.markdown('<h2 style="text-align: center;">Set Up 2FA</h2>', unsafe_allow_html=True)
+        st.write("Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.):")
+        qr_b64 = generate_qr_code(secret, username, f"{username}@guardianeye.com")
+        st.image(f"data:image/png;base64,{qr_b64}", width=200, caption="Scan with Authenticator App")
+        st.write("Enter the 6-digit code from your app to verify:")
+        code = st.text_input("2FA Code", max_chars=6, type="password")
+        if st.button("Verify 2FA"):
+            totp = pyotp.TOTP(secret)
+            if totp.verify(code):
+                st.session_state.authenticated = True
+                st.session_state.setup_2fa = False
+                st.success("2FA verified. Access granted.")
+                logger.info(f"2FA verified for user: {username}")
+                st.rerun()
+            else:
+                st.error("Invalid 2FA code. Try again.")
+                logger.warning(f"Invalid 2FA code for user: {username}")
+        st.button("Back to Sign In", on_click=lambda: st.session_state.update(setup_2fa=False, panel_state='sign_in'))
+    elif st.session_state.panel_state == 'sign_in':
         with st.form(key='sign_in_form'):
             st.markdown('<h2 style="text-align: center;">Sign In</h2>', unsafe_allow_html=True)
             username = st.text_input('Username', placeholder='Username')
             password = st.text_input('Password', type='password', placeholder='Password')
-            st.markdown('<a href="#" class="forgot-password">Forgot your password?</a>', unsafe_allow_html=True)
             submit = st.form_submit_button('Sign In')
             if submit:
                 try:
                     with sqlite3.connect('users.db') as conn:
                         c = conn.cursor()
-                        c.execute('SELECT password FROM users WHERE username = ?', (username,))
+                        c.execute('SELECT password, totp_secret FROM users WHERE username = ?', (username,))
                         result = c.fetchone()
                         if result:
-                            stored_password = result[0]
-                            if BCRYPT_AVAILABLE:
-                                if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                                    st.session_state.authenticated = True
-                                    logger.info(f"Authenticated: username={username}")
+                            stored_password, totp_secret = result
+                            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                                st.session_state.current_user = username
+                                if totp_secret:
+                                    st.session_state.setup_2fa = True
+                                    logger.info(f"Password correct, prompting 2FA for: {username}")
                                     st.rerun()
                                 else:
-                                    st.error('Invalid username or password')
-                                    logger.warning(f"Failed login attempt: username={username}")
+                                    st.session_state.authenticated = True
+                                    logger.info(f"Authenticated without 2FA: {username}")
+                                    st.rerun()
                             else:
-                                if password == stored_password:
-                                    st.session_state.authenticated = True
-                                    logger.info(f"Authenticated (insecure): username={username}")
-                                    st.rerun()
-                                else:
-                                    st.error('Invalid username or password')
-                                    logger.warning(f"Failed login attempt: username={username}")
+                                st.error('Invalid username or password')
+                                logger.warning(f"Failed login: wrong password for {username}")
                         else:
                             st.error('Invalid username or password')
-                            logger.warning(f"Failed login attempt: username={username}")
+                            logger.warning(f"Failed login: unknown user {username}")
                 except sqlite3.Error as e:
                     st.error('Database error during login')
                     logger.error(f"Login database error: {str(e)}")
@@ -329,29 +361,27 @@ def render_auth_ui():
                     st.error('All fields are required')
                 elif username.lower() == 'guardian':
                     st.error('Username "guardian" is reserved for admin')
-                    logger.warning(f"Sign-up failed: attempted to use reserved username 'guardian'")
+                    logger.warning(f"Sign-up failed: attempted reserved username 'guardian'")
                 elif not is_valid_email(email):
                     st.error('Invalid email format')
                 elif not is_valid_password(password):
                     st.error('Password must be at least 8 characters, include an uppercase letter and a number')
                 else:
                     try:
-                        if BCRYPT_AVAILABLE:
-                            hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                        else:
-                            hashed_pw = password
+                        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                        totp_secret = pyotp.random_base32()
                         with sqlite3.connect('users.db') as conn:
                             c = conn.cursor()
-                            c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                                      (username, email, hashed_pw))
+                            c.execute('INSERT INTO users (username, email, password, totp_secret) VALUES (?, ?, ?, ?)',
+                                      (username, email, hashed_pw, totp_secret))
                             conn.commit()
-                            st.success('Account created! Please sign in.')
+                            st.success('Account created! Sign in to set up 2FA.')
                             st.session_state.panel_state = 'sign_in'
-                            logger.info(f"New user registered: username={username}")
+                            logger.info(f"New user registered with 2FA: {username}")
                             st.rerun()
                     except sqlite3.IntegrityError:
                         st.error('Username or email already exists')
-                        logger.warning(f"Sign-up failed: username={username}, email={email} already exists")
+                        logger.warning(f"Sign-up failed: duplicate {username}/{email}")
                     except sqlite3.Error as e:
                         st.error('Database error during sign-up')
                         logger.error(f"Sign-up database error: {str(e)}")
